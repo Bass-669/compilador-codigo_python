@@ -44,3 +44,4 @@ jobs:
       with:
         name: procesador_excel_gui
         path: dist/procesador_excel_gui.zip
+        retention-days: 1
