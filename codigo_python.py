@@ -192,7 +192,6 @@ def sub_bloques(b):
     return subs
 
 def escribir_valor_bloque(hoja, col_dia, torno, valor, tipo_bloque):
-    """Función auxiliar para escribir valores en la hoja según el tipo de bloque"""
     tipo_bloque = tipo_bloque.strip().upper()
     if tipo_bloque == "PODADO":
         fila_valor = 3 if torno == 1 else 4
@@ -212,7 +211,7 @@ def escribir_valor_bloque(hoja, col_dia, torno, valor, tipo_bloque):
         valor_final = 0.0
     celda = hoja.cell(row=fila_valor, column=col_dia) # Escribir el valor en la celda
     celda.value = valor_final
-    celda.number_format = '0.00'
+    celda.number_format = '0' # pequeño cambio de 0.00 a 0
 
 def fecha(mes, dia, anio, torno):
     """Función principal para crear/modificar la hoja de reporte"""
