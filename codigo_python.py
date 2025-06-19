@@ -327,7 +327,7 @@ def fecha(mes, dia, anio, torno):
             hoja_nueva.cell(row=fila, column=col_dia, value=nueva_fecha)
         for tipo_bloque, f_fin in bloques_detectados: # Procesar todos los bloques detectados
             escribir_valor_bloque(hoja_nueva, col_dia, torno, f_fin, tipo_bloque)
-            escribir_valores_resumen_bloques(hoja_nueva, col_dia, torno, sumas_ad_por_bloque, tipos_bloque)
+            escribir_valores_resumen_bloques(hoja_nueva, col_dia, torno, sumas_ad_por_bloque, tipo_bloque)
         wb2.save(RUTA_ENTRADA)
         wb2.close()
         time.sleep(1)
