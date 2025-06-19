@@ -92,7 +92,7 @@ def ejecutar(txt, torno, mes, dia, anio):
 def procesar_datos(entrada, torno, mes, dia, anio):
     global bloques_detectados
     bloques_detectados = []
-    valores_suma_bloques = []  # Lista para almacenar los valores de AD de cada bloque
+    sumas_ad_por_bloque = []  # Lista para almacenar los valores de AD de cada bloque
     
     if not os.path.exists(RUTA_ENTRADA):
         return messagebox.showerror("Error", f"No se encontró:\n{RUTA_ENTRADA}")
@@ -159,7 +159,7 @@ def procesar_datos(entrada, torno, mes, dia, anio):
             except:
                 pass
             
-            # Añadir fórmula y calcular valor
+            # Añadir fórmula a la celda AD
             hoja.cell(row=f_fin, column=30, value=f"=SUM(AD{f_ini}:AD{f_fin - 1})").fill = FILL_AMARILLO
             
             # Calcular manualmente la suma de AD para este bloque
@@ -171,8 +171,10 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                 except (ValueError, TypeError):
                     suma_ad += 0
             
-            valores_suma_bloques.append(suma_ad)  # Guardar valor para este bloque
-            bloques_detectados.append((tipo_bloque, valor_d_f_fin, suma_ad))  # Incluir suma en bloques_detectados
+            # Guardar datos en listas separadas
+            bloques_detectados.append((tipo_bloque, valor_d_f_fin))
+            sumas_ad_por_bloque.append(suma_ad)  # Guarda los valores AD aquí
+            messagebox.showinfo("valores de suma_ad", sumas_ad_por_bloque)
             
             if len(subs) > 1:
                 for f in range(f_ini, f_fin + 1):
@@ -185,10 +187,11 @@ def procesar_datos(entrada, torno, mes, dia, anio):
         # Guardar cambios
         shutil.copy(RUTA_ENTRADA, os.path.join(CARPETA, "Reporte IR Tornos copia_de_seguridad.xlsx"))
         wb.save(RUTA_ENTRADA)
+        wb.close()
         shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
         
-        return valores_suma_bloques  # Retornar los valores calculados
-        messagebox.showinfo("Valor de suma bloques: ", valores_suma_bloques) #depuracion
+        return sumas_ad_por_bloque  # Retorna los valores AD calculados
+        
     except Exception as e:
         messagebox.showerror("Error", f"Error al procesar datos:\n{e}")
         return None
@@ -359,7 +362,7 @@ def fecha(mes, dia, anio, torno):
         mensaje = "✅ Valores actualizados correctamente." if hoja_nueva_existia else f"✅ Hoja '{nueva}' creada correctamente."
         messagebox.showinfo("Éxito", mensaje)
     except Exception as e:
-        messagebox.showwarning("Advertencia", f"No se pudo ajustar hoja:\n{e}")
+        messagebox.showwarning("Advertencia", f"No se pudo ajustar hoja esta itentando sobreescribir un dato:\n{e}") #depuracion
 
 ventana = tk.Tk()
 ventana.title("Ingresar datos")
