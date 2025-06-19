@@ -243,6 +243,22 @@ def escribir_valor_bloque(hoja, col_dia, torno, valor, tipo_bloque):
     celda.value = valor_final
     celda.number_format = '0' # pequeño cambio de 0.00 a 0
 
+def escribir_valores_resumen_bloques(hoja, col_dia, torno, sumas_ad_por_bloque, tipos_bloque):
+    messagebox.showwarning("Advertencia", f"Valor de sumas ad: '{sumas_ad_por_bloque}'")
+    for i, (tipo_bloque, valor) in enumerate(zip(tipos_bloque, sumas_ad_por_bloque)):
+        tipo_bloque = tipo_bloque.strip().upper()
+        if tipo_bloque == "PODADO":
+            fila_valor = 13 if torno == 1 else 14
+        elif tipo_bloque == "REGULAR":
+            fila_valor = 18 if torno == 1 else 19
+        else:
+            messagebox.showwarning("Advertencia", f"Tipo de bloque no reconocido: '{tipo_bloque}'")
+            continue
+
+        celda = hoja.cell(row=fila_valor, column=col_dia)
+        celda.value = valor
+        celda.number_format = '0.00%'
+
 def fecha(mes, dia, anio, torno):
     """Función principal para crear/modificar la hoja de reporte"""
     pythoncom.CoInitialize()
@@ -352,7 +368,7 @@ def fecha(mes, dia, anio, torno):
         mensaje = "✅ Valores actualizados correctamente." if hoja_nueva_existia else f"✅ Hoja '{nueva}' creada correctamente."
         messagebox.showinfo("Éxito", mensaje)
     except Exception as e:
-        messagebox.showwarning("Advertencia", f"No se pudo ajustar hoja esta itentando sobreescribir un dato:\n{e}") #depuracion
+        messagebox.showwarning("Advertencia", f"No se pudo ajustar hoja:\n{e}") 
 
 ventana = tk.Tk()
 ventana.title("Ingresar datos")
