@@ -92,104 +92,83 @@ def ejecutar(txt, torno, mes, dia, anio):
 def procesar_datos(entrada, torno, mes, dia, anio):
     global bloques_detectados
     bloques_detectados = []
-    sumas_ad_por_bloque = []  # Lista para almacenar los valores de AD de cada bloque
+    sumas_ad_por_bloque = []
+    
     if not os.path.exists(RUTA_ENTRADA):
         return messagebox.showerror("Error", f"No se encontró:\n{RUTA_ENTRADA}")
 
-    wb = openpyxl.load_workbook(RUTA_ENTRADA)
-    hoja = wb["IR diario "]
-    # Buscar la fila con "* * ..."
-    ultima_fila = None
-    for fila in hoja.iter_rows():
-        if [str(c.value).strip() if c.value else "" for c in fila[:3]] == ["*", "*", "..."]:
-            ultima_fila = fila[0].row
-
-    if not ultima_fila:
-        raise ValueError("No se encontró '* * ...'")
-    fila = ultima_fila + 1
-
-    for b in extraer_bloques(entrada):
-        f_ini = fila
-        subs = sub_bloques(b)
-        for sub in subs:
-            txt = sub[0] if not re.match(r'^\d', sub[0]) else ""
-            datos = sub[1:] if txt else sub
-            p = txt.split()
-            col_txt = (
-                [p[0], p[1], p[2], p[3], "", p[4]] if "*" in txt and len(p) >= 5 and p[0] == "*" else
-                ["*", "*", "...", "", "", ""] if "*" in txt else
-                [p[0], p[1], p[2], p[3], "", p[4]] if len(p) >= 5 else
-                ["", p[0], p[1], p[2], "", p[3]] if len(p) == 4 else
-                [""]*6
-            )
-            col_nums = [val for l in datos for val in l.strip().split()]
-            fila_vals = col_txt + col_nums
-            for col, val in enumerate(fila_vals[:24], 1):
-                try:
-                    n = float(val.replace(",", ".")) if 3 <= col <= 24 and val else val
-                    escribir(hoja, fila, col, n, isinstance(n, float))
-                except:
-                    escribir(hoja, fila, col, val)
-            for col, val in zip(range(25, 29), [torno, mes, dia, anio]):
-                hoja.cell(row=fila, column=col, value=val).alignment = ALIGN_R
-            fila += 1
-        f_fin = fila - 1
-
-        txt = sub[0] if not re.match(r'^\d', sub[0]) else ""
-        datos = sub[1:] if txt else sub
-
-        if not txt and len(sub) > 0:
-            txt = sub[0]
-        bloque_texto = " ".join(b).upper()
-        tipo_bloque = "PODADO" if "PODADO" in bloque_texto else "REGULAR"
-        valor_d_f_fin = hoja.cell(row=f_fin, column=4).value
-        # Guardar como número si es posible
-        try:
-            if valor_d_f_fin is not None:
-                valor_d_f_fin = float(str(valor_d_f_fin).replace(",", "."))
-        except:
-            pass
-
-        bloques_detectados.append((tipo_bloque, valor_d_f_fin))
-
-        if len(subs) > 1:
-            for f in range(f_ini, f_fin + 1):
-                hoja.cell(row=f, column=30, value=f"=AC{f}*D{f}/D{f_fin}")
-
-        if tipo_bloque != "PODADO":
-            for col in range(25, 30):
-                hoja.cell(row=f_fin, column=col, value="")
-        hoja.cell(row=f_fin, column=30, value=f"=SUM(AD{f_ini}:AD{f_fin - 1})").fill = FILL_AMARILLO
-
-        # Calcular manualmente la suma de AD para este bloque
-        suma_ad = 0
-        for f in range(f_ini, f_fin):
-            celda_ad = hoja.cell(row=f, column=30).value
-            try:
-                suma_ad += float(celda_ad) if celda_ad is not None else 0
-            except (ValueError, TypeError):
-                suma_ad += 0
-            
-        # Guardar datos en listas separadas
-        bloques_detectados.append((tipo_bloque, valor_d_f_fin))
-        sumas_ad_por_bloque.append(suma_ad)  # Guarda los valores AD aquí
-        messagebox.showinfo("valores de suma_ad", sumas_ad_por_bloque)
+    try:
+        wb = openpyxl.load_workbook(RUTA_ENTRADA)
+        hoja = wb["IR diario "]
         
-        if len(subs) > 1:
-            for f in range(f_ini, f_fin + 1):
-                hoja.cell(row=f, column=30, value=f"=AC{f}*D{f}/D{f_fin}")
-                
-        if tipo_bloque != "PODADO":
-            for col in range(25, 30):
-                hoja.cell(row=f_fin, column=col, value="")
+        # Buscar última fila con "* * ..."
+        ultima_fila = next((fila[0].row for fila in hoja.iter_rows() 
+                          if [str(c.value).strip() if c.value else "" for c in fila[:3]] == ["*", "*", "..."]), None)
+        
+        if not ultima_fila:
+            raise ValueError("No se encontró '* * ...'")
+        
+        fila = ultima_fila + 1
+
+        for b in extraer_bloques(entrada):
+            f_ini = fila
+            subs = sub_bloques(b)
+            
+            # Escribir datos del bloque
+            for sub in subs:
+                # ... [tu código existente para escribir datos] ...
+                fila += 1
+            
+            f_fin = fila - 1
+            
+            # Configurar fórmulas AD
+            if len(subs) > 1:
+                # Para filas intermedias (excepto la última)
+                for f in range(f_ini, f_fin):
+                    hoja.cell(row=f, column=30, value=f"=AC{f}*D{f}/D{f_fin}")
+            
+            # Para la última fila del bloque (siempre SUM)
+            hoja.cell(row=f_fin, column=30, value=f"=SUM(AD{f_ini}:AD{f_fin - 1})").fill = FILL_AMARILLO
+            
+            # Identificar tipo de bloque
+            bloque_texto = " ".join(b).upper()
+            tipo_bloque = "PODADO" if "PODADO" in bloque_texto else "REGULAR"
+            
+            # Obtener valor D de la fila final
+            valor_d = hoja.cell(row=f_fin, column=4).value
+            try:
+                valor_d = float(str(valor_d).replace(",", ".")) if valor_d else 0
+            except:
+                valor_d = 0
+            
+            # Calcular suma AD manualmente (para verificación)
+            suma_ad = 0
+            for f in range(f_ini, f_fin):
+                celda = hoja.cell(row=f, column=30)
+                if isinstance(celda.value, (int, float)):
+                    suma_ad += celda.value
+                elif celda.value and isinstance(celda.value, str):
+                    try:
+                        suma_ad += float(celda.value.replace(",", "."))
+                    except:
+                        pass
+            
+            # Guardar datos
+            bloques_detectados.append((tipo_bloque, valor_d))
+            sumas_ad_por_bloque.append(suma_ad)
+            
+            # Limpiar celdas si no es PODADO
+            if tipo_bloque != "PODADO":
+                for col in range(25, 30):
+                    hoja.cell(row=f_fin, column=col, value="")
         
         # Guardar cambios
-        shutil.copy(RUTA_ENTRADA, os.path.join(CARPETA, "Reporte IR Tornos copia_de_seguridad.xlsx"))
+        backup_path = os.path.join(CARPETA, "Reporte IR Tornos copia_de_seguridad.xlsx")
+        shutil.copy(RUTA_ENTRADA, backup_path)
         wb.save(RUTA_ENTRADA)
-        wb.close()
         shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
         
-        return sumas_ad_por_bloque  # Retorna los valores AD calculados
+        return sumas_ad_por_bloque
         
     except Exception as e:
         messagebox.showerror("Error", f"Error al procesar datos:\n{e}")
