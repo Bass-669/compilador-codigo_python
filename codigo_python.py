@@ -244,7 +244,7 @@ def escribir_valor_bloque(hoja, col_dia, torno, valor, tipo_bloque):
     celda.value = valor_final
     celda.number_format = '0' # pequeño cambio de 0.00 a 0
 
-def escribir_valores_resumen_bloques(hoja, col_dia, torno, sumas_ad_por_bloque, tipos_bloque):
+def escribir_valores_resumen_bloques(hoja, col_dia, torno, sumas_ad_por_bloque, tipo_bloque):
     messagebox.showwarning("Advertencia", f"Valor de sumas ad: '{sumas_ad_por_bloque}'")
     for i, (tipo_bloque, valor) in enumerate(zip(tipos_bloque, sumas_ad_por_bloque)):
         tipo_bloque = tipo_bloque.strip().upper()
