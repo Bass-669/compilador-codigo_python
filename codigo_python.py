@@ -101,9 +101,10 @@ def procesar_datos(entrada, torno, mes, dia, anio):
         wb = openpyxl.load_workbook(RUTA_ENTRADA)
         hoja = wb["IR diario "]
 
-        # Buscar última fila con "* * ..."
-        ultima_fila = next((fila[0].row for fila in hoja.iter_rows()
-                            if [str(c.value).strip() if c.value else "" for c in fila[:3]] == ["*", "*", "..."]), None)
+        ultima_fila = None
+        for fila in hoja.iter_rows():
+            if [str(c.value).strip() if c.value else "" for c in fila[:3]] == ["*", "*", "..."]:
+                ultima_fila = fila[0].row
 
         if not ultima_fila:
             raise ValueError("No se encontró '* * ...'")
@@ -114,8 +115,7 @@ def procesar_datos(entrada, torno, mes, dia, anio):
             f_ini = fila
             subs = sub_bloques(b)
 
-            # Escribir datos del bloque
-            for sub in subs:
+            for sub in subs:# Escribir datos del bloque
                 txt = sub[0] if not re.match(r'^\d', sub[0]) else ""
                 datos = sub[1:] if txt else sub
                 p = txt.split()
@@ -140,24 +140,18 @@ def procesar_datos(entrada, torno, mes, dia, anio):
 
             f_fin = fila - 1
 
-            # Escribir fórmulas intermedias
-            for f in range(f_ini, f_fin):
+            for f in range(f_ini, f_fin): # Escribir fórmulas intermedias
                 hoja.cell(row=f, column=30, value=f"=AC{f}*D{f}/D{f_fin}")
 
-            # Escribir fórmula de suma en la última fila
-            celda_suma = hoja.cell(row=f_fin, column=30)
+            celda_suma = hoja.cell(row=f_fin, column=30) # Escribir fórmula de suma en la última fila
             if f_fin - f_ini >= 1:
                 celda_suma.value = f"=SUM(AD{f_ini}:AD{f_fin - 1})"
             else:
                 celda_suma.value = ""
             celda_suma.fill = FILL_AMARILLO
-
-            # Identificar tipo de bloque
-            bloque_texto = " ".join(b).upper()
+            bloque_texto = " ".join(b).upper() # Identificar tipo de bloque
             tipo_bloque = "PODADO" if "PODADO" in bloque_texto else "REGULAR"
-
-            # Obtener valor D de la fila final
-            valor_d = hoja.cell(row=f_fin, column=4).value
+            valor_d = hoja.cell(row=f_fin, column=4).value # Obtener valor D de la fila final
             try:
                 valor_d = float(str(valor_d).replace(",", ".")) if valor_d else 0
             except:
@@ -175,21 +169,17 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                     except:
                         pass
 
-            # Guardar datos
             bloques_detectados.append((tipo_bloque, valor_d))
             sumas_ad_por_bloque.append(suma_ad)
 
-            # Limpiar celdas si no es PODADO
             if tipo_bloque != "PODADO":
                 for col in range(25, 30):
                     hoja.cell(row=f_fin, column=col, value="")
 
-        # Guardar cambios
         backup_path = os.path.join(CARPETA, "Reporte IR Tornos copia_de_seguridad.xlsx")
         shutil.copy(RUTA_ENTRADA, backup_path)
         wb.save(RUTA_ENTRADA)
         shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
-
         return sumas_ad_por_bloque
 
     except Exception as e:
