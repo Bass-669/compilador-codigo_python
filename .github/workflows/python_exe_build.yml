@@ -31,7 +31,7 @@ jobs:
       run: mkdir reportes
 
     - name: Build EXE
-      run: pyinstaller --onefile --windowed --name=procesador_excel_gui --hidden-import=openpyxl --hidden-import=tkinter --exclude-module=numpy codigo_local.py
+      run: pyinstaller --onefile --windowed --name=procesador_excel_gui --hidden-import=openpyxl --hidden-import=tkinter --exclude-module=numpy codigo_python.py
 
     - name: Crear archivo LEEME
       run: echo "Este archivo fue generado automáticamente. Es seguro y no contiene malware." > dist\LEEME.txt
