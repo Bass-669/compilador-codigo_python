@@ -91,7 +91,7 @@ def ejecutar(txt, torno, mes, dia, anio):
         ventana.destroy()
 
 def procesar_datos(entrada, torno, mes, dia, anio):
-    global bloques_detectados
+    global s_detectados
     bloques_detectados = []
     sumas_ad_por_bloque = []
 
@@ -246,7 +246,7 @@ def escribir_valor_bloque(hoja, col_dia, torno, valor, tipo_bloque):
 
 def escribir_valores_resumen_bloques(hoja, col_dia, torno, sumas_ad_por_bloque, tipo_bloque):
     messagebox.showwarning("Advertencia", f"Valor de sumas ad: '{sumas_ad_por_bloque}'")
-    for i, (tipo_bloque, valor) in enumerate(zip(tipos_bloque, sumas_ad_por_bloque)):
+    for i, (tipo_bloque, valor) in enumerate(zip(tipo_bloque, sumas_ad_por_bloque)):
         tipo_bloque = tipo_bloque.strip().upper()
         if tipo_bloque == "PODADO":
             fila_valor = 13 if torno == 1 else 14
