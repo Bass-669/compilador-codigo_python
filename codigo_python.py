@@ -161,27 +161,27 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                 hoja.cell(row=f_fin, column=col, value="")
         hoja.cell(row=f_fin, column=30, value=f"=SUM(AD{f_ini}:AD{f_fin - 1})").fill = FILL_AMARILLO
 
-            # Calcular manualmente la suma de AD para este bloque
-            suma_ad = 0
-            for f in range(f_ini, f_fin):
-                celda_ad = hoja.cell(row=f, column=30).value
-                try:
-                    suma_ad += float(celda_ad) if celda_ad is not None else 0
-                except (ValueError, TypeError):
-                    suma_ad += 0
+        # Calcular manualmente la suma de AD para este bloque
+        suma_ad = 0
+        for f in range(f_ini, f_fin):
+            celda_ad = hoja.cell(row=f, column=30).value
+            try:
+                suma_ad += float(celda_ad) if celda_ad is not None else 0
+            except (ValueError, TypeError):
+                suma_ad += 0
             
-            # Guardar datos en listas separadas
-            bloques_detectados.append((tipo_bloque, valor_d_f_fin))
-            sumas_ad_por_bloque.append(suma_ad)  # Guarda los valores AD aquí
-            messagebox.showinfo("valores de suma_ad", sumas_ad_por_bloque)
-            
-            if len(subs) > 1:
-                for f in range(f_ini, f_fin + 1):
-                    hoja.cell(row=f, column=30, value=f"=AC{f}*D{f}/D{f_fin}")
-                    
-            if tipo_bloque != "PODADO":
-                for col in range(25, 30):
-                    hoja.cell(row=f_fin, column=col, value="")
+        # Guardar datos en listas separadas
+        bloques_detectados.append((tipo_bloque, valor_d_f_fin))
+        sumas_ad_por_bloque.append(suma_ad)  # Guarda los valores AD aquí
+        messagebox.showinfo("valores de suma_ad", sumas_ad_por_bloque)
+        
+        if len(subs) > 1:
+            for f in range(f_ini, f_fin + 1):
+                hoja.cell(row=f, column=30, value=f"=AC{f}*D{f}/D{f_fin}")
+                
+        if tipo_bloque != "PODADO":
+            for col in range(25, 30):
+                hoja.cell(row=f_fin, column=col, value="")
         
         # Guardar cambios
         shutil.copy(RUTA_ENTRADA, os.path.join(CARPETA, "Reporte IR Tornos copia_de_seguridad.xlsx"))
