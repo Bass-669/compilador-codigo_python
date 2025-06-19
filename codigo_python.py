@@ -249,8 +249,8 @@ def fecha(mes, dia, anio, torno):
 
         for tipo_bloque, f_fin in bloques_detectados: # Procesar todos los bloques
             escribir_valor_bloque(hoja_nueva, col_dia, torno, f_fin, tipo_bloque)
-        # wb2.save(RUTA_ENTRADA)
-        # shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
+        wb2.save(RUTA_ENTRADA)
+        shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
 
         # --- NUEVO: ROTAR ETIQUETAS EN GRÁFICOS ---
         try:
@@ -266,11 +266,11 @@ def fecha(mes, dia, anio, torno):
                     x_axis.TickLabels.Orientation = 45 # Rotar etiquetas a 45 grados
                 except Exception as e:
                     continue
-            # wb_excel.Save()
-            # wb_excel.Close()
+            wb_excel.Save()
+            wb_excel.Close()
 
-            wb2.save(RUTA_ENTRADA)
-            shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
+            # wb2.save(RUTA_ENTRADA)
+            # shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
         except Exception as e:
             messagebox.showwarning("Advertencia", f"Error al rotar etiquetas: {str(e)}")
         finally:
