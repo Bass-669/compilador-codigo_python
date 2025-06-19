@@ -244,9 +244,8 @@ def escribir_valor_bloque(hoja, col_dia, torno, valor, tipo_bloque):
     celda.value = valor_final
     celda.number_format = '0' # pequeño cambio de 0.00 a 0
 
-def escribir_valores_resumen_bloques(hoja, col_dia, torno, sumas_ad_por_bloque, tipo_bloque):
-    messagebox.showwarning("Advertencia", f"Valor de sumas ad: '{sumas_ad_por_bloque}'")
-    for i, (tipo_bloque, valor) in enumerate(zip(tipo_bloque, sumas_ad_por_bloque)):
+def escribir_valores_resumen_bloques(hoja, col_dia, torno, sumas_ad_por_bloque, tipos_bloque):
+    for i, (tipo_bloque, valor) in enumerate(zip(tipos_bloque, sumas_ad_por_bloque)):
         tipo_bloque = tipo_bloque.strip().upper()
         if tipo_bloque == "PODADO":
             fila_valor = 13 if torno == 1 else 14
@@ -276,13 +275,14 @@ def fecha(mes, dia, anio, torno):
         hoja_nueva_existia = nueva in nombres_hojas
         if not hoja_nueva_existia:
             hojas_ir = [h for h in nombres_hojas if h.startswith("IR ") and len(h.split()) == 3]
-            
+
             def total_meses(nombre):
                 try:
                     _, mes_str, anio_str = nombre.split()
                     return int(anio_str) * 12 + MESES_NUM[mes_str]
                 except:
                     return -1
+
             hojas_ir_ordenadas = sorted(hojas_ir, key=total_meses)
             total_nueva = int(anio) * 12 + MESES_NUM[mes]
             for h in hojas_ir_ordenadas:
@@ -303,34 +303,43 @@ def fecha(mes, dia, anio, torno):
         return
     finally:
         try:
-            if wb: 
+            if wb:
                 wb.Close(SaveChanges=True)
         except:
             pass
         try:
-            if excel: 
+            if excel:
                 excel.Quit()
         except:
             pass
         pythoncom.CoUninitialize()
+
     try:
         wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
         hoja_nueva = wb2[nueva]
         col_dia = dia + 1  # columna B es 2, día 1 → columna 2
-        if not hoja_nueva_existia: # Limpiar celdas si es una hoja nueva
+
+        if not hoja_nueva_existia:
             filas_fechas = [2, 3, 4, 7, 8, 9, 12, 17, 22, 27, 31, 37]
             for fila in filas_fechas:
-                for col in range(2, 33):  # columnas B a AF
+                for col in range(2, 33):
                     hoja_nueva.cell(row=fila, column=col, value="")
-        nueva_fecha = f"{dia:02d}/{MESES_NUM[mes]:02d}/{anio}" # Escribir/Actualizar fecha
+
+        nueva_fecha = f"{dia:02d}/{MESES_NUM[mes]:02d}/{anio}"
         for fila in [2, 7, 12, 17, 22, 27, 31, 37]:
             hoja_nueva.cell(row=fila, column=col_dia, value=nueva_fecha)
-        for tipo_bloque, f_fin in bloques_detectados: # Procesar todos los bloques detectados
+
+        for tipo_bloque, f_fin in bloques_detectados:
             escribir_valor_bloque(hoja_nueva, col_dia, torno, f_fin, tipo_bloque)
-            escribir_valores_resumen_bloques(hoja_nueva, col_dia, torno, sumas_ad_por_bloque, tipo_bloque)
+
+        # Extraer lista de tipos de bloque para resumen
+        tipos_bloque = [tipo for tipo, _ in bloques_detectados]
+        escribir_valores_resumen_bloques(hoja_nueva, col_dia, torno, sumas_ad_por_bloque, tipos_bloque)
+
         wb2.save(RUTA_ENTRADA)
         wb2.close()
         time.sleep(1)
+
         excel_app = None
         wb_excel = None
         try:
@@ -340,11 +349,11 @@ def fecha(mes, dia, anio, torno):
             excel_app.DisplayAlerts = False
             wb_excel = excel_app.Workbooks.Open(RUTA_ENTRADA)
             sheet_excel = wb_excel.Sheets(nueva)
-            for chart_obj in sheet_excel.ChartObjects(): # Rotar etiquetas
+            for chart_obj in sheet_excel.ChartObjects():
                 try:
                     chart = chart_obj.Chart
-                    x_axis = chart.Axes(1)  # Eje X (categorías)
-                    x_axis.TickLabels.Orientation = 45  # Rotar 45 grados
+                    x_axis = chart.Axes(1)
+                    x_axis.TickLabels.Orientation = 45
                 except Exception as e:
                     print(f"Error en gráfico: {str(e)}")
                     continue
@@ -366,11 +375,14 @@ def fecha(mes, dia, anio, torno):
             wb_excel = None
             excel_app = None
             pythoncom.CoUninitialize()
+
         shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
         mensaje = "✅ Valores actualizados correctamente." if hoja_nueva_existia else f"✅ Hoja '{nueva}' creada correctamente."
         messagebox.showinfo("Éxito", mensaje)
+
     except Exception as e:
-        messagebox.showwarning("Advertencia", f"No se pudo ajustar hoja:\n{e}") 
+        messagebox.showwarning("Advertencia", f"No se pudo ajustar hoja:\n{e}")
+
 
 ventana = tk.Tk()
 ventana.title("Ingresar datos")
