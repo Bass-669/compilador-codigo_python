@@ -198,114 +198,149 @@ def fecha(mes, dia, anio, torno):
     nueva = f"IR {mes} {anio}"
     hoja_anterior = None
     hoja_nueva_existia = False
+    
     try:
+        # Primera parte: Creación de hoja con win32com
         excel = win32.gencache.EnsureDispatch('Excel.Application')
         excel.Visible = excel.DisplayAlerts = False
         wb = excel.Workbooks.Open(RUTA_ENTRADA, UpdateLinks=0)
+        
         nombres_hojas = [h.Name for h in wb.Sheets]
         hoja_nueva_existia = nueva in nombres_hojas
+        
         if not hoja_nueva_existia:
             hojas_ir = [h for h in nombres_hojas if h.startswith("IR ") and len(h.split()) == 3]
+            
             def total_meses(nombre):
                 try:
                     _, mes_str, anio_str = nombre.split()
                     return int(anio_str) * 12 + MESES_NUM[mes_str]
                 except:
                     return -1
+                    
             hojas_ir_ordenadas = sorted(hojas_ir, key=total_meses)
             total_nueva = int(anio) * 12 + MESES_NUM[mes]
+            
             for h in hojas_ir_ordenadas:
                 if total_meses(h) < total_nueva:
                     hoja_anterior = h
                 else:
                     break
+                    
             if not hoja_anterior:
                 return messagebox.showwarning("Orden inválido", f"No se encontró hoja anterior para insertar '{nueva}'.")
+                
             idx_anterior = [h.Name for h in wb.Sheets].index(hoja_anterior)
             insert_idx = min(idx_anterior + 2, wb.Sheets.Count)
             wb.Sheets(hoja_anterior).Copy(After=wb.Sheets(insert_idx - 1))
             wb.ActiveSheet.Name = nueva
             wb.Save()
+            
     except Exception as e:
         messagebox.showerror("Error", f"No se pudo crear hoja:\n{e}")
         return
+        
     finally:
-        if wb: wb.Close(SaveChanges=True)
-        if excel: excel.Quit()
+        # Cierre seguro de la primera parte con win32com
+        try:
+            if wb: 
+                wb.Close(SaveChanges=True)
+        except:
+            pass
+            
+        try:
+            if excel: 
+                excel.Quit()
+        except:
+            pass
+            
         pythoncom.CoUninitialize()
+
+    # Segunda parte: Trabajo con openpyxl y rotación de gráficos
     try:
+        # 1. Trabajar con openpyxl primero
         wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
         hoja_nueva = wb2[nueva]
         col_dia = dia + 1  # columna B es 2, día 1 → columna 2
+        
         if not hoja_nueva_existia:
             filas_fechas = [2, 3, 4, 7, 8, 9, 12, 17, 22, 27, 31, 37]
             for fila in filas_fechas:
                 for col in range(2, 33):  # columnas B a AF
                     hoja_nueva.cell(row=fila, column=col, value="")
 
-        nueva_fecha = f"{dia:02d}/{MESES_NUM[mes]:02d}/{anio}" # Escribir/Actualizar fecha
+        # Escribir/Actualizar fecha
+        nueva_fecha = f"{dia:02d}/{MESES_NUM[mes]:02d}/{anio}"
         for fila in [2, 7, 12, 17, 22, 27, 31, 37]:
             hoja_nueva.cell(row=fila, column=col_dia, value=nueva_fecha)
 
-        for tipo_bloque, f_fin in bloques_detectados: # Procesar todos los bloques
+        # Procesar todos los bloques
+        for tipo_bloque, f_fin in bloques_detectados:
             escribir_valor_bloque(hoja_nueva, col_dia, torno, f_fin, tipo_bloque)
+            
+        # Guardar y cerrar openpyxl ANTES de trabajar con win32com
         wb2.save(RUTA_ENTRADA)
-        shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
+        wb2.close()
+        time.sleep(1)  # Pequeña pausa para liberar el archivo
 
-        # --- NUEVO: ROTAR ETIQUETAS EN GRÁFICOS ---
+        # 2. Rotar etiquetas de gráficos con win32com
+        excel_app = None
+        wb_excel = None
+        
         try:
+            pythoncom.CoInitialize()  # Inicializar COM para este hilo
+            
             excel_app = win32.Dispatch("Excel.Application")
             excel_app.Visible = False
             excel_app.DisplayAlerts = False
             wb_excel = excel_app.Workbooks.Open(RUTA_ENTRADA)
+            
             sheet_excel = wb_excel.Sheets(nueva)
+            
             for chart_obj in sheet_excel.ChartObjects():
                 try:
-                    chart = chart_obj.Chart # Obtener el eje de categorías (eje X)   
-                    x_axis = chart.Axes(1)
-                    x_axis.TickLabels.Orientation = 45 # Rotar etiquetas a 45 grados
+                    chart = chart_obj.Chart
+                    x_axis = chart.Axes(1)  # Eje X (categorías)
+                    x_axis.TickLabels.Orientation = 45  # Rotar 45 grados
                 except Exception as e:
+                    print(f"Error en gráfico: {str(e)}")
                     continue
+            
+            # Guardar y cerrar correctamente
             wb_excel.Save()
-            wb_excel.Close()
-
-            # wb2.save(RUTA_ENTRADA)
-            # shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
+            wb_excel.Close(True)
+            
         except Exception as e:
             messagebox.showwarning("Advertencia", f"Error al rotar etiquetas: {str(e)}")
+            
         finally:
-            if 'wb_excel' in locals():
-                wb_excel.Close()
-            if 'excel_app' in locals():
-                excel_app.Quit()
-        # --- FIN DE NUEVO CÓDIGO ---
+            # Limpieza segura en orden inverso
+            try:
+                if wb_excel and wb_excel.ReadOnly == False:
+                    wb_excel.Close(False)
+            except:
+                pass
+                
+            try:
+                if excel_app:
+                    excel_app.Quit()
+            except:
+                pass
+                
+            # Liberar recursos
+            wb_excel = None
+            excel_app = None
+            pythoncom.CoUninitialize()  # Desinicializar COM
+
+        # 3. Copia final después de todas las operaciones
+        shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
 
         mensaje = "✅ Valores actualizados correctamente." if hoja_nueva_existia else f"✅ Hoja '{nueva}' creada correctamente."
         messagebox.showinfo("Éxito", mensaje)
+        
     except Exception as e:
         messagebox.showwarning("Advertencia", f"No se pudo ajustar hoja:\n{e}")
 
-def escribir_valor_bloque(hoja, col_dia, torno, valor, tipo_bloque):
-    tipo_bloque = tipo_bloque.strip().upper()
-    if tipo_bloque == "PODADO":
-        fila_valor = 3 if torno == 1 else 4
-    elif tipo_bloque == "REGULAR":
-        fila_valor = 8 if torno == 1 else 9
-    else:
-        messagebox.showwarning("Advertencia", f"Tipo de bloque no reconocido: '{tipo_bloque}'")
-        return
-    # try:
-    #     if valor is None:
-    #         valor_final = 0.0
-    #     elif isinstance(valor, (int, float)):
-    #         valor_final = float(valor)
-    #     else:
-    #         valor_final = float(str(valor).replace(",", "."))
-    #     celda = hoja.cell(row=fila_valor, column=col_dia)
-    #     celda.value = valor_final
-    #     celda.number_format = '0.00'
-    # except Exception as e:
-    #     messagebox.showerror("Error", f"Fallo al escribir {tipo_bloque}:\n{e}")
 
 ventana = tk.Tk()
 ventana.title("Ingresar datos")
