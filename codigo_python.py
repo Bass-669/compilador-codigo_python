@@ -192,23 +192,55 @@ def sub_bloques(b):
     if tmp: subs.append(tmp)
     return subs
 
+def escribir_valor_bloque(hoja, col_dia, torno, valor, tipo_bloque):
+    """Función auxiliar para escribir valores en la hoja según el tipo de bloque"""
+    tipo_bloque = tipo_bloque.strip().upper()
+    
+    # Determinar la fila según el tipo de bloque y número de torno
+    if tipo_bloque == "PODADO":
+        fila_valor = 3 if torno == 1 else 4
+    elif tipo_bloque == "REGULAR":
+        fila_valor = 8 if torno == 1 else 9
+    else:
+        messagebox.showwarning("Advertencia", f"Tipo de bloque no reconocido: '{tipo_bloque}'")
+        return
+
+    # Convertir el valor a float si es posible
+    try:
+        if valor is None:
+            valor_final = 0.0
+        elif isinstance(valor, (int, float)):
+            valor_final = float(valor)
+        else:
+            valor_final = float(str(valor).replace(",", "."))
+    except ValueError:
+        valor_final = 0.0
+
+    # Escribir el valor en la celda
+    celda = hoja.cell(row=fila_valor, column=col_dia)
+    celda.value = valor_final
+    celda.number_format = '0.00'
+
 def fecha(mes, dia, anio, torno):
+    """Función principal para crear/modificar la hoja de reporte"""
     pythoncom.CoInitialize()
     excel = wb = None
     nueva = f"IR {mes} {anio}"
     hoja_anterior = None
     hoja_nueva_existia = False
     
+    # PRIMERA PARTE: Creación de hoja con win32com
     try:
-        # Primera parte: Creación de hoja con win32com
         excel = win32.gencache.EnsureDispatch('Excel.Application')
-        excel.Visible = excel.DisplayAlerts = False
+        excel.Visible = False
+        excel.DisplayAlerts = False
         wb = excel.Workbooks.Open(RUTA_ENTRADA, UpdateLinks=0)
         
         nombres_hojas = [h.Name for h in wb.Sheets]
         hoja_nueva_existia = nueva in nombres_hojas
         
         if not hoja_nueva_existia:
+            # Lógica para encontrar la hoja anterior adecuada
             hojas_ir = [h for h in nombres_hojas if h.startswith("IR ") and len(h.split()) == 3]
             
             def total_meses(nombre):
@@ -228,7 +260,8 @@ def fecha(mes, dia, anio, torno):
                     break
                     
             if not hoja_anterior:
-                return messagebox.showwarning("Orden inválido", f"No se encontró hoja anterior para insertar '{nueva}'.")
+                messagebox.showwarning("Orden inválido", f"No se encontró hoja anterior para insertar '{nueva}'")
+                return
                 
             idx_anterior = [h.Name for h in wb.Sheets].index(hoja_anterior)
             insert_idx = min(idx_anterior + 2, wb.Sheets.Count)
@@ -256,13 +289,14 @@ def fecha(mes, dia, anio, torno):
             
         pythoncom.CoUninitialize()
 
-    # Segunda parte: Trabajo con openpyxl y rotación de gráficos
+    # SEGUNDA PARTE: Trabajo con openpyxl y rotación de gráficos
     try:
         # 1. Trabajar con openpyxl primero
         wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
         hoja_nueva = wb2[nueva]
         col_dia = dia + 1  # columna B es 2, día 1 → columna 2
         
+        # Limpiar celdas si es una hoja nueva
         if not hoja_nueva_existia:
             filas_fechas = [2, 3, 4, 7, 8, 9, 12, 17, 22, 27, 31, 37]
             for fila in filas_fechas:
@@ -274,11 +308,11 @@ def fecha(mes, dia, anio, torno):
         for fila in [2, 7, 12, 17, 22, 27, 31, 37]:
             hoja_nueva.cell(row=fila, column=col_dia, value=nueva_fecha)
 
-        # Procesar todos los bloques
+        # Procesar todos los bloques detectados
         for tipo_bloque, f_fin in bloques_detectados:
             escribir_valor_bloque(hoja_nueva, col_dia, torno, f_fin, tipo_bloque)
             
-        # Guardar y cerrar openpyxl ANTES de trabajar con win32com
+        # Guardar y cerrar openpyxl
         wb2.save(RUTA_ENTRADA)
         wb2.close()
         time.sleep(1)  # Pequeña pausa para liberar el archivo
@@ -297,6 +331,7 @@ def fecha(mes, dia, anio, torno):
             
             sheet_excel = wb_excel.Sheets(nueva)
             
+            # Rotar etiquetas en todos los gráficos
             for chart_obj in sheet_excel.ChartObjects():
                 try:
                     chart = chart_obj.Chart
@@ -306,7 +341,7 @@ def fecha(mes, dia, anio, torno):
                     print(f"Error en gráfico: {str(e)}")
                     continue
             
-            # Guardar y cerrar correctamente
+            # Guardar y cerrar
             wb_excel.Save()
             wb_excel.Close(True)
             
@@ -330,17 +365,17 @@ def fecha(mes, dia, anio, torno):
             # Liberar recursos
             wb_excel = None
             excel_app = None
-            pythoncom.CoUninitialize()  # Desinicializar COM
+            pythoncom.CoUninitialize()
 
         # 3. Copia final después de todas las operaciones
         shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
 
+        # Mostrar mensaje de éxito
         mensaje = "✅ Valores actualizados correctamente." if hoja_nueva_existia else f"✅ Hoja '{nueva}' creada correctamente."
         messagebox.showinfo("Éxito", mensaje)
         
     except Exception as e:
         messagebox.showwarning("Advertencia", f"No se pudo ajustar hoja:\n{e}")
-
 
 ventana = tk.Tk()
 ventana.title("Ingresar datos")
