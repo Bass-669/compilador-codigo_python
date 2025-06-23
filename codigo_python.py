@@ -82,7 +82,7 @@ def ejecutar(txt, torno, mes, dia, anio):
             barra['value'] = i
             ventana_carga.update_idletasks()
             time.sleep(1.5)
-        procesar_datos(txt, torno, mes, dia, anio)
+        procesar_datos(txt, torno, mes, dia, anio, bloques_detectados, sumas_ad_por_bloque)
         fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque)
     except Exception as e:
         messagebox.showerror("Error", f"Ocurrió un error en ejecutar():\n{e}")
@@ -181,7 +181,7 @@ def procesar_datos(entrada, torno, mes, dia, anio):
         shutil.copy(RUTA_ENTRADA, backup_path)
         wb.save(RUTA_ENTRADA)
         shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
-        return sumas_ad_por_bloque
+        return bloques_detectados, sumas_ad_por_bloque  # ← Devuelve una tupla
 
     except Exception as e:
         messagebox.showerror("Error", f"Error al procesar datos:\n{e}")
