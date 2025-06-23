@@ -168,9 +168,13 @@ def procesar_datos(entrada, torno, mes, dia, anio):
 
             suma_ad = 0
             for f in range(f_ini, f_fin):
-                celda = hoja.cell(row=f, column=30)
-                if isinstance(celda.value, (int, float)):
-                    suma_ad += celda.value
+                valor = obtener_valor_excel(RUTA_ENTRADA, "IR diario ", f, 30)
+                try:
+                    suma_ad += float(valor)
+                except:
+                    pass
+            sumas_ad_por_bloque.append(suma_ad)
+
                 elif celda.value and isinstance(celda.value, str):
                     try:
                         suma_ad += float(celda.value.replace(",", "."))
@@ -196,6 +200,28 @@ def procesar_datos(entrada, torno, mes, dia, anio):
     finally:
         if 'wb' in locals():
             wb.close()
+
+def obtener_valor_excel(ruta, hoja_nombre, fila, columna):
+    """Devuelve el valor evaluado de una celda en Excel usando win32com"""
+    pythoncom.CoInitialize()
+    try:
+        excel = win32.Dispatch("Excel.Application")
+        excel.Visible = False
+        excel.DisplayAlerts = False
+        wb = excel.Workbooks.Open(ruta)
+        hoja = wb.Sheets(hoja_nombre)
+        valor = hoja.Cells(fila, columna).Value
+        wb.Close(SaveChanges=False)
+        return valor
+    except Exception as e:
+        print(f"Error al obtener valor de Excel: {e}")
+        return 0
+    finally:
+        try:
+            excel.Quit()
+        except:
+            pass
+        pythoncom.CoUninitialize()
 
 def escribir(hoja, f, c, v, num=False):
     celda = hoja.cell(row=f, column=c, value=v)
@@ -261,6 +287,7 @@ def escribir_valores_resumen_bloques(hoja, col_dia, torno, sumas_ad_por_bloque, 
         else:
             messagebox.showwarning("Advertencia", f"Tipo de bloque no reconocido: '{tipo_bloque}'")
             continue
+
         celda = hoja.cell(row=fila_valor, column=col_dia)
         celda.value = valor
         celda.number_format = '0.00%'
@@ -337,11 +364,14 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque ):
         for tipo_bloque, f_fin in bloques_detectados:
             escribir_valor_bloque(hoja_nueva, col_dia, torno, f_fin, tipo_bloque)
 
-        tipos_bloque = [tipo for tipo, _ in bloques_detectados] # Extraer lista de tipos de bloque para resumen
+        # Extraer lista de tipos de bloque para resumen
+        tipos_bloque = [tipo for tipo, _ in bloques_detectados]
         escribir_valores_resumen_bloques(hoja_nueva, col_dia, torno, sumas_ad_por_bloque, tipos_bloque)
+
         wb2.save(RUTA_ENTRADA)
         wb2.close()
         time.sleep(1)
+
         excel_app = None
         wb_excel = None
         try:
