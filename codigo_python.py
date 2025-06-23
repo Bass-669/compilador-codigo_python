@@ -110,7 +110,7 @@ def obtener_valor_numerico(hoja, fila, columna):
 def procesar_datos(entrada, torno, mes, dia, anio):
     bloques_detectados = []
     sumas_ad_por_bloque = []
-    totales_por_categoria = {"PODADO": 0.0, "REGULAR": 0.0}
+    valores_para_resumen = []  # Aquí almacenaremos los valores calculados para las celdas amarillas
 
     if not os.path.exists(RUTA_ENTRADA):
         messagebox.showerror("Error", f"No se encontró:\n{RUTA_ENTRADA}")
@@ -133,7 +133,10 @@ def procesar_datos(entrada, torno, mes, dia, anio):
         for b in extraer_bloques(entrada):
             f_ini = fila
             subs = sub_bloques(b)
+            valores_d = []  # Almacenará los valores de la columna D
+            valores_ac = []  # Almacenará los valores de la columna AC
 
+            # Escribir datos del bloque y recolectar valores
             for sub in subs:
                 txt = sub[0] if not re.match(r'^\d', sub[0]) else ""
                 datos = sub[1:] if txt else sub
@@ -147,62 +150,81 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                 )
                 col_nums = [val for l in datos for val in l.strip().split()]
                 fila_vals = col_txt + col_nums
+                
+                # Escribir valores en Excel
                 for col, val in enumerate(fila_vals[:24], 1):
                     try:
                         n = float(val.replace(",", ".")) if 3 <= col <= 24 and val else val
                         escribir(hoja, fila, col, n, isinstance(n, float))
+                        
+                        # Guardar valores numéricos importantes
+                        if col == 4:  # Columna D
+                            valores_d.append(n if isinstance(n, float) else 0.0)
+                        elif col == 29:  # Columna AC (índice 28 en 0-based)
+                            valores_ac.append(n if isinstance(n, float) else 0.0)
                     except:
                         escribir(hoja, fila, col, val)
+                        # Guardar 0 si no es número
+                        if col == 4:
+                            valores_d.append(0.0)
+                        elif col == 29:
+                            valores_ac.append(0.0)
+                
+                # Escribir metadatos (torno, mes, día, año)
                 for col, val in zip(range(25, 29), [torno, mes, dia, anio]):
                     hoja.cell(row=fila, column=col, value=val).alignment = ALIGN_R
+                
                 fila += 1
 
             f_fin = fila - 1
 
-            # Calcular valores AD para cada fila del bloque
-            d_fin = obtener_valor_numerico(hoja, f_fin, 4)  # Valor D de la fila final
-            suma_ad = 0.0
-            
+            # Escribir fórmulas en Excel
             for f in range(f_ini, f_fin):
-                ac_val = obtener_valor_numerico(hoja, f, 29)  # Columna AC
-                d_val = obtener_valor_numerico(hoja, f, 4)    # Columna D
+                hoja.cell(row=f, column=30, value=f"=AC{f}*D{f}/D{f_fin}")
+            
+            if f_fin - f_ini >= 1:
+                hoja.cell(row=f_fin, column=30, value=f"=SUM(AD{f_ini}:AD{f_fin-1})")
+            else:
+                hoja.cell(row=f_fin, column=30, value="")
+            hoja.cell(row=f_fin, column=30).fill = FILL_AMARILLO
+
+            # Calcular manualmente el valor de la celda amarilla (suma AD)
+            suma_ad_manual = 0.0
+            d_fin = valores_d[-1] if valores_d else 0.0
+            
+            # Calcular AD para cada fila: (AC * D) / D_fin
+            for i in range(len(valores_d) - 1):  # Excluir la última fila (D_fin)
+                ac_val = valores_ac[i] if i < len(valores_ac) else 0.0
+                d_val = valores_d[i] if i < len(valores_d) else 0.0
                 
-                # Calcular valor AD
-                ad_val = (ac_val * d_val) / d_fin if d_fin != 0 else 0.0
-                hoja.cell(row=f, column=30, value=ad_val)  # Escribir en columna AD
-                suma_ad += ad_val
+                if d_fin != 0:
+                    ad_val = (ac_val * d_val) / d_fin
+                else:
+                    ad_val = 0.0
+                
+                suma_ad_manual += ad_val
+            
+            valores_para_resumen.append(suma_ad_manual)
 
-            # Escribir suma total en la fila final del bloque
-            hoja.cell(row=f_fin, column=30, value=suma_ad).fill = FILL_AMARILLO
-
-            # Determinar tipo de bloque y acumular totales
+            # Determinar tipo de bloque
             bloque_texto = " ".join(b).upper()
             tipo_bloque = "PODADO" if "PODADO" in bloque_texto else "REGULAR"
-            valor_d = obtener_valor_numerico(hoja, f_fin, 4)
+            valor_d = valores_d[-1] if valores_d else 0.0
             
             bloques_detectados.append((tipo_bloque, valor_d))
-            sumas_ad_por_bloque.append(suma_ad)
-            totales_por_categoria[tipo_bloque] += suma_ad
+            sumas_ad_por_bloque.append(suma_ad_manual)  # Usamos el valor calculado
 
             if tipo_bloque != "PODADO":
                 for col in range(25, 30):
                     hoja.cell(row=f_fin, column=col, value="")
 
-        # Calcular porcentajes para cada bloque
-        porcentajes_por_bloque = []
-        for i, (tipo_bloque, _) in enumerate(bloques_detectados):
-            total_categoria = totales_por_categoria[tipo_bloque]
-            suma_ad = sumas_ad_por_bloque[i]
-            porcentaje = suma_ad / total_categoria if total_categoria != 0 else 0.0
-            porcentajes_por_bloque.append(porcentaje)
-
-        # Hacer copia de seguridad
+        # Guardar los cambios
         backup_path = os.path.join(CARPETA, "Reporte IR Tornos copia_de_seguridad.xlsx")
         shutil.copy(RUTA_ENTRADA, backup_path)
         wb.save(RUTA_ENTRADA)
         shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
         
-        return bloques_detectados, porcentajes_por_bloque
+        return bloques_detectados, valores_para_resumen  # Devolvemos los valores calculados
 
     except Exception as e:
         messagebox.showerror("Error", f"Error al procesar datos:\n{e}")
