@@ -90,7 +90,7 @@ def ejecutar(txt, torno, mes, dia, anio):
         cerrar_carga()
         ventana.destroy()
 
-def procesar_datos(entrada, torno, mes, dia, anio):
+def procesar_datos(entrada, torno, mes, dia, anio, bloques_detectados, sumas_ad_por_bloque):
     global s_detectados
     bloques_detectados = []
     sumas_ad_por_bloque = []
