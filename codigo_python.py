@@ -110,20 +110,51 @@ def obtener_valor_numerico(hoja, fila, columna):
 def procesar_datos(entrada, torno, mes, dia, anio):
     bloques_detectados = []
     sumas_ad_por_bloque = []
-    valores_para_resumen = []  # Aquí almacenaremos los valores calculados para las celdas amarillas
-
+    valores_para_resumen = []
+    
     if not os.path.exists(RUTA_ENTRADA):
         messagebox.showerror("Error", f"No se encontró:\n{RUTA_ENTRADA}")
         return None, None
 
-    try:
-        wb = openpyxl.load_workbook(RUTA_ENTRADA)
-        hoja = wb["IR diario "]
+    temp_path = None
+    excel = wb_com = None
+    wb = None
 
+    try:
+        # Paso 1: Usar win32com para convertir fórmulas en valores
+        pythoncom.CoInitialize()
+        excel = win32.Dispatch("Excel.Application")
+        excel.Visible = False
+        excel.DisplayAlerts = False
+        wb_com = excel.Workbooks.Open(RUTA_ENTRADA)
+        hoja_com = wb_com.Sheets("IR diario ")
+        
+        # Copiar valores de AC (fórmulas) a AE (valores)
+        ultima_fila = hoja_com.UsedRange.Rows.Count
+        rango_ac = hoja_com.Range(f"AC1:AC{ultima_fila}")
+        rango_ac.Copy()
+        hoja_com.Range("AE1").PasteSpecial(Paste=-4163)  # xlPasteValues
+        excel.CutCopyMode = False
+        
+        # Guardar temporalmente y cerrar
+        temp_dir = os.path.join(BASE_DIR, "temp")
+        os.makedirs(temp_dir, exist_ok=True)
+        temp_path = os.path.join(temp_dir, "temp_report.xlsx")
+        wb_com.SaveAs(temp_path, FileFormat=51)
+        wb_com.Close(False)
+        excel.Quit()
+        pythoncom.CoUninitialize()
+
+        # Paso 2: Procesar con openpyxl
+        wb = openpyxl.load_workbook(temp_path)
+        hoja = wb["IR diario "]
+        
+        # Encontrar última fila con '* * ...'
         ultima_fila = None
         for fila in hoja.iter_rows():
             if [str(c.value).strip() if c.value else "" for c in fila[:3]] == ["*", "*", "..."]:
                 ultima_fila = fila[0].row
+                break
 
         if not ultima_fila:
             raise ValueError("No se encontró '* * ...'")
@@ -133,42 +164,15 @@ def procesar_datos(entrada, torno, mes, dia, anio):
         for b in extraer_bloques(entrada):
             f_ini = fila
             subs = sub_bloques(b)
-            valores_d = []  # Almacenará los valores de la columna D
-            valores_ac = []  # Almacenará los valores de la columna AC
+            valores_d = []
+            valores_ae = []  # Ahora leemos de AE (columna 31) en lugar de AC
 
-            # Escribir datos del bloque y recolectar valores
             for sub in subs:
-                txt = sub[0] if not re.match(r'^\d', sub[0]) else ""
-                datos = sub[1:] if txt else sub
-                p = txt.split()
-                col_txt = (
-                    [p[0], p[1], p[2], p[3], "", p[4]] if "*" in txt and len(p) >= 5 and p[0] == "*" else
-                    ["*", "*", "...", "", "", ""] if "*" in txt else
-                    [p[0], p[1], p[2], p[3], "", p[4]] if len(p) >= 5 else
-                    ["", p[0], p[1], p[2], "", p[3]] if len(p) == 4 else
-                    [""] * 6
-                )
-                col_nums = [val for l in datos for val in l.strip().split()]
-                fila_vals = col_txt + col_nums
-                
-                # Escribir valores en Excel
-                for col, val in enumerate(fila_vals[:24], 1):
-                    try:
-                        n = float(val.replace(",", ".")) if 3 <= col <= 24 and val else val
-                        escribir(hoja, fila, col, n, isinstance(n, float))
-                        
-                        # Guardar valores numéricos importantes
-                        if col == 4:  # Columna D
-                            valores_d.append(n if isinstance(n, float) else 0.0)
-                        elif col == 29:  # Columna AC (índice 28 en 0-based)
-                            valores_ac.append(n if isinstance(n, float) else 0.0)
-                    except:
-                        escribir(hoja, fila, col, val)
-                        # Guardar 0 si no es número
-                        if col == 4:
-                            valores_d.append(0.0)
-                        elif col == 29:
-                            valores_ac.append(0.0)
+                # Leer valores (columna D = 4, AE = 31)
+                valor_d = obtener_valor_numerico(hoja, fila, 4)
+                valor_ae = obtener_valor_numerico(hoja, fila, 31)  # Columna AE
+                valores_d.append(valor_d)
+                valores_ae.append(valor_ae)
                 
                 # Escribir metadatos (torno, mes, día, año)
                 for col, val in zip(range(25, 29), [torno, mes, dia, anio]):
@@ -177,72 +181,46 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                 fila += 1
 
             f_fin = fila - 1
-
-            # Escribir fórmulas en Excel
-            for f in range(f_ini, f_fin):
-                hoja.cell(row=f, column=30, value=f"=AC{f}*D{f}/D{f_fin}")
-            
-            if f_fin - f_ini >= 1:
-                hoja.cell(row=f_fin, column=30, value=f"=SUM(AD{f_ini}:AD{f_fin-1})")
-            else:
-                hoja.cell(row=f_fin, column=30, value="")
-            hoja.cell(row=f_fin, column=30).fill = FILL_AMARILLO
-
-            # Calcular manualmente el valor de la celda amarilla (suma AD)
-            suma_ad_manual = 0.0
             d_fin = valores_d[-1] if valores_d else 0.0
             
-            # Calcular AD para cada fila: (AC * D) / D_fin
-            for i in range(len(valores_d) - 1):  # Excluir la última fila (D_fin)
-                ac_val = valores_ac[i] if i < len(valores_ac) else 0.0
+            # Calcular suma AD manual (usando AE en lugar de AC)
+            suma_ad_manual = 0.0
+            for i in range(len(valores_d) - 1):
+                ae_val = valores_ae[i] if i < len(valores_ae) else 0.0
                 d_val = valores_d[i] if i < len(valores_d) else 0.0
-                
-                if d_fin != 0:
-                    ad_val = (ac_val * d_val) / d_fin
-                else:
-                    ad_val = 0.0
-                
+                ad_val = (ae_val * d_val) / d_fin if d_fin != 0 else 0.0
                 suma_ad_manual += ad_val
-            
-            valores_para_resumen.append(suma_ad_manual)
 
             # Determinar tipo de bloque
             bloque_texto = " ".join(b).upper()
             tipo_bloque = "PODADO" if "PODADO" in bloque_texto else "REGULAR"
-            # Mostrar mensaje de depuración PARA CADA BLOQUE
-            messagebox.showinfo(
-                "Debug - Valores calculados",
-                f"Bloque {len(bloques_detectados)+1} ({tipo_bloque}):\n"
-                f"Total filas: {len(valores_d)}\n"
-                f"D_fin: {d_fin}\n"
-                f"Suma AD manual: {suma_ad_manual}\n"
-                f"Últimos 5 D: {valores_d[-5:] if len(valores_d) >=5 else valores_d}\n"
-                f"Últimos 5 AC: {valores_ac[-5:] if len(valores_ac) >=5 else valores_ac}"
-            )
-
-            valor_d = valores_d[-1] if valores_d else 0.0
             
-            bloques_detectados.append((tipo_bloque, valor_d))
-            sumas_ad_por_bloque.append(suma_ad_manual)  # Usamos el valor calculado
+            bloques_detectados.append((tipo_bloque, d_fin))
+            valores_para_resumen.append(suma_ad_manual)
 
-            if tipo_bloque != "PODADO":
-                for col in range(25, 30):
-                    hoja.cell(row=f_fin, column=col, value="")
-
-        # Guardar los cambios
-        backup_path = os.path.join(CARPETA, "Reporte IR Tornos copia_de_seguridad.xlsx")
-        shutil.copy(RUTA_ENTRADA, backup_path)
+        # Guardar cambios en el archivo original
         wb.save(RUTA_ENTRADA)
         shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
         
-        return bloques_detectados, valores_para_resumen  # Devolvemos los valores calculados
+        return bloques_detectados, valores_para_resumen
 
     except Exception as e:
         messagebox.showerror("Error", f"Error al procesar datos:\n{e}")
         return None, None
     finally:
+        # Limpieza
         if 'wb' in locals():
             wb.close()
+        if 'wb_com' in locals() and wb_com is not None:
+            wb_com.Close(False)
+        if 'excel' in locals():
+            excel.Quit()
+        pythoncom.CoUninitialize()
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except:
+                pass
 
 def escribir(hoja, f, c, v, num=False):
     celda = hoja.cell(row=f, column=c, value=v)
@@ -299,26 +277,17 @@ def escribir_valor_bloque(hoja, col_dia, torno, valor, tipo_bloque):
     celda.number_format = '0' # pequeño cambio de 0.00 a 0
 
 def escribir_valores_resumen_bloques(hoja, col_dia, torno, porcentajes_por_bloque, tipos_bloque):
-    # Crear un mensaje con todos los valores para mostrar
-    mensaje = "Valores a escribir:\n\n"
-    
     for i, (tipo_bloque, porcentaje) in enumerate(zip(tipos_bloque, porcentajes_por_bloque)):
         tipo_bloque = tipo_bloque.strip().upper()
-        mensaje += f"Bloque {i+1} ({tipo_bloque}): {porcentaje:.6f} → {porcentaje*100:.2f}%\n"
-        
         if tipo_bloque == "PODADO":
             fila_valor = 13 if torno == 1 else 14
         elif tipo_bloque == "REGULAR":
             fila_valor = 18 if torno == 1 else 19
         else:
             continue
-            
         celda = hoja.cell(row=fila_valor, column=col_dia)
-        celda.value = porcentaje
+        celda.value = porcentaje / 100 if porcentaje > 1 else porcentaje  # Asegurar valor decimal
         celda.number_format = '0.00%'
-    
-    # Mostrar los valores en un messagebox
-    messagebox.showinfo("Depuración", mensaje)
 
 def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque ):
     """Función principal para crear/modificar la hoja de reporte"""
