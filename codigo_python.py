@@ -259,7 +259,7 @@ def escribir_valores_resumen_bloques(hoja, col_dia, torno, sumas_ad_por_bloque, 
         celda.value = valor
         celda.number_format = '0.00%'
 
-def fecha(mes, dia, anio, torno):
+def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque ):
     """Función principal para crear/modificar la hoja de reporte"""
     pythoncom.CoInitialize()
     excel = wb = None
@@ -282,7 +282,6 @@ def fecha(mes, dia, anio, torno):
                     return int(anio_str) * 12 + MESES_NUM[mes_str]
                 except:
                     return -1
-
             hojas_ir_ordenadas = sorted(hojas_ir, key=total_meses)
             total_nueva = int(anio) * 12 + MESES_NUM[mes]
             for h in hojas_ir_ordenadas:
@@ -382,7 +381,6 @@ def fecha(mes, dia, anio, torno):
 
     except Exception as e:
         messagebox.showwarning("Advertencia", f"No se pudo ajustar hoja:\n{e}")
-
 
 ventana = tk.Tk()
 ventana.title("Ingresar datos")
