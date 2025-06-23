@@ -173,14 +173,6 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                     suma_ad += float(valor)
                 except:
                     pass
-            sumas_ad_por_bloque.append(suma_ad)
-
-                elif celda.value and isinstance(celda.value, str):
-                    try:
-                        suma_ad += float(celda.value.replace(",", "."))
-                    except:
-                        pass
-
             bloques_detectados.append((tipo_bloque, valor_d))
             sumas_ad_por_bloque.append(suma_ad)
 
