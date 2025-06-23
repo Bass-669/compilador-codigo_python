@@ -78,25 +78,32 @@ def cerrar_carga():
 
 def ejecutar(txt, torno, mes, dia, anio):
     try:
-        for i in range(1, 101):
+        for i in range(1, 101, 20):  # más rápido, opcional
             barra['value'] = i
             ventana_carga.update_idletasks()
-            time.sleep(1.5)
-        procesar_datos(txt, torno, mes, dia, anio, bloques_detectados, sumas_ad_por_bloque)
-        fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque)
+            time.sleep(1)
+        
+        # CORREGIDO: capturar los valores retornados
+        bloques, sumas = procesar_datos(txt, torno, mes, dia, anio)
+        
+        if bloques is not None and sumas is not None:
+            fecha(mes, dia, anio, torno, bloques, sumas)
+        else:
+            messagebox.showwarning("Advertencia", "No se pudo procesar los datos.")
     except Exception as e:
         messagebox.showerror("Error", f"Ocurrió un error en ejecutar():\n{e}")
     finally:
         cerrar_carga()
         ventana.destroy()
 
-def procesar_datos(entrada, torno, mes, dia, anio, bloques_detectados, sumas_ad_por_bloque):
-    global s_detectados
+
+def procesar_datos(entrada, torno, mes, dia, anio):
     bloques_detectados = []
     sumas_ad_por_bloque = []
 
     if not os.path.exists(RUTA_ENTRADA):
-        return messagebox.showerror("Error", f"No se encontró:\n{RUTA_ENTRADA}")
+        messagebox.showerror("Error", f"No se encontró:\n{RUTA_ENTRADA}")
+        return None, None
 
     try:
         wb = openpyxl.load_workbook(RUTA_ENTRADA)
@@ -116,7 +123,7 @@ def procesar_datos(entrada, torno, mes, dia, anio, bloques_detectados, sumas_ad_
             f_ini = fila
             subs = sub_bloques(b)
 
-            for sub in subs:# Escribir datos del bloque
+            for sub in subs:
                 txt = sub[0] if not re.match(r'^\d', sub[0]) else ""
                 datos = sub[1:] if txt else sub
                 p = txt.split()
@@ -141,24 +148,24 @@ def procesar_datos(entrada, torno, mes, dia, anio, bloques_detectados, sumas_ad_
 
             f_fin = fila - 1
 
-            for f in range(f_ini, f_fin): # Escribir fórmulas intermedias
+            for f in range(f_ini, f_fin):
                 hoja.cell(row=f, column=30, value=f"=AC{f}*D{f}/D{f_fin}")
 
-            celda_suma = hoja.cell(row=f_fin, column=30) # Escribir fórmula de suma en la última fila
+            celda_suma = hoja.cell(row=f_fin, column=30)
             if f_fin - f_ini >= 1:
                 celda_suma.value = f"=SUM(AD{f_ini}:AD{f_fin - 1})"
             else:
                 celda_suma.value = ""
             celda_suma.fill = FILL_AMARILLO
-            bloque_texto = " ".join(b).upper() # Identificar tipo de bloque
+
+            bloque_texto = " ".join(b).upper()
             tipo_bloque = "PODADO" if "PODADO" in bloque_texto else "REGULAR"
-            valor_d = hoja.cell(row=f_fin, column=4).value # Obtener valor D de la fila final
+            valor_d = hoja.cell(row=f_fin, column=4).value
             try:
                 valor_d = float(str(valor_d).replace(",", ".")) if valor_d else 0
             except:
                 valor_d = 0
 
-            # Calcular suma AD manualmente (para verificación)
             suma_ad = 0
             for f in range(f_ini, f_fin):
                 celda = hoja.cell(row=f, column=30)
@@ -181,11 +188,11 @@ def procesar_datos(entrada, torno, mes, dia, anio, bloques_detectados, sumas_ad_
         shutil.copy(RUTA_ENTRADA, backup_path)
         wb.save(RUTA_ENTRADA)
         shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
-        return bloques_detectados, sumas_ad_por_bloque  # ← Devuelve una tupla
+        return bloques_detectados, sumas_ad_por_bloque
 
     except Exception as e:
         messagebox.showerror("Error", f"Error al procesar datos:\n{e}")
-        return None
+        return None, None
     finally:
         if 'wb' in locals():
             wb.close()
@@ -254,7 +261,6 @@ def escribir_valores_resumen_bloques(hoja, col_dia, torno, sumas_ad_por_bloque, 
         else:
             messagebox.showwarning("Advertencia", f"Tipo de bloque no reconocido: '{tipo_bloque}'")
             continue
-
         celda = hoja.cell(row=fila_valor, column=col_dia)
         celda.value = valor
         celda.number_format = '0.00%'
@@ -331,14 +337,11 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque ):
         for tipo_bloque, f_fin in bloques_detectados:
             escribir_valor_bloque(hoja_nueva, col_dia, torno, f_fin, tipo_bloque)
 
-        # Extraer lista de tipos de bloque para resumen
-        tipos_bloque = [tipo for tipo, _ in bloques_detectados]
+        tipos_bloque = [tipo for tipo, _ in bloques_detectados] # Extraer lista de tipos de bloque para resumen
         escribir_valores_resumen_bloques(hoja_nueva, col_dia, torno, sumas_ad_por_bloque, tipos_bloque)
-
         wb2.save(RUTA_ENTRADA)
         wb2.close()
         time.sleep(1)
-
         excel_app = None
         wb_excel = None
         try:
