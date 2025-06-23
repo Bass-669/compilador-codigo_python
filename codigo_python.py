@@ -82,11 +82,9 @@ def ejecutar(txt, torno, mes, dia, anio):
             barra['value'] = i
             ventana_carga.update_idletasks()
             time.sleep(1)
-        
-        bloques, sumas = procesar_datos(txt, torno, mes, dia, anio)
-        
-        if bloques is not None and sumas is not None:
-            fecha(mes, dia, anio, torno, bloques, sumas)
+        bloques, porcentajes = procesar_datos(txt, torno, mes, dia, anio)
+        if bloques is not None and porcentajes is not None:
+            fecha(mes, dia, anio, torno, bloques, porcentajes)
         else:
             messagebox.showwarning("Advertencia", "No se pudo procesar los datos.")
     except Exception as e:
@@ -95,9 +93,24 @@ def ejecutar(txt, torno, mes, dia, anio):
         cerrar_carga()
         ventana.destroy()
 
+def obtener_valor_numerico(hoja, fila, columna):
+    """Obtiene un valor numérico de una celda de forma segura"""
+    valor = hoja.cell(row=fila, column=columna).value
+    if valor is None:
+        return 0.0
+    if isinstance(valor, (int, float)):
+        return float(valor)
+    if isinstance(valor, str):
+        try:
+            return float(valor.replace(",", "."))
+        except ValueError:
+            return 0.0
+    return 0.0
+
 def procesar_datos(entrada, torno, mes, dia, anio):
     bloques_detectados = []
     sumas_ad_por_bloque = []
+    totales_por_categoria = {"PODADO": 0.0, "REGULAR": 0.0}
 
     if not os.path.exists(RUTA_ENTRADA):
         messagebox.showerror("Error", f"No se encontró:\n{RUTA_ENTRADA}")
@@ -146,43 +159,50 @@ def procesar_datos(entrada, torno, mes, dia, anio):
 
             f_fin = fila - 1
 
+            # Calcular valores AD para cada fila del bloque
+            d_fin = obtener_valor_numerico(hoja, f_fin, 4)  # Valor D de la fila final
+            suma_ad = 0.0
+            
             for f in range(f_ini, f_fin):
-                hoja.cell(row=f, column=30, value=f"=AC{f}*D{f}/D{f_fin}")
+                ac_val = obtener_valor_numerico(hoja, f, 29)  # Columna AC
+                d_val = obtener_valor_numerico(hoja, f, 4)    # Columna D
+                
+                # Calcular valor AD
+                ad_val = (ac_val * d_val) / d_fin if d_fin != 0 else 0.0
+                hoja.cell(row=f, column=30, value=ad_val)  # Escribir en columna AD
+                suma_ad += ad_val
 
-            celda_suma = hoja.cell(row=f_fin, column=30)
-            if f_fin - f_ini >= 1:
-                celda_suma.value = f"=SUM(AD{f_ini}:AD{f_fin - 1})"
-            else:
-                celda_suma.value = ""
-            celda_suma.fill = FILL_AMARILLO
+            # Escribir suma total en la fila final del bloque
+            hoja.cell(row=f_fin, column=30, value=suma_ad).fill = FILL_AMARILLO
 
+            # Determinar tipo de bloque y acumular totales
             bloque_texto = " ".join(b).upper()
             tipo_bloque = "PODADO" if "PODADO" in bloque_texto else "REGULAR"
-            valor_d = hoja.cell(row=f_fin, column=4).value
-            try:
-                valor_d = float(str(valor_d).replace(",", ".")) if valor_d else 0
-            except:
-                valor_d = 0
-
-            suma_ad = 0
-            for f in range(f_ini, f_fin):
-                valor = obtener_valor_excel(RUTA_ENTRADA, "IR diario ", f, 30)
-                try:
-                    suma_ad += float(valor)
-                except:
-                    pass
+            valor_d = obtener_valor_numerico(hoja, f_fin, 4)
+            
             bloques_detectados.append((tipo_bloque, valor_d))
             sumas_ad_por_bloque.append(suma_ad)
+            totales_por_categoria[tipo_bloque] += suma_ad
 
             if tipo_bloque != "PODADO":
                 for col in range(25, 30):
                     hoja.cell(row=f_fin, column=col, value="")
 
+        # Calcular porcentajes para cada bloque
+        porcentajes_por_bloque = []
+        for i, (tipo_bloque, _) in enumerate(bloques_detectados):
+            total_categoria = totales_por_categoria[tipo_bloque]
+            suma_ad = sumas_ad_por_bloque[i]
+            porcentaje = suma_ad / total_categoria if total_categoria != 0 else 0.0
+            porcentajes_por_bloque.append(porcentaje)
+
+        # Hacer copia de seguridad
         backup_path = os.path.join(CARPETA, "Reporte IR Tornos copia_de_seguridad.xlsx")
         shutil.copy(RUTA_ENTRADA, backup_path)
         wb.save(RUTA_ENTRADA)
         shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
-        return bloques_detectados, sumas_ad_por_bloque
+        
+        return bloques_detectados, porcentajes_por_bloque
 
     except Exception as e:
         messagebox.showerror("Error", f"Error al procesar datos:\n{e}")
@@ -190,36 +210,6 @@ def procesar_datos(entrada, torno, mes, dia, anio):
     finally:
         if 'wb' in locals():
             wb.close()
-
-# def obtener_valor_excel(ruta, hoja_nombre, fila, columna):
-#     """Devuelve el valor evaluado de una celda en Excel usando win32com, sin dejar rastro."""
-#     pythoncom.CoInitialize()
-#     valor = None
-#     try:
-#         excel = win32.Dispatch("Excel.Application")
-#         excel.Visible = False
-#         excel.DisplayAlerts = False
-#         wb = excel.Workbooks.Open(ruta)
-#         hoja = wb.Sheets(hoja_nombre)
-#         # Copiar la celda original
-#         hoja.Cells(fila, columna).Copy()
-#         # Pegar como valor en la celda a la derecha
-#         hoja.Cells(fila, columna + 1).PasteSpecial(Paste=-4163)  # xlPasteValues
-#         # Leer el valor pegado
-#         valor = hoja.Cells(fila, columna + 1).Value
-#         # Borrar el valor pegado
-#         hoja.Cells(fila, columna + 1).Value = ""
-#         wb.Close(SaveChanges=False)
-#     except Exception as e:
-#         print(f"Error al obtener valor de Excel: {e}")
-#         valor = 0
-#     finally:
-#         try:
-#             excel.Quit()
-#         except:
-#             pass
-#         pythoncom.CoUninitialize()
-#     return valor
 
 def escribir(hoja, f, c, v, num=False):
     celda = hoja.cell(row=f, column=c, value=v)
@@ -275,19 +265,17 @@ def escribir_valor_bloque(hoja, col_dia, torno, valor, tipo_bloque):
     celda.value = valor_final
     celda.number_format = '0' # pequeño cambio de 0.00 a 0
 
-def escribir_valores_resumen_bloques(hoja, col_dia, torno, sumas_ad_por_bloque, tipos_bloque):
-    for i, (tipo_bloque, valor) in enumerate(zip(tipos_bloque, sumas_ad_por_bloque)):
+def escribir_valores_resumen_bloques(hoja, col_dia, torno, porcentajes_por_bloque, tipos_bloque):
+    for i, (tipo_bloque, porcentaje) in enumerate(zip(tipos_bloque, porcentajes_por_bloque)):
         tipo_bloque = tipo_bloque.strip().upper()
         if tipo_bloque == "PODADO":
             fila_valor = 13 if torno == 1 else 14
         elif tipo_bloque == "REGULAR":
             fila_valor = 18 if torno == 1 else 19
         else:
-            messagebox.showwarning("Advertencia", f"Tipo de bloque no reconocido: '{tipo_bloque}'")
             continue
-
         celda = hoja.cell(row=fila_valor, column=col_dia)
-        celda.value = valor
+        celda.value = porcentaje  # Ya viene como valor entre 0 y 1
         celda.number_format = '0.00%'
 
 def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque ):
