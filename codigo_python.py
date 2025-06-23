@@ -83,7 +83,7 @@ def ejecutar(txt, torno, mes, dia, anio):
             ventana_carga.update_idletasks()
             time.sleep(1.5)
         procesar_datos(txt, torno, mes, dia, anio)
-        fecha(mes, dia, anio, torno)
+        fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque)
     except Exception as e:
         messagebox.showerror("Error", f"Ocurrió un error en ejecutar():\n{e}")
     finally:
