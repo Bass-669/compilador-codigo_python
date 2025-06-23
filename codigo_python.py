@@ -118,8 +118,23 @@ def procesar_datos(entrada, torno, mes, dia, anio):
     wb = None
     excel = wb_com = None
 
+    def obtener_valor_ac(cell_value):
+        """Convierte valores de AC a float manejando casos especiales"""
+        if cell_value is None:
+            return 0.0
+        if isinstance(cell_value, (int, float)):
+            return float(cell_value)
+        if isinstance(cell_value, str):
+            if any(x in cell_value.lower() for x in ['r%', 'potential', 'n/a', '--']):
+                return 0.0
+            try:
+                return float(cell_value.replace(",", "."))
+            except ValueError:
+                return 0.0
+        return 0.0
+
     try:
-        # --- PASO 1: Leer valores de AC con win32com ---
+        # === PASO 1: Leer valores de AC con win32com ===
         pythoncom.CoInitialize()
         excel = win32.Dispatch("Excel.Application")
         excel.Visible = False
@@ -129,17 +144,14 @@ def procesar_datos(entrada, torno, mes, dia, anio):
             wb_com = excel.Workbooks.Open(RUTA_ENTRADA)
             hoja_com = wb_com.Sheets("IR diario ")
             
-            # Verificar existencia de la hoja
             if hoja_com is None:
                 raise ValueError("Hoja 'IR diario ' no encontrada")
             
-            # Leer todos los valores de AC
-            ultima_fila = hoja_com.UsedRange.Rows.Count
-            for fila in range(1, ultima_fila + 1):
+            # Leer valores de AC sin límites
+            for fila in range(1, hoja_com.UsedRange.Rows.Count + 1):
                 cell_value = hoja_com.Range(f"AC{fila}").Value
-                valores_ac_dict[fila] = float(cell_value) if cell_value is not None else 0.0
-            
-            # Cerrar Excel COM
+                valores_ac_dict[fila] = obtener_valor_ac(cell_value)
+
             wb_com.Close(False)
             excel.Quit()
             pythoncom.CoUninitialize()
@@ -150,23 +162,25 @@ def procesar_datos(entrada, torno, mes, dia, anio):
             if excel is not None:
                 excel.Quit()
             pythoncom.CoUninitialize()
-            raise ValueError(f"Error al leer valores AC: {str(e)}")
+            raise ValueError(f"Error al leer Excel: {str(e)}")
 
-        # --- PASO 2: Procesar con openpyxl ---
+        # === PASO 2: Procesar con openpyxl ===
         wb = openpyxl.load_workbook(RUTA_ENTRADA)
         hoja = wb["IR diario "]
         
-        # Encontrar fila con '* * ...' (búsqueda segura)
+        # Buscar '* * ...' SIN límite de filas
         ultima_fila = None
-        for fila in hoja.iter_rows(min_row=1, max_row=10000, max_col=3):
-            valores = [
-                str(fila[0].value).strip() if fila[0].value else "",
-                str(fila[1].value).strip() if fila[1].value else "",
-                str(fila[2].value).strip() if fila[2].value else ""
-            ]
-            if valores == ["*", "*", "..."]:
-                ultima_fila = fila[0].row
-                break
+        for fila in hoja.iter_rows():  # Sin parámetros de límite
+            try:
+                c1 = str(fila[0].value).strip() if fila[0].value else ""
+                c2 = str(fila[1].value).strip() if fila[1].value else ""
+                c3 = str(fila[2].value).strip() if fila[2].value else ""
+                
+                if [c1, c2, c3] == ["*", "*", "..."]:
+                    ultima_fila = fila[0].row
+                    break
+            except IndexError:
+                continue
 
         if not ultima_fila:
             raise ValueError("No se encontró el patrón '* * ...'")
@@ -175,7 +189,7 @@ def procesar_datos(entrada, torno, mes, dia, anio):
         bloques = extraer_bloques(entrada)
         
         if not bloques:
-            raise ValueError("No se detectaron bloques válidos en los datos")
+            raise ValueError("No hay bloques válidos en los datos")
 
         for b in bloques:
             if not b:
@@ -190,40 +204,32 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                 if not sub:
                     continue
                 
-                # Leer valor D desde Excel
-                try:
-                    valor_d = obtener_valor_numerico(hoja, fila, 4)
-                    valores_d.append(valor_d)
-                    
-                    # Obtener valor AC desde memoria
-                    valor_ae = valores_ac_dict.get(fila, 0.0)
-                    valores_ae.append(valor_ae)
-                    
-                    # Escribir metadatos
-                    for col, val in zip(range(25, 29), [torno, mes, dia, anio]):
-                        hoja.cell(row=fila, column=col, value=val).alignment = ALIGN_R
-                    
-                    fila += 1
+                # Leer valor D (columna 4)
+                valor_d = obtener_valor_numerico(hoja, fila, 4)
+                valores_d.append(valor_d)
                 
-                except Exception as e:
-                    raise ValueError(f"Error en fila {fila}: {str(e)}")
+                # Obtener valor AC desde memoria
+                valor_ae = valores_ac_dict.get(fila, 0.0)
+                valores_ae.append(valor_ae)
+                
+                # Escribir metadatos (columnas 25-28)
+                for col, val in zip(range(25, 29), [torno, mes, dia, anio]):
+                    hoja.cell(row=fila, column=col, value=val).alignment = ALIGN_R
+                
+                fila += 1
 
             # Calcular suma AD
-            try:
-                d_fin = valores_d[-1] if valores_d else 0.0
-                suma_ad_manual = sum(
-                    (valores_ae[i] * valores_d[i]) / d_fin 
-                    for i in range(len(valores_d) - 1) 
-                    if d_fin != 0
-                )
-                
-                # Clasificar bloque
-                tipo_bloque = "PODADO" if "PODADO" in " ".join(b).upper() else "REGULAR"
-                bloques_detectados.append((tipo_bloque, d_fin))
-                valores_para_resumen.append(suma_ad_manual)
-            
-            except Exception as e:
-                raise ValueError(f"Error en cálculo AD: {str(e)}")
+            d_fin = valores_d[-1] if valores_d else 0.0
+            suma_ad_manual = sum(
+                (valores_ae[i] * valores_d[i]) / d_fin 
+                for i in range(len(valores_d) - 1) 
+                if d_fin != 0
+            )
+
+            # Clasificar bloque
+            tipo_bloque = "PODADO" if "PODADO" in " ".join(b).upper() else "REGULAR"
+            bloques_detectados.append((tipo_bloque, d_fin))
+            valores_para_resumen.append(suma_ad_manual)
 
         # Guardar resultados
         wb.save(RUTA_ENTRADA)
