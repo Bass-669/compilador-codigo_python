@@ -209,6 +209,17 @@ def procesar_datos(entrada, torno, mes, dia, anio):
             # Determinar tipo de bloque
             bloque_texto = " ".join(b).upper()
             tipo_bloque = "PODADO" if "PODADO" in bloque_texto else "REGULAR"
+            # Mostrar mensaje de depuración PARA CADA BLOQUE
+            messagebox.showinfo(
+                "Debug - Valores calculados",
+                f"Bloque {len(bloques_detectados)+1} ({tipo_bloque}):\n"
+                f"Total filas: {len(valores_d)}\n"
+                f"D_fin: {d_fin}\n"
+                f"Suma AD manual: {suma_ad_manual}\n"
+                f"Últimos 5 D: {valores_d[-5:] if len(valores_d) >=5 else valores_d}\n"
+                f"Últimos 5 AC: {valores_ac[-5:] if len(valores_ac) >=5 else valores_ac}"
+            )
+
             valor_d = valores_d[-1] if valores_d else 0.0
             
             bloques_detectados.append((tipo_bloque, valor_d))
