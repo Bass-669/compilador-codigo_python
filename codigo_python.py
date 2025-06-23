@@ -148,7 +148,6 @@ def procesar_datos(entrada, torno, mes, dia, anio):
         for fila in hoja.iter_rows():
             if [str(c.value).strip() if c.value else "" for c in fila[:3]] == ["*", "*", "..."]:
                 ultima_fila = fila[0].row
-                break
 
         if not ultima_fila:
             messagebox.showerror("Error", "No se encontró '* * ...'")
