@@ -105,149 +105,136 @@ def obtener_valor_numerico(hoja, fila, columna):
     return float(valor)
 
 def procesar_datos(entrada, torno, mes, dia, anio):
+    import tempfile
+
     bloques_detectados = []
     sumas_ad_por_bloque = []
-    valores_para_resumen = []
-    
+
     if not os.path.exists(RUTA_ENTRADA):
         messagebox.showerror("Error", f"No se encontró:\n{RUTA_ENTRADA}")
         return None, None
 
-    # Diccionario para guardar valores {fila: valor_AC}
-    valores_ac_dict = {}
-    wb = None
-    excel = wb_com = None
-
-    def obtener_valor_ac(cell_value):
-        """Convierte valores de AC a float manejando casos especiales"""
-        if cell_value is None:
-            return 0.0
-        if isinstance(cell_value, (int, float)):
-            return float(cell_value)
-        if isinstance(cell_value, str):
-            if any(x in cell_value.lower() for x in ['r%', 'potential', 'n/a', '--']):
-                return 0.0
-            try:
-                return float(cell_value.replace(",", "."))
-            except ValueError:
-                return 0.0
-        return 0.0
+    # === Paso 1: Crear archivo temporal con valores en AE ===
+    pythoncom.CoInitialize()
+    excel = win32.Dispatch("Excel.Application")
+    excel.Visible = False
+    excel.DisplayAlerts = False
 
     try:
-        # === PASO 1: Leer valores de AC con win32com ===
-        pythoncom.CoInitialize()
-        excel = win32.Dispatch("Excel.Application")
-        excel.Visible = False
-        excel.DisplayAlerts = False
-        
-        try:
-            wb_com = excel.Workbooks.Open(RUTA_ENTRADA)
-            hoja_com = wb_com.Sheets("IR diario ")
-            
-            if hoja_com is None:
-                raise ValueError("Hoja 'IR diario ' no encontrada")
-            
-            # Leer valores de AC sin límites
-            for fila in range(1, hoja_com.UsedRange.Rows.Count + 1):
-                cell_value = hoja_com.Range(f"AC{fila}").Value
-                valores_ac_dict[fila] = obtener_valor_ac(cell_value)
+        wb = excel.Workbooks.Open(RUTA_ENTRADA)
+        hoja = wb.Sheets("IR diario ")
 
-            wb_com.Close(False)
-            excel.Quit()
-            pythoncom.CoUninitialize()
+        used_rows = hoja.UsedRange.Rows.Count
+        hoja.Range(f"AE1:AE{used_rows}").Value = hoja.Range(f"AC1:AC{used_rows}").Value
 
-        except Exception as e:
-            if wb_com is not None:
-                wb_com.Close(False)
-            if excel is not None:
-                excel.Quit()
-            pythoncom.CoUninitialize()
-            raise ValueError(f"Error al leer Excel: {str(e)}")
+        temp_path = os.path.join(BASE_DIR, CARPETA, "temp_report.xlsx")
+        wb.SaveAs(temp_path)
+        wb.Close(False)
+        excel.Quit()
+    except Exception as e:
+        messagebox.showerror("Error", f"No se pudo generar archivo temporal:\n{e}")
+        excel.Quit()
+        pythoncom.CoUninitialize()
+        return None, None
 
-        # === PASO 2: Procesar con openpyxl ===
-        wb = openpyxl.load_workbook(RUTA_ENTRADA)
+    pythoncom.CoUninitialize()
+
+    # === Paso 2: Leer desde archivo temporal (columna AE) ===
+    try:
+        wb = openpyxl.load_workbook(temp_path)
         hoja = wb["IR diario "]
-        
-        # Buscar '* * ...' SIN límite de filas
+
         ultima_fila = None
-        for fila in hoja.iter_rows():  # Sin parámetros de límite
-            try:
-                c1 = str(fila[0].value).strip() if fila[0].value else ""
-                c2 = str(fila[1].value).strip() if fila[1].value else ""
-                c3 = str(fila[2].value).strip() if fila[2].value else ""
-                
-                if [c1, c2, c3] == ["*", "*", "..."]:
-                    ultima_fila = fila[0].row
-                    break
-            except IndexError:
-                continue
+        for fila in hoja.iter_rows():
+            if [str(c.value).strip() if c.value else "" for c in fila[:3]] == ["*", "*", "..."]:
+                ultima_fila = fila[0].row
+                break
 
         if not ultima_fila:
-            raise ValueError("No se encontró el patrón '* * ...'")
+            messagebox.showerror("Error", "No se encontró '* * ...'")
+            return None, None
 
         fila = ultima_fila + 1
         bloques = extraer_bloques(entrada)
-        
-        if not bloques:
-            raise ValueError("No hay bloques válidos en los datos")
 
         for b in bloques:
-            if not b:
-                continue
-                
             f_ini = fila
             subs = sub_bloques(b)
-            valores_d = []
-            valores_ae = []
+            valores_d, valores_ae = [], []
 
             for sub in subs:
-                if not sub:
-                    continue
-                
-                # Leer valor D (columna 4)
-                valor_d = obtener_valor_numerico(hoja, fila, 4)
+                txt = sub[0] if not re.match(r'^\d', sub[0]) else ""
+                datos = sub[1:] if txt else sub
+                p = txt.split()
+                col_txt = (
+                    [p[0], p[1], p[2], p[3], "", p[4]] if "*" in txt and len(p) >= 5 and p[0] == "*" else
+                    ["*", "*", "...", "", "", ""] if "*" in txt else
+                    [p[0], p[1], p[2], p[3], "", p[4]] if len(p) >= 5 else
+                    ["", p[0], p[1], p[2], "", p[3]] if len(p) == 4 else
+                    [""] * 6
+                )
+                col_nums = [val for l in datos for val in l.strip().split()]
+                fila_vals = col_txt + col_nums
+
+                for col, val in enumerate(fila_vals[:24], 1):
+                    try:
+                        n = float(val.replace(",", ".")) if 3 <= col <= 24 and val else val
+                        escribir(hoja, fila, col, n, isinstance(n, float))
+                    except:
+                        escribir(hoja, fila, col, val)
+
+                valor_d = hoja.cell(row=fila, column=4).value
+                try:
+                    valor_d = float(str(valor_d).replace(",", ".")) if valor_d else 0.0
+                except:
+                    valor_d = 0.0
                 valores_d.append(valor_d)
-                
-                # Obtener valor AC desde memoria
-                valor_ae = valores_ac_dict.get(fila, 0.0)
+
+                valor_ae = hoja.cell(row=fila, column=31).value  # AE = col 31
+                try:
+                    valor_ae = float(str(valor_ae).replace(",", ".")) if valor_ae else 0.0
+                except:
+                    valor_ae = 0.0
                 valores_ae.append(valor_ae)
-                
-                # Escribir metadatos (columnas 25-28)
+
                 for col, val in zip(range(25, 29), [torno, mes, dia, anio]):
                     hoja.cell(row=fila, column=col, value=val).alignment = ALIGN_R
-                
+
+                messagebox.showinfo("Fila escrita", f"Fila {fila}: D={valor_d}, AE={valor_ae}")
                 fila += 1
 
-            # Calcular suma AD
-            d_fin = valores_d[-1] if valores_d else 0.0
-            suma_ad_manual = sum(
-                (valores_ae[i] * valores_d[i]) / d_fin 
-                for i in range(len(valores_d) - 1) 
-                if d_fin != 0
-            )
+            f_fin = fila - 1
+            for f in range(f_ini, f_fin):
+                hoja.cell(row=f, column=30, value=f"=AC{f}*D{f}/D{f_fin}")
 
-            # Clasificar bloque
+            celda_suma = hoja.cell(row=f_fin, column=30)
+            if f_fin - f_ini >= 1:
+                celda_suma.value = f"=SUM(AD{f_ini}:AD{f_fin - 1})"
+            else:
+                celda_suma.value = ""
+            celda_suma.fill = FILL_AMARILLO
+
+            d_fin = valores_d[-1] if valores_d else 0.0
+            suma_ad = 0.0
+            if d_fin != 0:
+                for i in range(len(valores_d) - 1):
+                    suma_ad += (valores_ae[i] * valores_d[i]) / d_fin
+
             tipo_bloque = "PODADO" if "PODADO" in " ".join(b).upper() else "REGULAR"
             bloques_detectados.append((tipo_bloque, d_fin))
-            valores_para_resumen.append(suma_ad_manual)
+            sumas_ad_por_bloque.append(suma_ad)
 
-        # Guardar resultados
+            messagebox.showinfo("Resumen", f"{tipo_bloque} – D: {d_fin:.2f}, AD: {suma_ad:.4f}")
+
         wb.save(RUTA_ENTRADA)
+        wb.close()
         shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
-        
-        return bloques_detectados, valores_para_resumen
+        return bloques_detectados, sumas_ad_por_bloque
 
     except Exception as e:
-        messagebox.showerror("Error", f"Error al procesar datos:\n{str(e)}")
+        messagebox.showerror("Error", f"Error al procesar datos:\n{e}")
         return None, None
-    
-    finally:
-        # Limpieza segura
-        if wb is not None:
-            wb.close()
-        if excel is not None:
-            excel.Quit()
-        pythoncom.CoUninitialize()
+
 
 def escribir(hoja, f, c, v, num=False):
     celda = hoja.cell(row=f, column=c, value=v)
