@@ -129,11 +129,11 @@ def procesar_datos(entrada, torno, mes, dia, anio):
         
         try:
             wb_com = excel.Workbooks.Open(RUTA_ENTRADA)
-            hoja_com = wb_com.Sheets("IR diario")
+            hoja_com = wb_com.Sheets("IR diario ")
             
             # Verificar si la hoja existe
             if hoja_com is None:
-                raise ValueError("No se encontró la hoja 'IR diario'")
+                raise ValueError("No se encontró la hoja 'IR diario '")
             
             # Obtener la última fila con datos reales
             ultima_fila = hoja_com.UsedRange.Rows.Count
