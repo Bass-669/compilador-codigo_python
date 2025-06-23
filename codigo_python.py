@@ -78,12 +78,11 @@ def cerrar_carga():
 
 def ejecutar(txt, torno, mes, dia, anio):
     try:
-        for i in range(1, 101, 20):  # más rápido, opcional
+        for i in range(1, 101, 20):
             barra['value'] = i
             ventana_carga.update_idletasks()
             time.sleep(1)
         
-        # CORREGIDO: capturar los valores retornados
         bloques, sumas = procesar_datos(txt, torno, mes, dia, anio)
         
         if bloques is not None and sumas is not None:
@@ -95,7 +94,6 @@ def ejecutar(txt, torno, mes, dia, anio):
     finally:
         cerrar_carga()
         ventana.destroy()
-
 
 def procesar_datos(entrada, torno, mes, dia, anio):
     bloques_detectados = []
@@ -194,56 +192,34 @@ def procesar_datos(entrada, torno, mes, dia, anio):
             wb.close()
 
 # def obtener_valor_excel(ruta, hoja_nombre, fila, columna):
-#     """Devuelve el valor evaluado de una celda en Excel usando win32com"""
+#     """Devuelve el valor evaluado de una celda en Excel usando win32com, sin dejar rastro."""
 #     pythoncom.CoInitialize()
+#     valor = None
 #     try:
 #         excel = win32.Dispatch("Excel.Application")
 #         excel.Visible = False
 #         excel.DisplayAlerts = False
 #         wb = excel.Workbooks.Open(ruta)
 #         hoja = wb.Sheets(hoja_nombre)
-#         valor = hoja.Cells(fila, columna).Value
+#         # Copiar la celda original
+#         hoja.Cells(fila, columna).Copy()
+#         # Pegar como valor en la celda a la derecha
+#         hoja.Cells(fila, columna + 1).PasteSpecial(Paste=-4163)  # xlPasteValues
+#         # Leer el valor pegado
+#         valor = hoja.Cells(fila, columna + 1).Value
+#         # Borrar el valor pegado
+#         hoja.Cells(fila, columna + 1).Value = ""
 #         wb.Close(SaveChanges=False)
-#         return valor
 #     except Exception as e:
 #         print(f"Error al obtener valor de Excel: {e}")
-#         return 0
+#         valor = 0
 #     finally:
 #         try:
 #             excel.Quit()
 #         except:
 #             pass
 #         pythoncom.CoUninitialize()
-
-def obtener_valor_excel(ruta, hoja_nombre, fila, columna):
-    """Devuelve el valor evaluado de una celda en Excel usando win32com, sin dejar rastro."""
-    pythoncom.CoInitialize()
-    valor = None
-    try:
-        excel = win32.Dispatch("Excel.Application")
-        excel.Visible = False
-        excel.DisplayAlerts = False
-        wb = excel.Workbooks.Open(ruta)
-        hoja = wb.Sheets(hoja_nombre)
-        # Copiar la celda original
-        hoja.Cells(fila, columna).Copy()
-        # Pegar como valor en la celda a la derecha
-        hoja.Cells(fila, columna + 1).PasteSpecial(Paste=-4163)  # xlPasteValues
-        # Leer el valor pegado
-        valor = hoja.Cells(fila, columna + 1).Value
-        # Borrar el valor pegado
-        hoja.Cells(fila, columna + 1).Value = ""
-        wb.Close(SaveChanges=False)
-    except Exception as e:
-        print(f"Error al obtener valor de Excel: {e}")
-        valor = 0
-    finally:
-        try:
-            excel.Quit()
-        except:
-            pass
-        pythoncom.CoUninitialize()
-    return valor
+#     return valor
 
 def escribir(hoja, f, c, v, num=False):
     celda = hoja.cell(row=f, column=c, value=v)
@@ -374,7 +350,7 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque ):
         col_dia = dia + 1  # columna B es 2, día 1 → columna 2
 
         if not hoja_nueva_existia:
-            filas_fechas = [2, 3, 4, 7, 8, 9, 12, 17, 22, 27, 31, 37]
+            filas_fechas = [2, 3, 4, 7, 8, 9, 12, 13, 14, 17, 18, 19, 22, 27, 31, 37]
             for fila in filas_fechas:
                 for col in range(2, 33):
                     hoja_nueva.cell(row=fila, column=col, value="")
