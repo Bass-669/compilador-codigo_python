@@ -288,17 +288,26 @@ def escribir_valor_bloque(hoja, col_dia, torno, valor, tipo_bloque):
     celda.number_format = '0' # pequeño cambio de 0.00 a 0
 
 def escribir_valores_resumen_bloques(hoja, col_dia, torno, porcentajes_por_bloque, tipos_bloque):
+    # Crear un mensaje con todos los valores para mostrar
+    mensaje = "Valores a escribir:\n\n"
+    
     for i, (tipo_bloque, porcentaje) in enumerate(zip(tipos_bloque, porcentajes_por_bloque)):
         tipo_bloque = tipo_bloque.strip().upper()
+        mensaje += f"Bloque {i+1} ({tipo_bloque}): {porcentaje:.6f} → {porcentaje*100:.2f}%\n"
+        
         if tipo_bloque == "PODADO":
             fila_valor = 13 if torno == 1 else 14
         elif tipo_bloque == "REGULAR":
             fila_valor = 18 if torno == 1 else 19
         else:
             continue
+            
         celda = hoja.cell(row=fila_valor, column=col_dia)
-        celda.value = porcentaje  # Ya viene como valor entre 0 y 1
+        celda.value = porcentaje
         celda.number_format = '0.00%'
+    
+    # Mostrar los valores en un messagebox
+    messagebox.showinfo("Depuración", mensaje)
 
 def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque ):
     """Función principal para crear/modificar la hoja de reporte"""
