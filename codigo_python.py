@@ -193,27 +193,57 @@ def procesar_datos(entrada, torno, mes, dia, anio):
         if 'wb' in locals():
             wb.close()
 
+# def obtener_valor_excel(ruta, hoja_nombre, fila, columna):
+#     """Devuelve el valor evaluado de una celda en Excel usando win32com"""
+#     pythoncom.CoInitialize()
+#     try:
+#         excel = win32.Dispatch("Excel.Application")
+#         excel.Visible = False
+#         excel.DisplayAlerts = False
+#         wb = excel.Workbooks.Open(ruta)
+#         hoja = wb.Sheets(hoja_nombre)
+#         valor = hoja.Cells(fila, columna).Value
+#         wb.Close(SaveChanges=False)
+#         return valor
+#     except Exception as e:
+#         print(f"Error al obtener valor de Excel: {e}")
+#         return 0
+#     finally:
+#         try:
+#             excel.Quit()
+#         except:
+#             pass
+#         pythoncom.CoUninitialize()
+
 def obtener_valor_excel(ruta, hoja_nombre, fila, columna):
-    """Devuelve el valor evaluado de una celda en Excel usando win32com"""
+    """Devuelve el valor evaluado de una celda en Excel usando win32com, sin dejar rastro."""
     pythoncom.CoInitialize()
+    valor = None
     try:
         excel = win32.Dispatch("Excel.Application")
         excel.Visible = False
         excel.DisplayAlerts = False
         wb = excel.Workbooks.Open(ruta)
         hoja = wb.Sheets(hoja_nombre)
-        valor = hoja.Cells(fila, columna).Value
+        # Copiar la celda original
+        hoja.Cells(fila, columna).Copy()
+        # Pegar como valor en la celda a la derecha
+        hoja.Cells(fila, columna + 1).PasteSpecial(Paste=-4163)  # xlPasteValues
+        # Leer el valor pegado
+        valor = hoja.Cells(fila, columna + 1).Value
+        # Borrar el valor pegado
+        hoja.Cells(fila, columna + 1).Value = ""
         wb.Close(SaveChanges=False)
-        return valor
     except Exception as e:
         print(f"Error al obtener valor de Excel: {e}")
-        return 0
+        valor = 0
     finally:
         try:
             excel.Quit()
         except:
             pass
         pythoncom.CoUninitialize()
+    return valor
 
 def escribir(hoja, f, c, v, num=False):
     celda = hoja.cell(row=f, column=c, value=v)
