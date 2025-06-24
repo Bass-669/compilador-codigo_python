@@ -159,15 +159,14 @@ def procesar_datos(entrada, torno, mes, dia, anio):
             # Borrar columnas auxiliares (torno, mes, etc.) solo en la fila de la autosuma
             for col in range(25, 30):
                 hoja.cell(row=fila_autosuma, column=col, value="")
-            
-            # Guarda el valor que había antes en la celda de autosuma
-            celda_origen = hoja.cell(row=fila_autosuma, column=30).value
-            messagebox.showinfo("Valor CO", f"Valor celda origen: {celda_origen}")    
+ 
             # Ahora sí: sobrescribimos con la fórmula de autosuma
             celda_autosuma = hoja.cell(row=fila_autosuma, column=30)
             celda_autosuma.value = f"=SUM(AD{f_ini}:AD{fila_autosuma - 1})"
             celda_autosuma.fill = FILL_AMARILLO
-
+            # Guarda el valor que había antes en la celda de autosuma
+            celda_origen = hoja.cell(row=fila_autosuma, column=30).value
+            messagebox.showinfo("Valor CO", f"Valor celda origen: {celda_origen}")   
 
             bloque_texto = " ".join(b).upper()
             tipo_bloque = "PODADO" if "PODADO" in bloque_texto else "REGULAR"
