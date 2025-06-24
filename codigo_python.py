@@ -96,22 +96,29 @@ def ejecutar(txt, torno, mes, dia, anio):
 def procesar_datos(entrada, torno, mes, dia, anio):
     bloques_detectados = []
     sumas_ad_por_bloque = []
+
     if not os.path.exists(RUTA_ENTRADA):
         messagebox.showerror("Error", f"No se encontró:\n{RUTA_ENTRADA}")
         return None, None
+
     try:
         wb = openpyxl.load_workbook(RUTA_ENTRADA)
         hoja = wb["IR diario "]
+
         ultima_fila = None
         for fila in hoja.iter_rows():
             if [str(c.value).strip() if c.value else "" for c in fila[:3]] == ["*", "*", "..."]:
                 ultima_fila = fila[0].row
+
         if not ultima_fila:
             raise ValueError("No se encontró '* * ...'")
+
         fila = ultima_fila + 1
+
         for b in extraer_bloques(entrada):
             f_ini = fila
             subs = sub_bloques(b)
+
             for sub in subs:
                 txt = sub[0] if not re.match(r'^\d', sub[0]) else ""
                 datos = sub[1:] if txt else sub
@@ -125,63 +132,73 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                 )
                 col_nums = [val for l in datos for val in l.strip().split()]
                 fila_vals = col_txt + col_nums
+
                 for col, val in enumerate(fila_vals[:24], 1):
                     try:
                         n = float(val.replace(",", ".")) if 3 <= col <= 24 and val else val
                         escribir(hoja, fila, col, n, isinstance(n, float))
                     except:
                         escribir(hoja, fila, col, val)
+
                 for col, val in zip(range(25, 29), [torno, mes, dia, anio]):
                     hoja.cell(row=fila, column=col, value=val).alignment = ALIGN_R
+
                 fila += 1
+
             f_fin = fila - 1
+
             for f in range(f_ini, f_fin):
                 hoja.cell(row=f, column=30, value=f"=AC{f}*D{f}/D{f_fin}")
+
             celda_suma = hoja.cell(row=f_fin, column=30)
             if f_fin - f_ini >= 1:
                 celda_suma.value = f"=SUM(AD{f_ini}:AD{f_fin - 1})"
             else:
                 celda_suma.value = ""
-                celda_origen = f"AD{f_fin}"
-                temp_path = crear_archivo_temporal_con_ae(celda_origen)
-                if not temp_path:
-                    return None, None
             celda_suma.fill = FILL_AMARILLO
+
+            # Obtener suma_ad desde archivo temporal
+            celda_origen = f"AD{f_fin}"
+            temp_path, suma_ad = crear_archivo_temporal_con_ae(celda_origen)
+            if not temp_path:
+                return None, None
+
             bloque_texto = " ".join(b).upper()
             tipo_bloque = "PODADO" if "PODADO" in bloque_texto else "REGULAR"
+
             valor_d = hoja.cell(row=f_fin, column=4).value
             try:
                 valor_d = float(str(valor_d).replace(",", ".")) if valor_d else 0
             except:
                 valor_d = 0
-            suma_ad = 0
-            # for f in range(f_ini, f_fin):
-            #     valor = obtener_valor_excel(RUTA_ENTRADA, "IR diario ", f, 30)
-            #     try:
-            #         suma_ad += float(valor)
-            #     except:
-            #         pass
+
             bloques_detectados.append((tipo_bloque, valor_d))
             sumas_ad_por_bloque.append(suma_ad)
+
             if tipo_bloque != "PODADO":
                 for col in range(25, 30):
                     hoja.cell(row=f_fin, column=col, value="")
+
         backup_path = os.path.join(CARPETA, "Reporte IR Tornos copia_de_seguridad.xlsx")
         shutil.copy(RUTA_ENTRADA, backup_path)
         wb.save(RUTA_ENTRADA)
         shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
-        temp_path = crear_archivo_temporal_con_ae()
-        if not temp_path:
-            return None, None
+
         return bloques_detectados, sumas_ad_por_bloque
+
     except Exception as e:
         messagebox.showerror("Error", f"Error al procesar datos:\n{e}")
         return None, None
+
     finally:
         if 'wb' in locals():
             wb.close()
 
 def crear_archivo_temporal_con_ae(celda_origen):
+    import pythoncom
+    import win32com.client as win32
+    import openpyxl
+
     pythoncom.CoInitialize()
     excel = win32.Dispatch("Excel.Application")
     excel.Visible = False
@@ -191,31 +208,27 @@ def crear_archivo_temporal_con_ae(celda_origen):
         wb = excel.Workbooks.Open(RUTA_ENTRADA)
         hoja = wb.Sheets("IR diario ")
 
-        # Copiar fórmula de autosuma a AE1
         hoja.Range("AE1").Formula = hoja.Range(celda_origen).Formula
 
-        # Guardar archivo temporal
         temp_path = os.path.join(BASE_DIR, CARPETA, "temp_report.xlsx")
         wb.SaveAs(temp_path)
         wb.Close(False)
         excel.Quit()
 
-        # Leer el valor de AE1 desde el archivo temporal
         wb_temp = openpyxl.load_workbook(temp_path, data_only=True)
         hoja_temp = wb_temp["IR diario "]
         valor_ae1 = hoja_temp["AE1"].value
         wb_temp.close()
 
-        # Mostrar el valor en un messagebox
         messagebox.showinfo("Valor AE1", f"Valor de AE1 (autosuma): {valor_ae1}")
 
-        return temp_path, valor_ae1
+        return temp_path, float(valor_ae1) if valor_ae1 else 0.0
 
     except Exception as e:
         excel.Quit()
         pythoncom.CoUninitialize()
         messagebox.showerror("Error", f"No se pudo generar archivo temporal:\n{e}")
-        return None, None
+        return None, 0.0
 
     finally:
         pythoncom.CoUninitialize()
