@@ -165,8 +165,9 @@ def procesar_datos(entrada, torno, mes, dia, anio):
             celda_autosuma.value = f"=SUM(AD{f_ini}:AD{fila_autosuma - 1})"
             celda_autosuma.fill = FILL_AMARILLO
             # Guarda el valor que había antes en la celda de autosuma
-            celda_origen = celda_autosuma
-            messagebox.showinfo("Valor CO", f"Valor celda origen: {celda_origen}")   
+            celda_origen = f"AD{fila_autosuma}"  # Dirección como texto
+            messagebox.showinfo("Celda origen", f"Se usará: {celda_origen}")
+
 
             bloque_texto = " ".join(b).upper()
             tipo_bloque = "PODADO" if "PODADO" in bloque_texto else "REGULAR"
