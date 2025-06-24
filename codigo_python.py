@@ -93,16 +93,6 @@ def ejecutar(txt, torno, mes, dia, anio):
         cerrar_carga()
         ventana.destroy()
 
-def obtener_valor_numerico(hoja, fila, columna):
-    valor = hoja.cell(row=fila, column=columna).value
-    if valor is None:
-        return 0.0
-    if isinstance(valor, str):
-        try:
-            return float(valor.replace(",", "."))
-        except ValueError:
-            return 0.0
-    return float(valor)
 
 def procesar_datos(entrada, torno, mes, dia, anio):
     bloques_detectados = []
@@ -215,6 +205,7 @@ def procesar_datos(entrada, torno, mes, dia, anio):
             else:
                 celda_suma.value = ""
             celda_suma.fill = FILL_AMARILLO
+
             # Vaciar columnas Y–AC en la última fila del bloque
             for col in range(25, 30):
                 hoja.cell(row=f_fin, column=col, value=None)
@@ -228,14 +219,14 @@ def procesar_datos(entrada, torno, mes, dia, anio):
             sumas_ad_por_bloque.append(suma_ad)
             messagebox.showinfo("Resumen", f"{tipo_bloque} – D: {d_fin:.2f}, AD: {suma_ad:.4f}")
 
-        wb.save(RUTA_ENTRADA)
+        wb.save(temp_path)
         wb.close()
-        shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
         return bloques_detectados, sumas_ad_por_bloque
 
     except Exception as e:
         messagebox.showerror("Error", f"Error al procesar datos:\n{e}")
         return None, None
+
 
 def escribir(hoja, f, c, v, num=False):
     celda = hoja.cell(row=f, column=c, value=v)
