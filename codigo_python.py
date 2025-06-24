@@ -144,7 +144,7 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                     hoja.cell(row=fila, column=col, value=val).alignment = ALIGN_R
 
                 fila += 1
-            f_fin = fila - 1
+            """f_fin = fila - 1
 
             for f in range(f_ini, f_fin):
                 hoja.cell(row=f, column=30, value=f"=AC{f}*D{f}/D{f_fin}")
@@ -154,7 +154,19 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                 celda_suma.value = f"=SUM(AD{f_ini}:AD{f_fin - 1})"
             else:
                 celda_suma.value = ""
-            celda_suma.fill = FILL_AMARILLO
+            celda_suma.fill = FILL_AMARILLO"""
+
+            f_fin = fila - 1
+            tipo_bloque = "PODADO" if "PODADO" in txt.upper() else "REGULAR"
+            bloques_detectados.append((tipo_bloque, f_fin))
+    
+            if len(subs) > 1:
+                for f in range(f_ini, f_fin + 1):
+                    hoja.cell(row=f, column=30, value=f"=AC{f}*D{f}/D{f_fin}")
+    
+            for col in range(25, 30):
+                hoja.cell(row=f_fin, column=col, value="")
+            hoja.cell(row=f_fin, column=30, value=f"=SUM(AD{f_ini}:AD{f_fin - 1})").fill = FILL_AMARILLO
 
             # Obtener suma_ad desde archivo temporal
             celda_origen = f"AD{f_fin}"
