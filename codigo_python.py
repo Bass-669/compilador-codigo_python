@@ -162,6 +162,7 @@ def procesar_datos(entrada, torno, mes, dia, anio):
             
             # Guardar referencia estilo Excel
             celda_origen = celda_autosuma.coordinate
+            messagebox.showinfo("Valor CO", f"Valor celda origen: {celda_origen}")
 
             temp_path, suma_ad = crear_archivo_temporal_con_ae(celda_origen)
             if not temp_path:
