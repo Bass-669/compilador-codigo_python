@@ -215,27 +215,22 @@ def crear_archivo_temporal_con_ae(celda_origen):
     try:
         wb = excel.Workbooks.Open(RUTA_ENTRADA)
         hoja = wb.Sheets("IR diario ")
-
         # Obtener número de fila desde celda_origen (ej. "AD43256" → 43256)
         fila = int(''.join(filter(str.isdigit, celda_origen)))
-
         # Copiar la celda con fórmula de AD{fila}
         hoja.Range(celda_origen).Copy()
-
         # Pegar solo el valor en AE{fila}
         celda_destino = f"AE{fila}"
         hoja.Range(celda_destino).PasteSpecial(Paste=-4163)  # xlPasteValues
-
         # Mostrar valor de AE justo después del pegado
         valor_pego = hoja.Range(celda_destino).Value
         messagebox.showinfo("Copiado a AE", f"Valor pegado en {celda_destino}: {valor_pego}")
-
+        messagebox.showinfo("Copiado a AE", f"Valor pegado en {celda_destino}: {hoja.Range(celda_destino).Value}")#dsfsdf
         # Guardar archivo temporal ahora
         temp_path = os.path.join(BASE_DIR, CARPETA, "temp_report.xlsx")
         wb.SaveAs(temp_path)
         wb.Close(False)
         excel.Quit()
-
         # Leer valor desde el archivo temporal (modo data_only)
         wb_temp = openpyxl.load_workbook(temp_path, data_only=True)
         hoja_temp = wb_temp["IR diario "]
