@@ -101,43 +101,60 @@ def procesar_datos(entrada, torno, mes, dia, anio):
     if not os.path.exists(RUTA_ENTRADA):
         messagebox.showerror("Error", f"No se encontró:\n{RUTA_ENTRADA}")
         return None, None
-
-    # === Paso 1: Escribir datos nuevos en RUTA_ENTRADA ===
-    try:
-        wb = openpyxl.load_workbook(RUTA_ENTRADA)
-        hoja = wb["IR diario "]
-        fila = hoja.max_row + 1
-
-        bloques = extraer_bloques(entrada)
-        for b in bloques:
-            subs = sub_bloques(b)
-            for sub in subs:
-                txt = sub[0] if not re.match(r'^\d', sub[0]) else ""
-                datos = sub[1:] if txt else sub
-                p = txt.split()
-                col_txt = (
-                    [p[0], p[1], p[2], p[3], "", p[4]] if "*" in txt and len(p) >= 5 and p[0] == "*" else
-                    ["*", "*", "...", "", "", ""] if "*" in txt else
-                    [p[0], p[1], p[2], p[3], "", p[4]] if len(p) >= 5 else
-                    ["", p[0], p[1], p[2], "", p[3]] if len(p) == 4 else [""] * 6
-                )
-                col_nums = [val for l in datos for val in l.strip().split()]
-                fila_vals = col_txt + col_nums
-                for col, val in enumerate(fila_vals[:24], 1):
-                    try:
-                        n = float(val.replace(",", ".")) if 3 <= col <= 24 and val else val
-                        escribir(hoja, fila, col, n, isinstance(n, float))
-                    except:
-                        escribir(hoja, fila, col, val)
-                for col, val in zip(range(25, 29), [torno, mes, dia, anio]):
-                    hoja.cell(row=fila, column=col, value=val).alignment = ALIGN_R
-                fila += 1
-
-        wb.save(RUTA_ENTRADA)
-        wb.close()
-    except Exception as e:
-        messagebox.showerror("Error", f"No se pudo escribir datos:\n{e}")
-        return None, None
+        # === Paso 1: Escribir datos nuevos en RUTA_ENTRADA ===
+        try:
+            wb = openpyxl.load_workbook(RUTA_ENTRADA)
+            hoja = wb["IR diario "]
+        
+            # Buscar la última fila con "* * ..."
+            ultima_fila = None
+            for fila in hoja.iter_rows():
+                if [str(c.value).strip() if c.value else "" for c in fila[:3]] == ["*", "*", "..."]:
+                    ultima_fila = fila[0].row
+        
+            if not ultima_fila:
+                messagebox.showerror("Error", "No se encontró '* * ...'")
+                return None, None
+        
+            fila = ultima_fila + 1  # Comenzar justo después
+        
+            bloques = extraer_bloques(entrada)
+            for b in bloques:
+                subs = sub_bloques(b)
+                f_ini = fila  # Guardar inicio del bloque
+                for sub in subs:
+                    txt = sub[0] if not re.match(r'^\d', sub[0]) else ""
+                    datos = sub[1:] if txt else sub
+                    p = txt.split()
+                    col_txt = (
+                        [p[0], p[1], p[2], p[3], "", p[4]] if "*" in txt and len(p) >= 5 and p[0] == "*" else
+                        ["*", "*", "...", "", "", ""] if "*" in txt else
+                        [p[0], p[1], p[2], p[3], "", p[4]] if len(p) >= 5 else
+                        ["", p[0], p[1], p[2], "", p[3]] if len(p) == 4 else [""] * 6
+                    )
+                    col_nums = [val for l in datos for val in l.strip().split()]
+                    fila_vals = col_txt + col_nums
+                    for col, val in enumerate(fila_vals[:24], 1):
+                        try:
+                            n = float(val.replace(",", ".")) if 3 <= col <= 24 and val else val
+                            escribir(hoja, fila, col, n, isinstance(n, float))
+                        except:
+                            escribir(hoja, fila, col, val)
+                    for col, val in zip(range(25, 29), [torno, mes, dia, anio]):
+                        hoja.cell(row=fila, column=col, value=val).alignment = ALIGN_R
+                    fila += 1
+        
+                f_fin = fila - 1  # Última fila del bloque
+        
+                # Limpiar columnas Y–AC solo en la última fila del bloque
+                for col in range(25, 30):
+                    hoja.cell(row=f_fin, column=col, value=None)
+        
+            wb.save(RUTA_ENTRADA)
+            wb.close()
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo escribir datos:\n{e}")
+            return None, None
 
     # === Paso 2: Crear archivo temporal con AC → AE ===
     pythoncom.CoInitialize()
