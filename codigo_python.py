@@ -195,38 +195,32 @@ def procesar_datos(entrada, torno, mes, dia, anio):
         if 'wb' in locals():
             wb.close()
 
+import time
+
 def crear_archivo_temporal_con_ae(celda_origen):
     pythoncom.CoInitialize()
     excel = win32.Dispatch("Excel.Application")
     excel.Visible = False
     excel.DisplayAlerts = False
-
     try:
         wb = excel.Workbooks.Open(RUTA_ENTRADA)
         hoja = wb.Sheets("IR diario ")
-
-        # Forzar recálculo de fórmulas
+        # Forzar recálculo
         excel.CalculateUntilAsyncQueriesDone()
         wb.Application.CalculateFull()
-
-        # Obtener valor evaluado de la celda de autosuma
+        time.sleep(1.5)  # Esperar 1.5 segundos para asegurar que Excel termine
+        # Obtener valor evaluado
         valor_suma = hoja.Range(celda_origen).Value
-
-        # Obtener fila desde la celda_origen (ej. "AD43134" → 43134)
+        # Obtener número de fila
         fila = int(''.join(filter(str.isdigit, celda_origen)))
-
-        # Escribir el valor en la columna AE (columna 31) de esa fila
+        # Escribir valor en AE{fila}
         hoja.Cells(fila, 31).Value = valor_suma  # AE = columna 31
-
         # Guardar archivo temporal
         temp_path = os.path.join(BASE_DIR, CARPETA, "temp_report.xlsx")
         wb.SaveAs(temp_path)
         wb.Close(False)
         excel.Quit()
-
-        # Mostrar el valor en un messagebox
         messagebox.showinfo("Valor AE", f"Valor de autosuma en AE{fila}: {valor_suma}")
-
         return temp_path, float(valor_suma) if valor_suma else 0.0
 
     except Exception as e:
@@ -234,10 +228,8 @@ def crear_archivo_temporal_con_ae(celda_origen):
         pythoncom.CoUninitialize()
         messagebox.showerror("Error", f"No se pudo generar archivo temporal:\n{e}")
         return None, 0.0
-
     finally:
         pythoncom.CoUninitialize()
-
 
 def escribir(hoja, f, c, v, num=False):
     celda = hoja.cell(row=f, column=c, value=v)
