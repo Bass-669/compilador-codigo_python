@@ -203,26 +203,33 @@ def crear_archivo_temporal_con_ae(celda_origen):
     excel.Visible = False
     excel.DisplayAlerts = False
     try:
+        # Abrir archivo original
         wb = excel.Workbooks.Open(RUTA_ENTRADA)
         hoja = wb.Sheets("IR diario ")
-        # Forzar recálculo
+        # Asegurar modo de cálculo automático
+        excel.Calculation = -4105  # xlCalculationAutomatic
+        # Forzar recálculo completo
         excel.CalculateUntilAsyncQueriesDone()
         wb.Application.CalculateFull()
-        time.sleep(10)  # Esperar 1.5 segundos para asegurar que Excel termine
-        # Obtener valor evaluado
-        valor_suma = hoja.Range(celda_origen).Value
+        time.sleep(1)
         # Obtener número de fila
         fila = int(''.join(filter(str.isdigit, celda_origen)))
+        # Obtener valor evaluado
+        valor_suma = hoja.Range(celda_origen).Value
         # Escribir valor en AE{fila}
-        hoja.Cells(fila, 31).Value = valor_suma  # AE = columna 31
+        hoja.Cells(fila, 31).Value = valor_suma
         # Guardar archivo temporal
         temp_path = os.path.join(BASE_DIR, CARPETA, "temp_report.xlsx")
         wb.SaveAs(temp_path)
         wb.Close(False)
         excel.Quit()
-        messagebox.showinfo("Valor AE", f"Valor de autosuma en AE{fila}: {valor_suma}")
-        return temp_path, float(valor_suma) if valor_suma else 0.0
-
+        # Reabrir con openpyxl para asegurar lectura del valor
+        wb_temp = openpyxl.load_workbook(temp_path, data_only=True)
+        hoja_temp = wb_temp["IR diario "]
+        valor_final = hoja_temp.cell(row=fila, column=31).value
+        wb_temp.close()
+        messagebox.showinfo("Valor AE", f"Valor de autosuma en AE{fila}: {valor_final}")
+        return temp_path, float(valor_final) if valor_final else 0.0
     except Exception as e:
         excel.Quit()
         pythoncom.CoUninitialize()
