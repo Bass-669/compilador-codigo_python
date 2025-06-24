@@ -93,7 +93,6 @@ def ejecutar(txt, torno, mes, dia, anio):
         cerrar_carga()
         ventana.destroy()
 
-
 def procesar_datos(entrada, torno, mes, dia, anio):
     bloques_detectados = []
     sumas_ad_por_bloque = []
@@ -101,118 +100,50 @@ def procesar_datos(entrada, torno, mes, dia, anio):
     if not os.path.exists(RUTA_ENTRADA):
         messagebox.showerror("Error", f"No se encontró:\n{RUTA_ENTRADA}")
         return None, None
-        # === Paso 1: Escribir datos nuevos en RUTA_ENTRADA ===
-        try:
-            wb = openpyxl.load_workbook(RUTA_ENTRADA)
-            hoja = wb["IR diario "]
-        
-            # Buscar la última fila con "* * ..."
-            ultima_fila = None
-            for fila in hoja.iter_rows():
-                if [str(c.value).strip() if c.value else "" for c in fila[:3]] == ["*", "*", "..."]:
-                    ultima_fila = fila[0].row
-        
-            if not ultima_fila:
-                messagebox.showerror("Error", "No se encontró '* * ...'")
-                return None, None
-        
-            fila = ultima_fila + 1  # Comenzar justo después
-        
-            bloques = extraer_bloques(entrada)
-            for b in bloques:
-                subs = sub_bloques(b)
-                f_ini = fila  # Guardar inicio del bloque
-                for sub in subs:
-                    txt = sub[0] if not re.match(r'^\d', sub[0]) else ""
-                    datos = sub[1:] if txt else sub
-                    p = txt.split()
-                    col_txt = (
-                        [p[0], p[1], p[2], p[3], "", p[4]] if "*" in txt and len(p) >= 5 and p[0] == "*" else
-                        ["*", "*", "...", "", "", ""] if "*" in txt else
-                        [p[0], p[1], p[2], p[3], "", p[4]] if len(p) >= 5 else
-                        ["", p[0], p[1], p[2], "", p[3]] if len(p) == 4 else [""] * 6
-                    )
-                    col_nums = [val for l in datos for val in l.strip().split()]
-                    fila_vals = col_txt + col_nums
-                    for col, val in enumerate(fila_vals[:24], 1):
-                        try:
-                            n = float(val.replace(",", ".")) if 3 <= col <= 24 and val else val
-                            escribir(hoja, fila, col, n, isinstance(n, float))
-                        except:
-                            escribir(hoja, fila, col, val)
-                    for col, val in zip(range(25, 29), [torno, mes, dia, anio]):
-                        hoja.cell(row=fila, column=col, value=val).alignment = ALIGN_R
-                    fila += 1
-        
-                f_fin = fila - 1  # Última fila del bloque
-        
-                # Limpiar columnas Y–AC solo en la última fila del bloque
-                for col in range(25, 30):
-                    hoja.cell(row=f_fin, column=col, value=None)
-        
-            wb.save(RUTA_ENTRADA)
-            wb.close()
-        except Exception as e:
-            messagebox.showerror("Error", f"No se pudo escribir datos:\n{e}")
-            return None, None
 
-    # === Paso 2: Crear archivo temporal con AC → AE ===
-    pythoncom.CoInitialize()
-    excel = win32.Dispatch("Excel.Application")
-    excel.Visible = False
-    excel.DisplayAlerts = False
     try:
-        wb = excel.Workbooks.Open(RUTA_ENTRADA)
-        hoja = wb.Sheets("IR diario ")
-        used_rows = hoja.UsedRange.Rows.Count
-        hoja.Range(f"AE1:AE{used_rows}").Value = hoja.Range(f"AC1:AC{used_rows}").Value
-        temp_path = os.path.join(BASE_DIR, CARPETA, "temp_report.xlsx")
-        wb.SaveAs(temp_path)
-        wb.Close(False)
-        excel.Quit()
-    except Exception as e:
-        messagebox.showerror("Error", f"No se pudo generar archivo temporal:\n{e}")
-        excel.Quit()
-        pythoncom.CoUninitialize()
-        return None, None
-    pythoncom.CoUninitialize()
-
-    # === Paso 3: Leer desde archivo temporal y calcular ===
-    try:
-        wb = openpyxl.load_workbook(temp_path, data_only=True)
+        wb = openpyxl.load_workbook(RUTA_ENTRADA)
         hoja = wb["IR diario "]
+
         ultima_fila = None
         for fila in hoja.iter_rows():
             if [str(c.value).strip() if c.value else "" for c in fila[:3]] == ["*", "*", "..."]:
                 ultima_fila = fila[0].row
+
         if not ultima_fila:
-            messagebox.showerror("Error", "No se encontró '* * ...'")
-            return None, None
+            raise ValueError("No se encontró '* * ...'")
 
         fila = ultima_fila + 1
-        bloques = extraer_bloques(entrada)
-        for b in bloques:
+
+        for b in extraer_bloques(entrada):
             f_ini = fila
             subs = sub_bloques(b)
-            valores_d, valores_ae = [], []
+
             for sub in subs:
-                valor_d = hoja.cell(row=fila, column=4).value
-                try:
-                    valor_d = float(str(valor_d).replace(",", ".")) if valor_d else 0.0
-                except:
-                    valor_d = 0.0
-                valores_d.append(valor_d)
-
-                valor_ae = hoja.cell(row=fila, column=31).value
-                try:
-                    valor_ae = float(str(valor_ae).replace(",", ".")) if valor_ae else 0.0
-                except:
-                    valor_ae = 0.0
-                valores_ae.append(valor_ae)
-
+                txt = sub[0] if not re.match(r'^\d', sub[0]) else ""
+                datos = sub[1:] if txt else sub
+                p = txt.split()
+                col_txt = (
+                    [p[0], p[1], p[2], p[3], "", p[4]] if "*" in txt and len(p) >= 5 and p[0] == "*" else
+                    ["*", "*", "...", "", "", ""] if "*" in txt else
+                    [p[0], p[1], p[2], p[3], "", p[4]] if len(p) >= 5 else
+                    ["", p[0], p[1], p[2], "", p[3]] if len(p) == 4 else
+                    [""] * 6
+                )
+                col_nums = [val for l in datos for val in l.strip().split()]
+                fila_vals = col_txt + col_nums
+                for col, val in enumerate(fila_vals[:24], 1):
+                    try:
+                        n = float(val.replace(",", ".")) if 3 <= col <= 24 and val else val
+                        escribir(hoja, fila, col, n, isinstance(n, float))
+                    except:
+                        escribir(hoja, fila, col, val)
+                for col, val in zip(range(25, 29), [torno, mes, dia, anio]):
+                    hoja.cell(row=fila, column=col, value=val).alignment = ALIGN_R
                 fila += 1
 
             f_fin = fila - 1
+
             for f in range(f_ini, f_fin):
                 hoja.cell(row=f, column=30, value=f"=AC{f}*D{f}/D{f_fin}")
 
@@ -221,29 +152,79 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                 celda_suma.value = f"=SUM(AD{f_ini}:AD{f_fin - 1})"
             else:
                 celda_suma.value = ""
+                celda_origen = f"AD{f_fin}"
+                temp_path = crear_archivo_temporal_con_ae(celda_origen)
+                if not temp_path:
+                    return None, None
+
             celda_suma.fill = FILL_AMARILLO
+            bloque_texto = " ".join(b).upper()
+            tipo_bloque = "PODADO" if "PODADO" in bloque_texto else "REGULAR"
+            valor_d = hoja.cell(row=f_fin, column=4).value
+            try:
+                valor_d = float(str(valor_d).replace(",", ".")) if valor_d else 0
+            except:
+                valor_d = 0
 
-            # Vaciar columnas Y–AC en la última fila del bloque
-            for col in range(25, 30):
-                hoja.cell(row=f_fin, column=col, value=None)
-
-            # Obtener valor de la autosuma directamente
-            suma_ad = celda_suma.value if isinstance(celda_suma.value, (int, float)) else 0.0
-            d_fin = valores_d[-1] if valores_d else 0.0
-            tipo_bloque = "PODADO" if "PODADO" in " ".join(b).upper() else "REGULAR"
-
-            bloques_detectados.append((tipo_bloque, d_fin))
+            suma_ad = 0
+            for f in range(f_ini, f_fin):
+                valor = obtener_valor_excel(RUTA_ENTRADA, "IR diario ", f, 30)
+                try:
+                    suma_ad += float(valor)
+                except:
+                    pass
+            bloques_detectados.append((tipo_bloque, valor_d))
             sumas_ad_por_bloque.append(suma_ad)
-            messagebox.showinfo("Resumen", f"{tipo_bloque} – D: {d_fin:.2f}, AD: {suma_ad:.4f}")
 
-        wb.save(temp_path)
-        wb.close()
+            if tipo_bloque != "PODADO":
+                for col in range(25, 30):
+                    hoja.cell(row=f_fin, column=col, value="")
+
+        backup_path = os.path.join(CARPETA, "Reporte IR Tornos copia_de_seguridad.xlsx")
+        shutil.copy(RUTA_ENTRADA, backup_path)
+        wb.save(RUTA_ENTRADA)
+        shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
+        temp_path = crear_archivo_temporal_con_ae()
+        if not temp_path:
+            return None, None
+
         return bloques_detectados, sumas_ad_por_bloque
 
     except Exception as e:
         messagebox.showerror("Error", f"Error al procesar datos:\n{e}")
         return None, None
+    finally:
+        if 'wb' in locals():
+            wb.close()
 
+def crear_archivo_temporal_con_ae(celda_origen):
+    pythoncom.CoInitialize()
+    excel = win32.Dispatch("Excel.Application")
+    excel.Visible = False
+    excel.DisplayAlerts = False
+
+    try:
+        wb = excel.Workbooks.Open(RUTA_ENTRADA)
+        hoja = wb.Sheets("IR diario ")
+
+        # Copiar solo la celda de autosuma a AE1
+        hoja.Range("AE1").Formula = hoja.Range(celda_origen).Formula
+
+        # Guardar archivo temporal
+        temp_path = os.path.join(BASE_DIR, CARPETA, "temp_report.xlsx")
+        wb.SaveAs(temp_path)
+        wb.Close(False)
+        excel.Quit()
+        return temp_path
+
+    except Exception as e:
+        excel.Quit()
+        pythoncom.CoUninitialize()
+        messagebox.showerror("Error", f"No se pudo generar archivo temporal:\n{e}")
+        return None
+
+    finally:
+        pythoncom.CoUninitialize()
 
 def escribir(hoja, f, c, v, num=False):
     celda = hoja.cell(row=f, column=c, value=v)
