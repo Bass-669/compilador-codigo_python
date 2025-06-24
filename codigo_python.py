@@ -153,16 +153,22 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                 for f in range(f_ini, f_fin + 1):
                     hoja.cell(row=f, column=30, value=f"=AC{f}*D{f}/D{f_fin}")
 
+            # Calcular la fila real donde colocarás la suma
+            fila_autosuma = fila - 1  # porque después del último subbloque, fila ya se incrementó una más
+            
+            # Borrar columnas auxiliares (torno, mes, etc.) solo en la fila de la autosuma
             for col in range(25, 30):
-                hoja.cell(row=f_fin, column=col, value="")
-
-            celda_autosuma = hoja.cell(row=f_fin, column=30)
-            celda_autosuma.value = f"=SUM(AD{f_ini}:AD{f_fin - 1})"
+                hoja.cell(row=fila_autosuma, column=col, value="")
+            
+            # Escribir fórmula de autosuma y formato
+            celda_autosuma = hoja.cell(row=fila_autosuma, column=30)  # columna AD = 30
+            celda_autosuma.value = f"=SUM(AD{f_ini}:AD{fila_autosuma - 1})"
             celda_autosuma.fill = FILL_AMARILLO
             
-            # Guardar referencia estilo Excel
+            # Guardar coordenada real
             celda_origen = celda_autosuma.coordinate
             messagebox.showinfo("Valor CO", f"Valor celda origen: {celda_origen}")
+
 
             temp_path, suma_ad = crear_archivo_temporal_con_ae(celda_origen)
             if not temp_path:
