@@ -184,9 +184,12 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                 for col in range(25, 30):
                     hoja.cell(row=f_fin, column=col, value="")
 
-            temp_path = crear_archivo_temporal_con_ae(celda_origen)
+            temp_path, valor_ae = crear_archivo_temporal_con_ae(celda_origen)
             if not temp_path:
                 return None, None
+            
+            sumas_ad_por_bloque.append(valor_ae)  # Guardar el valor real desde AE
+
 
         backup_path = os.path.join(CARPETA, "Reporte IR Tornos copia_de_seguridad.xlsx")
         shutil.copy(RUTA_ENTRADA, backup_path)
@@ -216,25 +219,30 @@ def crear_archivo_temporal_con_ae(celda_origen):
         # Obtener número de fila desde celda_origen (ej. "AD43256" → 43256)
         fila = int(''.join(filter(str.isdigit, celda_origen)))
 
-        # Copiar la celda con fórmula
+        # Copiar la celda con fórmula de AD{fila}
         hoja.Range(celda_origen).Copy()
 
         # Pegar solo el valor en AE{fila}
-        hoja.Range(f"AE{fila}").PasteSpecial(Paste=-4163)  # xlPasteValues
+        celda_destino = f"AE{fila}"
+        hoja.Range(celda_destino).PasteSpecial(Paste=-4163)  # xlPasteValues
 
-        # Guardar archivo temporal
+        # Mostrar valor de AE justo después del pegado
+        valor_pego = hoja.Range(celda_destino).Value
+        messagebox.showinfo("Copiado a AE", f"Valor pegado en {celda_destino}: {valor_pego}")
+
+        # Guardar archivo temporal ahora
         temp_path = os.path.join(BASE_DIR, CARPETA, "temp_report.xlsx")
         wb.SaveAs(temp_path)
         wb.Close(False)
         excel.Quit()
 
-        # Leer el valor pegado desde el archivo temporal
+        # Leer valor desde el archivo temporal (modo data_only)
         wb_temp = openpyxl.load_workbook(temp_path, data_only=True)
         hoja_temp = wb_temp["IR diario "]
         valor_final = hoja_temp.cell(row=fila, column=31).value  # AE = col 31
         wb_temp.close()
 
-        messagebox.showinfo("Valor AE", f"Valor de autosuma en AE{fila}: {valor_final}")
+        messagebox.showinfo("Valor final AE", f"Valor leído desde archivo en AE{fila}: {valor_final}")
         return temp_path, float(valor_final) if valor_final else 0.0
 
     except Exception as e:
@@ -301,18 +309,20 @@ def escribir_valor_bloque(hoja, col_dia, torno, valor, tipo_bloque):
     celda.value = valor_final
     celda.number_format = '0' # pequeño cambio de 0.00 a 0
 
-def escribir_valores_resumen_bloques(hoja, col_dia, torno, porcentajes_por_bloque, tipos_bloque):
-    for i, (tipo_bloque, porcentaje) in enumerate(zip(tipos_bloque, porcentajes_por_bloque)):
+def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque, tipos_bloque):
+    for i, (tipo_bloque, valor_ae) in enumerate(zip(tipos_bloque, valores_ae_por_bloque)):
         tipo_bloque = tipo_bloque.strip().upper()
         if tipo_bloque == "PODADO":
             fila_valor = 13 if torno == 1 else 14
         elif tipo_bloque == "REGULAR":
             fila_valor = 18 if torno == 1 else 19
         else:
-            continue
+            continue  # ignorar bloques con tipo desconocido
+
         celda = hoja.cell(row=fila_valor, column=col_dia)
-        celda.value = porcentaje / 100 if porcentaje > 1 else porcentaje  # Asegurar valor decimal
-        celda.number_format = '0.00%'
+        celda.value = valor_ae / 100 if valor_ae > 1 else valor_ae  # Porcentaje en decimal
+        celda.number_format = '0.00%'  # Formato de porcentaje con 2 decimales
+
 
 def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque ):
     """Función principal para crear/modificar la hoja de reporte"""
