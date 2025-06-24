@@ -156,7 +156,13 @@ def procesar_datos(entrada, torno, mes, dia, anio):
             for col in range(25, 30):
                 hoja.cell(row=f_fin, column=col, value="")
 
-            hoja.cell(row=f_fin, column=30, value=f"=SUM(AD{f_ini}:AD{f_fin - 1})").fill = FILL_AMARILLO
+            celda_autosuma = hoja.cell(row=f_fin, column=30)
+            celda_autosuma.value = f"=SUM(AD{f_ini}:AD{f_fin - 1})"
+            celda_autosuma.fill = FILL_AMARILLO
+            
+            # Guardar referencia estilo Excel
+            celda_origen = celda_autosuma.coordinate  # Esto da "AD43274", por ejemplo
+
 
             # Obtener suma_ad desde archivo temporal
             celda_origen = f"AD{f_fin}"
