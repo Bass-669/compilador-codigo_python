@@ -160,14 +160,13 @@ def procesar_datos(entrada, torno, mes, dia, anio):
             for col in range(25, 30):
                 hoja.cell(row=fila_autosuma, column=col, value="")
             
-            # Escribir fórmula de autosuma y formato
-            celda_autosuma = hoja.cell(row=fila_autosuma, column=30)  # columna AD = 30
+            # Guarda el valor que había antes en la celda de autosuma
+            celda_origen = hoja.cell(row=fila_autosuma, column=30).value
+            messagebox.showinfo("Valor CO", f"Valor celda origen: {celda_origen}")    
+            # Ahora sí: sobrescribimos con la fórmula de autosuma
+            celda_autosuma = hoja.cell(row=fila_autosuma, column=30)
             celda_autosuma.value = f"=SUM(AD{f_ini}:AD{fila_autosuma - 1})"
             celda_autosuma.fill = FILL_AMARILLO
-            
-            # Guardar coordenada real
-            celda_origen = celda_autosuma.coordinate
-            messagebox.showinfo("Valor CO", f"Valor celda origen: {celda_origen}")
 
 
             temp_path, suma_ad = crear_archivo_temporal_con_ae(celda_origen)
