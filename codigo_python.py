@@ -184,6 +184,9 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                 for col in range(25, 30):
                     hoja.cell(row=f_fin, column=col, value="")
 
+            wb.save(RUTA_ENTRADA)
+            shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO)) # asegurar que temp tenga los datos
+            
             temp_path, valor_ae = crear_archivo_temporal_con_ae(celda_origen)
             if not temp_path:
                 return None, None
