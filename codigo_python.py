@@ -172,7 +172,7 @@ def procesar_datos(entrada, torno, mes, dia, anio):
 
     # === Paso 3: Leer desde archivo temporal y calcular ===
     try:
-        wb = openpyxl.load_workbook(temp_path)
+        wb = openpyxl.load_workbook(temp_path, data_only=True)
         hoja = wb["IR diario "]
         ultima_fila = None
         for fila in hoja.iter_rows():
@@ -208,19 +208,22 @@ def procesar_datos(entrada, torno, mes, dia, anio):
             f_fin = fila - 1
             for f in range(f_ini, f_fin):
                 hoja.cell(row=f, column=30, value=f"=AC{f}*D{f}/D{f_fin}")
+
             celda_suma = hoja.cell(row=f_fin, column=30)
             if f_fin - f_ini >= 1:
                 celda_suma.value = f"=SUM(AD{f_ini}:AD{f_fin - 1})"
             else:
                 celda_suma.value = ""
             celda_suma.fill = FILL_AMARILLO
-            d_fin = valores_d[-1] if valores_d else 0.0
-            suma_ad = 0.0
-            if d_fin != 0:
-                for i in range(len(valores_d) - 1):
-                    suma_ad += (valores_ae[i] * valores_d[i]) / d_fin
+            # Vaciar columnas Y–AC en la última fila del bloque
+            for col in range(25, 30):
+                hoja.cell(row=f_fin, column=col, value=None)
 
+            # Obtener valor de la autosuma directamente
+            suma_ad = celda_suma.value if isinstance(celda_suma.value, (int, float)) else 0.0
+            d_fin = valores_d[-1] if valores_d else 0.0
             tipo_bloque = "PODADO" if "PODADO" in " ".join(b).upper() else "REGULAR"
+
             bloques_detectados.append((tipo_bloque, d_fin))
             sumas_ad_por_bloque.append(suma_ad)
             messagebox.showinfo("Resumen", f"{tipo_bloque} – D: {d_fin:.2f}, AD: {suma_ad:.4f}")
@@ -233,7 +236,6 @@ def procesar_datos(entrada, torno, mes, dia, anio):
     except Exception as e:
         messagebox.showerror("Error", f"Error al procesar datos:\n{e}")
         return None, None
-
 
 def escribir(hoja, f, c, v, num=False):
     celda = hoja.cell(row=f, column=c, value=v)
