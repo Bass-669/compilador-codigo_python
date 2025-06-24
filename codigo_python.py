@@ -144,7 +144,6 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                     hoja.cell(row=fila, column=col, value=val).alignment = ALIGN_R
 
                 fila += 1
-
             f_fin = fila - 1
 
             for f in range(f_ini, f_fin):
@@ -195,34 +194,33 @@ def procesar_datos(entrada, torno, mes, dia, anio):
             wb.close()
 
 def crear_archivo_temporal_con_ae(celda_origen):
-    import pythoncom
-    import win32com.client as win32
-    import openpyxl
-
     pythoncom.CoInitialize()
     excel = win32.Dispatch("Excel.Application")
     excel.Visible = False
     excel.DisplayAlerts = False
 
     try:
+        # Abrir archivo original
         wb = excel.Workbooks.Open(RUTA_ENTRADA)
         hoja = wb.Sheets("IR diario ")
 
-        hoja.Range("AE1").Formula = hoja.Range(celda_origen).Formula
+        # Obtener el valor evaluado de la celda de autosuma
+        valor_suma = hoja.Range(celda_origen).Value
 
+        # Escribir etiqueta y valor en AE1
+        hoja.Range("AE1").Value = "Valor suma"
+        hoja.Range("AE1").Value = valor_suma
+
+        # Guardar archivo temporal
         temp_path = os.path.join(BASE_DIR, CARPETA, "temp_report.xlsx")
         wb.SaveAs(temp_path)
         wb.Close(False)
         excel.Quit()
 
-        wb_temp = openpyxl.load_workbook(temp_path, data_only=True)
-        hoja_temp = wb_temp["IR diario "]
-        valor_ae1 = hoja_temp["AE1"].value
-        wb_temp.close()
+        # Mostrar el valor en un messagebox
+        messagebox.showinfo("Valor AE1", f"Valor de autosuma: {valor_suma}")
 
-        messagebox.showinfo("Valor AE1", f"Valor de AE1 (autosuma): {valor_ae1}")
-
-        return temp_path, float(valor_ae1) if valor_ae1 else 0.0
+        return temp_path, float(valor_suma) if valor_suma else 0.0
 
     except Exception as e:
         excel.Quit()
@@ -232,6 +230,7 @@ def crear_archivo_temporal_con_ae(celda_origen):
 
     finally:
         pythoncom.CoUninitialize()
+
 
 def escribir(hoja, f, c, v, num=False):
     celda = hoja.cell(row=f, column=c, value=v)
