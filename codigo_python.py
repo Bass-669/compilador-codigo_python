@@ -208,7 +208,7 @@ def crear_archivo_temporal_con_ae(celda_origen):
         # Forzar recálculo
         excel.CalculateUntilAsyncQueriesDone()
         wb.Application.CalculateFull()
-        time.sleep(1.5)  # Esperar 1.5 segundos para asegurar que Excel termine
+        time.sleep(10)  # Esperar 1.5 segundos para asegurar que Excel termine
         # Obtener valor evaluado
         valor_suma = hoja.Range(celda_origen).Value
         # Obtener número de fila
