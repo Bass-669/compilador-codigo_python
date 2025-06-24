@@ -195,48 +195,49 @@ def procesar_datos(entrada, torno, mes, dia, anio):
         if 'wb' in locals():
             wb.close()
 
-import time
-
 def crear_archivo_temporal_con_ae(celda_origen):
     pythoncom.CoInitialize()
     excel = win32.Dispatch("Excel.Application")
     excel.Visible = False
     excel.DisplayAlerts = False
+
     try:
-        # Abrir archivo original
         wb = excel.Workbooks.Open(RUTA_ENTRADA)
         hoja = wb.Sheets("IR diario ")
-        # Asegurar modo de cálculo automático
-        excel.Calculation = -4105  # xlCalculationAutomatic
-        # Forzar recálculo completo
-        excel.CalculateUntilAsyncQueriesDone()
-        wb.Application.CalculateFull()
-        time.sleep(1)
-        # Obtener número de fila
+
+        # Obtener número de fila desde celda_origen (ej. "AD43256" → 43256)
         fila = int(''.join(filter(str.isdigit, celda_origen)))
-        # Obtener valor evaluado
-        valor_suma = hoja.Range(celda_origen).Value
-        # Escribir valor en AE{fila}
-        hoja.Cells(fila, 31).Value = valor_suma
+
+        # Copiar la celda con fórmula
+        hoja.Range(celda_origen).Copy()
+
+        # Pegar solo el valor en AE{fila}
+        hoja.Range(f"AE{fila}").PasteSpecial(Paste=-4163)  # xlPasteValues
+
         # Guardar archivo temporal
         temp_path = os.path.join(BASE_DIR, CARPETA, "temp_report.xlsx")
         wb.SaveAs(temp_path)
         wb.Close(False)
         excel.Quit()
-        # Reabrir con openpyxl para asegurar lectura del valor
+
+        # Leer el valor pegado desde el archivo temporal
         wb_temp = openpyxl.load_workbook(temp_path, data_only=True)
         hoja_temp = wb_temp["IR diario "]
-        valor_final = hoja_temp.cell(row=fila, column=31).value
+        valor_final = hoja_temp.cell(row=fila, column=31).value  # AE = col 31
         wb_temp.close()
+
         messagebox.showinfo("Valor AE", f"Valor de autosuma en AE{fila}: {valor_final}")
         return temp_path, float(valor_final) if valor_final else 0.0
+
     except Exception as e:
         excel.Quit()
         pythoncom.CoUninitialize()
         messagebox.showerror("Error", f"No se pudo generar archivo temporal:\n{e}")
         return None, 0.0
+
     finally:
         pythoncom.CoUninitialize()
+
 
 def escribir(hoja, f, c, v, num=False):
     celda = hoja.cell(row=f, column=c, value=v)
