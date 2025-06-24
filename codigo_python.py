@@ -169,10 +169,6 @@ def procesar_datos(entrada, torno, mes, dia, anio):
             celda_autosuma.fill = FILL_AMARILLO
 
 
-            temp_path, suma_ad = crear_archivo_temporal_con_ae(celda_origen)
-            if not temp_path:
-                return None, None
-
             bloque_texto = " ".join(b).upper()
             tipo_bloque = "PODADO" if "PODADO" in bloque_texto else "REGULAR"
 
@@ -188,6 +184,10 @@ def procesar_datos(entrada, torno, mes, dia, anio):
             if tipo_bloque != "PODADO":
                 for col in range(25, 30):
                     hoja.cell(row=f_fin, column=col, value="")
+
+            temp_path, suma_ad = crear_archivo_temporal_con_ae(celda_origen)
+            if not temp_path:
+                return None, None
 
         backup_path = os.path.join(CARPETA, "Reporte IR Tornos copia_de_seguridad.xlsx")
         shutil.copy(RUTA_ENTRADA, backup_path)
