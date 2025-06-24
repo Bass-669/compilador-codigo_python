@@ -178,13 +178,12 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                 valor_d = 0
 
             bloques_detectados.append((tipo_bloque, valor_d))
-            sumas_ad_por_bloque.append(suma_ad)
 
             if tipo_bloque != "PODADO":
                 for col in range(25, 30):
                     hoja.cell(row=f_fin, column=col, value="")
 
-            temp_path, suma_ad = crear_archivo_temporal_con_ae(celda_origen)
+            temp_path = crear_archivo_temporal_con_ae(celda_origen)
             if not temp_path:
                 return None, None
 
