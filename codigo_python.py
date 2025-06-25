@@ -79,15 +79,23 @@ def cerrar_carga():
 
 def ejecutar(txt, torno, mes, dia, anio):
     try:
-        for i in range(1, 101, 20):
-            barra['value'] = i
-            ventana_carga.update_idletasks()
-            time.sleep(1)
+        # Actualizar barra al inicio del procesamiento
+        barra['value'] = 30
+        ventana_carga.update_idletasks()
+        
         bloques, porcentajes = procesar_datos(txt, torno, mes, dia, anio)
+        
+        # Actualizar barra después de procesar datos
+        barra['value'] = 70
+        ventana_carga.update_idletasks()
+        
         if bloques is not None and porcentajes is not None:
             fecha(mes, dia, anio, torno, bloques, porcentajes)
         else:
             messagebox.showwarning("Advertencia", "No se pudo procesar los datos.")
+        
+        # Completar barra al final
+        barra['value'] = 100
     except Exception as e:
         messagebox.showerror("Error", f"Ocurrió un error en ejecutar():\n{e}")
     finally:
@@ -274,12 +282,13 @@ def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque
         celda.value = valor_ae / 100 if valor_ae > 1 else valor_ae  # Porcentaje en decimal
         celda.number_format = '0.00%'  # Formato de porcentaje con 2 decimales
 
-def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque ):
+def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
     pythoncom.CoInitialize()
     excel = wb = None
     nueva = f"IR {mes} {anio}"
     hoja_anterior = None
     hoja_nueva_existia = False
+    
     try:
         excel = win32.gencache.EnsureDispatch('Excel.Application')
         excel.Visible = False
@@ -287,24 +296,30 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque ):
         wb = excel.Workbooks.Open(RUTA_ENTRADA, UpdateLinks=0)
         nombres_hojas = [h.Name for h in wb.Sheets]
         hoja_nueva_existia = nueva in nombres_hojas
+        
         if not hoja_nueva_existia:
             hojas_ir = [h for h in nombres_hojas if h.startswith("IR ") and len(h.split()) == 3]
+            
             def total_meses(nombre):
                 try:
                     _, mes_str, anio_str = nombre.split()
                     return int(anio_str) * 12 + MESES_NUM[mes_str]
                 except:
                     return -1
+                    
             hojas_ir_ordenadas = sorted(hojas_ir, key=total_meses)
             total_nueva = int(anio) * 12 + MESES_NUM[mes]
+            
             for h in hojas_ir_ordenadas:
                 if total_meses(h) < total_nueva:
                     hoja_anterior = h
                 else:
                     break
+                    
             if not hoja_anterior:
                 messagebox.showwarning("Orden inválido", f"No se encontró hoja anterior para insertar '{nueva}'")
                 return
+                
             idx_anterior = [h.Name for h in wb.Sheets].index(hoja_anterior)
             insert_idx = min(idx_anterior + 2, wb.Sheets.Count)
             wb.Sheets(hoja_anterior).Copy(After=wb.Sheets(insert_idx - 1))
@@ -325,65 +340,89 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque ):
         except:
             pass
         pythoncom.CoUninitialize()
+        
     try:
         wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
         hoja_nueva = wb2[nueva]
         col_dia = dia + 1  # columna B es 2, día 1 → columna 2
+        
         if not hoja_nueva_existia:
             filas_fechas = [2, 3, 4, 7, 8, 9, 12, 13, 14, 17, 18, 19, 22, 27, 31, 37]
             for fila in filas_fechas:
                 for col in range(2, 33):
                     hoja_nueva.cell(row=fila, column=col, value="")
+                    
         nueva_fecha = f"{dia:02d}/{MESES_NUM[mes]:02d}/{anio}"
         for fila in [2, 7, 12, 17, 22, 27, 31, 37]:
             hoja_nueva.cell(row=fila, column=col_dia, value=nueva_fecha)
-        for tipo_bloque, f_fin in bloques_detectados:
-            escribir_valor_bloque(hoja_nueva, col_dia, torno, f_fin, tipo_bloque)
-        tipos_bloque = [tipo for tipo, _ in bloques_detectados]
-        escribir_valores_resumen_bloques(hoja_nueva, col_dia, torno, sumas_ad_por_bloque, tipos_bloque)
+            
+        # Extraer solo los valores para escribir (segundo elemento de cada par)
+        valores_para_escribir = [val for i, (tipo, val) in enumerate(bloques_detectados) if i % 2 == 1]
+        tipos_para_escribir = [tipo for i, (tipo, val) in enumerate(bloques_detectados) if i % 2 == 1]
+        
+        for (tipo_bloque, valor), valor_ae in zip(zip(tipos_para_escribir, valores_para_escribir), sumas_ad_por_bloque):
+            escribir_valor_bloque(hoja_nueva, col_dia, torno, valor, tipo_bloque)
+            
+        escribir_valores_resumen_bloques(hoja_nueva, col_dia, torno, sumas_ad_por_bloque, tipos_para_escribir)
+        
         wb2.save(RUTA_ENTRADA)
         wb2.close()
-        time.sleep(0.5)
-        excel_app = None
-        wb_excel = None
-        try:
-            pythoncom.CoInitialize()
-            excel_app = win32.Dispatch("Excel.Application")
-            excel_app.Visible = False
-            excel_app.DisplayAlerts = False
-            wb_excel = excel_app.Workbooks.Open(RUTA_ENTRADA)
-            sheet_excel = wb_excel.Sheets(nueva)
-            for chart_obj in sheet_excel.ChartObjects():
-                try:
-                    chart = chart_obj.Chart
-                    x_axis = chart.Axes(1)
-                    x_axis.TickLabels.Orientation = 45
-                except Exception as e:
-                    print(f"Error en gráfico: {str(e)}")
-                    continue
-            wb_excel.Save()
-            wb_excel.Close(True)
-        except Exception as e:
-            messagebox.showwarning("Advertencia", f"Error al rotar etiquetas: {str(e)}")
-        finally:
-            try:
-                if wb_excel and wb_excel.ReadOnly == False:
-                    wb_excel.Close(False)
-            except:
-                pass
-            try:
-                if excel_app:
-                    excel_app.Quit()
-            except:
-                pass
-            wb_excel = None
-            excel_app = None
-            pythoncom.CoUninitialize()
+        
+        # Rotar etiquetas solo si es hoja nueva
+        if not hoja_nueva_existia:
+            rotar_etiquetas_graficos(RUTA_ENTRADA, nueva)
+            
         shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
         mensaje = "✅ Valores actualizados correctamente." if hoja_nueva_existia else f"✅ Hoja '{nueva}' creada correctamente."
         messagebox.showinfo("Éxito", mensaje)
     except Exception as e:
         messagebox.showwarning("Advertencia", f"No se pudo ajustar hoja:\n{e}")
+
+def rotar_etiquetas_graficos(ruta_archivo, nombre_hoja):
+    pythoncom.CoInitialize()
+    excel = None
+    try:
+        # Iniciar Excel en segundo plano
+        excel = win32.Dispatch("Excel.Application")
+        excel.Visible = False
+        excel.DisplayAlerts = False
+        excel.ScreenUpdating = False  # Optimizar rendimiento
+        
+        # Abrir el libro de trabajo
+        wb = excel.Workbooks.Open(ruta_archivo)
+        sheet = wb.Sheets(nombre_hoja)
+        
+        # Procesar todos los gráficos en la hoja
+        for chart_obj in sheet.ChartObjects():
+            try:
+                chart = chart_obj.Chart
+                # Obtener eje X (eje 1 en Excel)
+                x_axis = chart.Axes(1)
+                # Rotar etiquetas a 45 grados
+                x_axis.TickLabels.Orientation = 45
+            except Exception as e:
+                # Algunos objetos pueden no ser gráficos, ignorar errores
+                print(f"Advertencia: Error en gráfico - {str(e)}")
+                continue
+        
+        # Guardar y cerrar
+        wb.Save()
+        wb.Close(True)
+    except Exception as e:
+        print(f"Error crítico al rotar etiquetas: {str(e)}")
+    finally:
+        # Limpieza garantizada
+        try:
+            if 'wb' in locals():
+                wb.Close(False)
+        except:
+            pass
+        try:
+            if excel:
+                excel.Quit()
+        except:
+            pass
+        pythoncom.CoUninitialize()
 
 ventana = tk.Tk()
 ventana.title("Ingresar datos")
