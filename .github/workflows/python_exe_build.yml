@@ -22,28 +22,26 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install nuitka openpyxl tkcalendar xlwings pywin32
-        # Instalación de herramientas adicionales para Nuitka (opcional, mejora la compatibilidad)
-        pip install ordered-set zstandard
+        pip install nuitka openpyxl tkcalendar xlwings pywin32 ordered-set zstandard
 
     - name: Crear carpeta reportes
       run: mkdir reportes
 
     - name: Build EXE with Nuitka (Optimizado)
       run: |
-        python -m nuitka \
-          --standalone \
-          --onefile \
-          --windows-disable-console \
-          --output-dir=dist \
-          --output-filename=procesador_excel_gui.exe \
-          --enable-plugin=tk-inter \          # Soporte para tkinter
-          --include-package=openpyxl \        # Fuerza inclusión de openpyxl
-          --include-package=xlwings \         # Fuerza inclusión de xlwings
-          --include-package=pywin32 \         # Necesario para pywin32
-          --include-data-dir=reportes=reportes \  # Incluye carpeta 'reportes'
-          --remove-output \                   # Limpia archivos temporales
-          --assume-yes-for-downloads \        # Acepta descargas automáticas (ej: CCache)
+        python -m nuitka `
+          --standalone `
+          --onefile `
+          --windows-disable-console `
+          --output-dir=dist `
+          --output-filename=procesador_excel_gui.exe `
+          --enable-plugin=tk-inter `
+          --include-package=openpyxl `
+          --include-package=xlwings `
+          --include-package=pywin32 `
+          --include-data-dir=reportes=reportes `
+          --remove-output `
+          --assume-yes-for-downloads `
           codigo_python.py
 
     - name: Crear archivo LEEME
