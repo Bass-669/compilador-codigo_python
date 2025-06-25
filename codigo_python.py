@@ -225,7 +225,7 @@ def procesar_datos(entrada, torno, mes, dia, anio):
         excel_app.Quit()
         pythoncom.CoUninitialize()
 
-def crear_archivo_temporal_con_ae(celda_origen):
+def obtener_valor_ae_directo(celda_origen):
     pythoncom.CoInitialize()
     excel = win32.Dispatch("Excel.Application")
     excel.Visible = False
