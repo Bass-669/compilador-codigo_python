@@ -97,7 +97,7 @@ def ejecutar(txt, torno, mes, dia, anio):
 
 def procesar_datos(entrada, torno, mes, dia, anio):
     bloques_detectados = []
-    celdas_autosuma = []  # Almacenar referencias a celdas AD para procesar después
+    sumas_ad_por_bloque = []
     if not os.path.exists(RUTA_ENTRADA):
         messagebox.showerror("Error", f"No se encontró:\n{RUTA_ENTRADA}")
         return None, None
@@ -115,92 +115,94 @@ def procesar_datos(entrada, torno, mes, dia, anio):
         # Búsqueda eficiente de última fila con '* * ...'
         ultima_fila = None
         for fila in range(hoja.max_row, 0, -1):
-            valores = [
-                str(hoja.cell(fila, 1).value or "").strip(),
-                str(hoja.cell(fila, 2).value or "").strip(),
-                str(hoja.cell(fila, 3).value or "").strip()
-            ]
-            if valores == ["*", "*", "..."]:
+            c1 = str(hoja.cell(fila, 1).value or "").strip()
+            c2 = str(hoja.cell(fila, 2).value or "").strip()
+            c3 = str(hoja.cell(fila, 3).value or "").strip()
+            if c1 == "*" and c2 == "*" and c3 == "...":
                 ultima_fila = fila
                 break
 
         if not ultima_fila:
             raise ValueError("No se encontró patrón '* * ...'")
 
-        fila = ultima_fila + 1
+        fila_actual = ultima_fila + 1
         bloques = list(extraer_bloques(entrada))
 
-        # Precompile regex para mejor rendimiento
-        regex_numero = re.compile(r'^\d')
-        regex_asterisco = re.compile(r'^\*')
-        
         for b in bloques:
-            f_ini = fila
+            fila_inicio_bloque = fila_actual
             subs = sub_bloques(b)
             
             for sub in subs:
-                txt = sub[0] if not regex_numero.match(sub[0]) else ""
-                datos = sub[1:] if txt else sub
+                # Restaurar lógica original de procesamiento de texto
+                if re.match(r'^\d', sub[0]):
+                    txt = ""
+                    datos = sub
+                else:
+                    txt = sub[0]
+                    datos = sub[1:]
                 
-                # Procesamiento eficiente de texto
-                if txt:
-                    p = txt.split()
-                    if regex_asterisco.match(txt):
-                        col_txt = ["*", "*", "...", "", "", ""] if len(p) < 5 or p[0] != "*" else [p[0], p[1], p[2], p[3], "", p[4]]
+                p = txt.split()
+                if "*" in txt:
+                    if len(p) >= 5 and p[0] == "*":
+                        col_txt = [p[0], p[1], p[2], p[3], "", p[4]]
                     else:
-                        col_txt = (
-                            [p[0], p[1], p[2], p[3], "", p[4]] if len(p) >= 5 else
-                            ["", p[0], p[1], p[2], "", p[3]] if len(p) == 4 else
-                            [""] * 6
-                        )
+                        col_txt = ["*", "*", "...", "", "", ""]
+                elif len(p) >= 5:
+                    col_txt = [p[0], p[1], p[2], p[3], "", p[4]]
+                elif len(p) == 4:
+                    col_txt = ["", p[0], p[1], p[2], "", p[3]]
                 else:
                     col_txt = [""] * 6
                 
-                # Procesamiento eficiente de números
                 col_nums = []
-                for l in datos:
-                    col_nums.extend(l.strip().split())
+                for linea in datos:
+                    col_nums.extend(linea.strip().split())
                 
-                # Escritura optimizada en batch
-                for col, val in enumerate(col_txt + col_nums, 1):
-                    if col > 24: break
-                    if 3 <= col <= 24 and val:
-                        try:
-                            n = float(val.replace(",", "."))
-                            escribir(hoja, fila, col, n, True)
-                            continue
-                        except ValueError:
-                            pass
-                    escribir(hoja, fila, col, val, False)
+                # Escribir valores manteniendo estructura original
+                for col, val in enumerate(col_txt, 1):
+                    escribir(hoja, fila_actual, col, val, False)
                 
-                # Valores fijos
-                for offset, val in enumerate([torno, mes, dia, anio], 25):
-                    celda = hoja.cell(fila, offset, val)
-                    celda.alignment = ALIGN_R
+                for col, val in enumerate(col_nums, len(col_txt) + 1):
+                    if col > 24:
+                        break
+                    try:
+                        num_val = float(val.replace(",", "."))
+                        escribir(hoja, fila_actual, col, num_val, True)
+                    except ValueError:
+                        escribir(hoja, fila_actual, col, val, False)
                 
-                fila += 1
+                # Escribir valores fijos (columnas 25-28)
+                hoja.cell(fila_actual, 25, torno).alignment = ALIGN_R
+                hoja.cell(fila_actual, 26, mes).alignment = ALIGN_R
+                hoja.cell(fila_actual, 27, dia).alignment = ALIGN_R
+                hoja.cell(fila_actual, 28, anio).alignment = ALIGN_R
+                
+                fila_actual += 1
             
-            f_fin = fila - 1
-            bloque_texto = " ".join(b).upper()
-            tipo_bloque = "PODADO" if "PODADO" in bloque_texto else "REGULAR"
+            fila_fin_bloque = fila_actual - 1
+            tipo_bloque = "PODADO" if "PODADO" in " ".join(b).upper() else "REGULAR"
             
-            # Configurar fórmulas y celdas especiales
+            # Calcular fórmulas para bloques con múltiples sub-bloques
             if len(subs) > 1:
-                for f in range(f_ini, f_fin + 1):
-                    hoja.cell(f, 30, f"=AC{f}*D{f}/D{f_fin}")
+                for f in range(fila_inicio_bloque, fila_fin_bloque + 1):
+                    formula = f"=AC{f}*D{f}/D{fila_fin_bloque}"
+                    hoja.cell(f, 30, formula)
             
             # Configurar celda de autosuma
-            celda_autosuma = hoja.cell(f_fin, 30)
-            celda_autosuma.value = f"=SUM(AD{f_ini}:AD{f_fin-1})"
+            celda_autosuma = hoja.cell(fila_fin_bloque, 30)
+            celda_autosuma.value = f"=SUM(AD{fila_inicio_bloque}:AD{fila_fin_bloque-1})"
             celda_autosuma.fill = FILL_AMARILLO
-            celdas_autosuma.append(f"AD{f_fin}")  # Guardar referencia
+            referencia_celda = f"AD{fila_fin_bloque}"
             
             # Obtener valor D para reporte
             valor_d = 0.0
-            d_cell = hoja.cell(f_fin, 4).value
-            if d_cell and isinstance(d_cell, (int, float, str)):
+            celda_d = hoja.cell(fila_fin_bloque, 4).value
+            if celda_d:
                 try:
-                    valor_d = float(str(d_cell).replace(",", "."))
+                    if isinstance(celda_d, (int, float)):
+                        valor_d = float(celda_d)
+                    else:
+                        valor_d = float(str(celda_d).replace(",", "."))
                 except ValueError:
                     pass
             bloques_detectados.append((tipo_bloque, valor_d))
@@ -208,21 +210,16 @@ def procesar_datos(entrada, torno, mes, dia, anio):
             # Limpiar celdas para bloques regulares
             if tipo_bloque != "PODADO":
                 for col in range(25, 30):
-                    hoja.cell(f_fin, col, "")
-
-        # Guardar cambios antes de leer con win32com
-        wb.save(RUTA_ENTRADA)
-        wb.close()
-        
-        # Obtener valores AE usando la función original
-        sumas_ad_por_bloque = []
-        for celda_ref in celdas_autosuma:
-            valor_ae = obtener_valor_ae_directo(excel_app, RUTA_ENTRADA, celda_ref)
+                    hoja.cell(fila_fin_bloque, col, "")
+            
+            # Obtener valor AE usando la función original
+            valor_ae = obtener_valor_ae_directo(excel_app, RUTA_ENTRADA, referencia_celda)
             if valor_ae is None:
                 return None, None
             sumas_ad_por_bloque.append(valor_ae)
-        
-        # Crear copias de seguridad
+
+        # Guardar cambios y crear copias de seguridad
+        wb.save(RUTA_ENTRADA)
         backup_path = os.path.join(BASE_DIR, CARPETA, "Reporte IR Tornos copia_de_seguridad.xlsx")
         shutil.copy(RUTA_ENTRADA, backup_path)
         shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
@@ -233,7 +230,8 @@ def procesar_datos(entrada, torno, mes, dia, anio):
         messagebox.showerror("Error", f"Error en procesamiento:\n{str(e)}")
         return None, None
     finally:
-        if 'wb' in locals() and wb: wb.close()
+        if 'wb' in locals() and wb: 
+            wb.close()
         excel_app.Quit()
         pythoncom.CoUninitialize()
 
