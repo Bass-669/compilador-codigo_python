@@ -45,17 +45,22 @@ jobs:
           --remove-output ^
           --assume-yes-for-downloads ^
           codigo_python.py
-    
+
+    - name: Verificar si el EXE fue generado
+      shell: cmd
+      run: if not exist dist\procesador_excel_gui.exe exit 1
+
     - name: Crear archivo LEEME
       run: echo "Este archivo fue generado automáticamente con Nuitka. Es seguro y no contiene malware." > dist\LEEME.txt
-    
+
     - name: Comprimir carpeta standalone en ZIP
+      shell: pwsh
       run: |
-        powershell Compress-Archive -Path `
-          dist\procesador_excel_gui.exe, `
-          dist\procesador_excel_gui.dist\*, `
-          dist\LEEME.txt `
-          -DestinationPath dist\procesador_excel_gui.zip
+        Compress-Archive -Path `
+          dist/procesador_excel_gui.exe, `
+          dist/procesador_excel_gui.dist/*, `
+          dist/LEEME.txt `
+          -DestinationPath dist/procesador_excel_gui.zip
 
     - name: Subir artefacto ZIP
       uses: actions/upload-artifact@v4
