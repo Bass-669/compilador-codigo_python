@@ -21,7 +21,6 @@ BORDER = Border(*(Side(style='thin'),)*4)
 ALIGN_R = Alignment(horizontal='right')
 FILL_AMARILLO = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
 bloques_detectados = []
-sumas_ad_por_bloque = []
 
 def obtener_datos():
     datos = entrada_texto.get("1.0", tk.END).strip()
@@ -95,30 +94,22 @@ def ejecutar(txt, torno, mes, dia, anio):
 
 def procesar_datos(entrada, torno, mes, dia, anio):
     bloques_detectados = []
-    sumas_ad_por_bloque = []
-
     if not os.path.exists(RUTA_ENTRADA):
         messagebox.showerror("Error", f"No se encontró:\n{RUTA_ENTRADA}")
         return None, None
-
     try:
         wb = openpyxl.load_workbook(RUTA_ENTRADA)
         hoja = wb["IR diario "]
-
         ultima_fila = None
         for fila in hoja.iter_rows():
             if [str(c.value).strip() if c.value else "" for c in fila[:3]] == ["*", "*", "..."]:
                 ultima_fila = fila[0].row
-
         if not ultima_fila:
             raise ValueError("No se encontró '* * ...'")
-
         fila = ultima_fila + 1
-
         for b in extraer_bloques(entrada):
             f_ini = fila
             subs = sub_bloques(b)
-
             for sub in subs:
                 txt = sub[0] if not re.match(r'^\d', sub[0]) else ""
                 datos = sub[1:] if txt else sub
@@ -132,7 +123,6 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                 )
                 col_nums = [val for l in datos for val in l.strip().split()]
                 fila_vals = col_txt + col_nums
-
                 for col, val in enumerate(fila_vals[:24], 1):
                     try:
                         n = float(val.replace(",", ".")) if 3 <= col <= 24 and val else val
@@ -142,69 +132,44 @@ def procesar_datos(entrada, torno, mes, dia, anio):
 
                 for col, val in zip(range(25, 29), [torno, mes, dia, anio]):
                     hoja.cell(row=fila, column=col, value=val).alignment = ALIGN_R
-
                 fila += 1
-
             f_fin = fila - 1
             tipo_bloque = "PODADO" if "PODADO" in txt.upper() else "REGULAR"
             bloques_detectados.append((tipo_bloque, f_fin))
-
             if len(subs) > 1:
                 for f in range(f_ini, f_fin + 1):
                     hoja.cell(row=f, column=30, value=f"=AC{f}*D{f}/D{f_fin}")
-
-            # Calcular la fila real donde colocarás la suma
-            fila_autosuma = fila - 1  # porque después del último subbloque, fila ya se incrementó una más
-            
-            # Borrar columnas auxiliares (torno, mes, etc.) solo en la fila de la autosuma
+            fila_autosuma = fila - 1 # Calcular la fila real donde colocarás la suma
             for col in range(25, 30):
                 hoja.cell(row=fila_autosuma, column=col, value="")
- 
-            # Ahora sí: sobrescribimos con la fórmula de autosuma
-            celda_autosuma = hoja.cell(row=fila_autosuma, column=30)
+            celda_autosuma = hoja.cell(row=fila_autosuma, column=30) # Ahora sí: sobrescribimos con la fórmula de autosuma
             celda_autosuma.value = f"=SUM(AD{f_ini}:AD{fila_autosuma - 1})"
             celda_autosuma.fill = FILL_AMARILLO
-            # Guarda el valor que había antes en la celda de autosuma
             celda_origen = f"AD{fila_autosuma}"  # Dirección como texto
-            messagebox.showinfo("Celda origen", f"Se usará: {celda_origen}")
-
-
             bloque_texto = " ".join(b).upper()
             tipo_bloque = "PODADO" if "PODADO" in bloque_texto else "REGULAR"
-
             valor_d = hoja.cell(row=f_fin, column=4).value
             try:
                 valor_d = float(str(valor_d).replace(",", ".")) if valor_d else 0
             except:
                 valor_d = 0
-
             bloques_detectados.append((tipo_bloque, valor_d))
-
             if tipo_bloque != "PODADO":
                 for col in range(25, 30):
                     hoja.cell(row=f_fin, column=col, value="")
-
             wb.save(RUTA_ENTRADA)
             shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO)) # asegurar que temp tenga los datos
-            
             temp_path, valor_ae = crear_archivo_temporal_con_ae(celda_origen)
             if not temp_path:
                 return None, None
-            
-            sumas_ad_por_bloque.append(valor_ae)  # Guardar el valor real desde AE
-
-
         backup_path = os.path.join(CARPETA, "Reporte IR Tornos copia_de_seguridad.xlsx")
         shutil.copy(RUTA_ENTRADA, backup_path)
         wb.save(RUTA_ENTRADA)
         shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
-
-        return bloques_detectados, sumas_ad_por_bloque
-
+        return bloques_detectados
     except Exception as e:
         messagebox.showerror("Error", f"Error al procesar datos:\n{e}")
         return None, None
-
     finally:
         if 'wb' in locals():
             wb.close()
@@ -214,44 +179,30 @@ def crear_archivo_temporal_con_ae(celda_origen):
     excel = win32.Dispatch("Excel.Application")
     excel.Visible = False
     excel.DisplayAlerts = False
-
     try:
         wb = excel.Workbooks.Open(RUTA_ENTRADA)
         hoja = wb.Sheets("IR diario ")
-        # Obtener número de fila desde celda_origen (ej. "AD43256" → 43256)
-        fila = int(''.join(filter(str.isdigit, celda_origen)))
-        # Copiar la celda con fórmula de AD{fila}
-        hoja.Range(celda_origen).Copy()
-        # Pegar solo el valor en AE{fila}
-        celda_destino = f"AE{fila}"
+        fila = int(''.join(filter(str.isdigit, celda_origen))) # Obtener número de fila desde celda_origen
+        hoja.Range(celda_origen).Copy() # Copiar la celda con fórmula de AD{fila}
+        celda_destino = f"AE{fila}"  # Pegar solo el valor en AE{fila}
         hoja.Range(celda_destino).PasteSpecial(Paste=-4163)  # xlPasteValues
-        # Mostrar valor de AE justo después del pegado
         valor_pego = hoja.Range(celda_destino).Value
-        messagebox.showinfo("Copiado a AE", f"Valor pegado en {celda_destino}: {valor_pego}")
-        messagebox.showinfo("Copiado a AE", f"Valor pegado en {celda_destino}: {hoja.Range(celda_destino).Value}")#dsfsdf
-        # Guardar archivo temporal ahora
-        temp_path = os.path.join(BASE_DIR, CARPETA, "temp_report.xlsx")
+        temp_path = os.path.join(BASE_DIR, CARPETA, "temp_report.xlsx") # Guardar archivo temporal ahora
         wb.SaveAs(temp_path)
         wb.Close(False)
         excel.Quit()
-        # Leer valor desde el archivo temporal (modo data_only)
-        wb_temp = openpyxl.load_workbook(temp_path, data_only=True)
+        wb_temp = openpyxl.load_workbook(temp_path, data_only=True) # Leer valor desde el archivo temporal (modo data_only)
         hoja_temp = wb_temp["IR diario "]
         valor_final = hoja_temp.cell(row=fila, column=31).value  # AE = col 31
         wb_temp.close()
-
-        messagebox.showinfo("Valor final AE", f"Valor leído desde archivo en AE{fila}: {valor_final}")
         return temp_path, float(valor_final) if valor_final else 0.0
-
     except Exception as e:
         excel.Quit()
         pythoncom.CoUninitialize()
         messagebox.showerror("Error", f"No se pudo generar archivo temporal:\n{e}")
         return None, 0.0
-
     finally:
         pythoncom.CoUninitialize()
-
 
 def escribir(hoja, f, c, v, num=False):
     celda = hoja.cell(row=f, column=c, value=v)
@@ -315,15 +266,12 @@ def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque
         elif tipo_bloque == "REGULAR":
             fila_valor = 18 if torno == 1 else 19
         else:
-            continue  # ignorar bloques con tipo desconocido
-
+            continue
         celda = hoja.cell(row=fila_valor, column=col_dia)
-        celda.value = valor_ae / 100 if valor_ae > 1 else valor_ae  # Porcentaje en decimal
-        celda.number_format = '0.00%'  # Formato de porcentaje con 2 decimales
+        celda.value = valor_ae / 100 if valor_ae > 1 else valor_ae
+        celda.number_format = '0.00%'
 
-
-def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque ):
-    """Función principal para crear/modificar la hoja de reporte"""
+def fecha(mes, dia, anio, torno, bloques_detectados):
     pythoncom.CoInitialize()
     excel = wb = None
     nueva = f"IR {mes} {anio}"
@@ -338,7 +286,6 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque ):
         hoja_nueva_existia = nueva in nombres_hojas
         if not hoja_nueva_existia:
             hojas_ir = [h for h in nombres_hojas if h.startswith("IR ") and len(h.split()) == 3]
-
             def total_meses(nombre):
                 try:
                     _, mes_str, anio_str = nombre.split()
@@ -375,33 +322,25 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque ):
         except:
             pass
         pythoncom.CoUninitialize()
-
     try:
         wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
         hoja_nueva = wb2[nueva]
         col_dia = dia + 1  # columna B es 2, día 1 → columna 2
-
         if not hoja_nueva_existia:
             filas_fechas = [2, 3, 4, 7, 8, 9, 12, 13, 14, 17, 18, 19, 22, 27, 31, 37]
             for fila in filas_fechas:
                 for col in range(2, 33):
                     hoja_nueva.cell(row=fila, column=col, value="")
-
         nueva_fecha = f"{dia:02d}/{MESES_NUM[mes]:02d}/{anio}"
         for fila in [2, 7, 12, 17, 22, 27, 31, 37]:
             hoja_nueva.cell(row=fila, column=col_dia, value=nueva_fecha)
-
         for tipo_bloque, f_fin in bloques_detectados:
             escribir_valor_bloque(hoja_nueva, col_dia, torno, f_fin, tipo_bloque)
-
-        # Extraer lista de tipos de bloque para resumen
         tipos_bloque = [tipo for tipo, _ in bloques_detectados]
-        escribir_valores_resumen_bloques(hoja_nueva, col_dia, torno, sumas_ad_por_bloque, tipos_bloque)
-
+        escribir_valores_resumen_bloques(hoja_nueva, col_dia, torno, tipos_bloque)
         wb2.save(RUTA_ENTRADA)
         wb2.close()
-        time.sleep(1)
-
+        time.sleep(0.5)
         excel_app = None
         wb_excel = None
         try:
@@ -437,11 +376,9 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque ):
             wb_excel = None
             excel_app = None
             pythoncom.CoUninitialize()
-
         shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
         mensaje = "✅ Valores actualizados correctamente." if hoja_nueva_existia else f"✅ Hoja '{nueva}' creada correctamente."
         messagebox.showinfo("Éxito", mensaje)
-
     except Exception as e:
         messagebox.showwarning("Advertencia", f"No se pudo ajustar hoja:\n{e}")
 
