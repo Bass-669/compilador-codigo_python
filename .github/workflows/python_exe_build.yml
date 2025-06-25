@@ -1,4 +1,4 @@
-name: Build Optimized Python EXE with Nuitka
+name: Compilar EXE Python con Nuitka
 
 on:
   push:
@@ -11,15 +11,15 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - name: Checkout repository
+    - name: Descargar repositorio
       uses: actions/checkout@v2
 
-    - name: Set up Python
+    - name: Configurar Python
       uses: actions/setup-python@v2
       with:
         python-version: '3.11'
 
-    - name: Install dependencies
+    - name: Instalar dependencias
       run: |
         python -m pip install --upgrade pip
         pip install nuitka openpyxl tkcalendar xlwings pywin32 ordered-set zstandard
@@ -27,21 +27,21 @@ jobs:
     - name: Crear carpeta reportes
       run: mkdir reportes
 
-    - name: Build EXE with Nuitka
+    - name: Compilar EXE con Nuitka
       run: |
-        python -m nuitka `
-          --standalone `
-          --onefile `
-          --windows-console-mode=disable `
-          --output-dir=dist `
-          --output-filename=procesador_excel_gui.exe `
-          --include-data-files=./reportes/Reporte IR Tornos.xlsx=reportes/Reporte IR Tornos.xlsx `
-          --enable-plugin=tk-inter `
-          --include-package=openpyxl `
-          --include-package=xlwings `
-          --include-module=win32com `
-          --remove-output `
-          --assume-yes-for-downloads `
+        python -m nuitka ^
+          --standalone ^
+          --onefile ^
+          --windows-console-mode=disable ^
+          --output-dir=dist ^
+          --output-filename=procesador_excel_gui.exe ^
+          --include-data-files=./reportes/Reporte%20IR%20Tornos.xlsx=reportes/Reporte%20IR%20Tornos.xlsx ^
+          --enable-plugin=tk-inter ^
+          --include-package=openpyxl ^
+          --include-package=xlwings ^
+          --include-module=win32com ^
+          --remove-output ^
+          --assume-yes-for-downloads ^
           codigo_python.py
 
     - name: Crear archivo LEEME
@@ -50,7 +50,7 @@ jobs:
     - name: Comprimir EXE en ZIP
       run: powershell Compress-Archive -Path dist\procesador_excel_gui.exe,dist\LEEME.txt -DestinationPath dist\procesador_excel_gui.zip
 
-    - name: Upload ZIP artifact
+    - name: Subir artefacto ZIP
       uses: actions/upload-artifact@v4
       with:
         name: procesador_excel_gui_nuitka_optimized
