@@ -28,6 +28,7 @@ jobs:
       run: mkdir reportes
 
     - name: Compilar EXE con Nuitka
+      shell: cmd
       run: |
         python -m nuitka ^
           --standalone ^
@@ -35,7 +36,7 @@ jobs:
           --windows-console-mode=disable ^
           --output-dir=dist ^
           --output-filename=procesador_excel_gui.exe ^
-          --include-data-files=./reportes/Reporte%20IR%20Tornos.xlsx=reportes/Reporte%20IR%20Tornos.xlsx ^
+          --include-data-files=./reportes/Reporte IR Tornos.xlsx=reportes/Reporte IR Tornos.xlsx ^
           --enable-plugin=tk-inter ^
           --include-package=openpyxl ^
           --include-package=xlwings ^
