@@ -101,119 +101,74 @@ def procesar_datos(entrada, torno, mes, dia, anio):
     if not os.path.exists(RUTA_ENTRADA):
         messagebox.showerror("Error", f"No se encontró:\n{RUTA_ENTRADA}")
         return None, None
-
-    # Inicializar win32com una sola vez
-    pythoncom.CoInitialize()
-    excel_app = win32.Dispatch("Excel.Application")
-    excel_app.Visible = False
-    excel_app.DisplayAlerts = False
-
     try:
         wb = openpyxl.load_workbook(RUTA_ENTRADA)
         hoja = wb["IR diario "]
         ultima_fila = None
-        
-        # Buscar la última fila con '* * ...' de manera eficiente
-        for fila in reversed(range(1, hoja.max_row + 1)):
-            valores = [
-                str(hoja.cell(row=fila, column=1).value or "").strip(),
-                str(hoja.cell(row=fila, column=2).value or "").strip(),
-                str(hoja.cell(row=fila, column=3).value or "").strip()
-            ]
-            if valores == ["*", "*", "..."]:
-                ultima_fila = fila
-                break
-
+        for fila in hoja.iter_rows():
+            if [str(c.value).strip() if c.value else "" for c in fila[:3]] == ["*", "*", "..."]:
+                ultima_fila = fila[0].row
         if not ultima_fila:
             raise ValueError("No se encontró '* * ...'")
-
         fila = ultima_fila + 1
-        bloques = list(extraer_bloques(entrada))  # Convertir a lista para evitar recálculos
-        
-        for b in bloques:
+        for b in extraer_bloques(entrada):
             f_ini = fila
             subs = sub_bloques(b)
             for sub in subs:
                 txt = sub[0] if not re.match(r'^\d', sub[0]) else ""
                 datos = sub[1:] if txt else sub
                 p = txt.split()
-                
-                # Optimizado: Pre-calcular patrones comunes
-                if "*" in txt:
-                    if len(p) >= 5 and p[0] == "*":
-                        col_txt = [p[0], p[1], p[2], p[3], "", p[4]]
-                    else:
-                        col_txt = ["*", "*", "...", "", "", ""]
-                elif len(p) >= 5:
-                    col_txt = [p[0], p[1], p[2], p[3], "", p[4]]
-                elif len(p) == 4:
-                    col_txt = ["", p[0], p[1], p[2], "", p[3]]
-                else:
-                    col_txt = [""] * 6
-                
-                col_nums = []
-                for l in datos:
-                    col_nums.extend(l.strip().split())
-                
+                col_txt = (
+                    [p[0], p[1], p[2], p[3], "", p[4]] if "*" in txt and len(p) >= 5 and p[0] == "*" else
+                    ["*", "*", "...", "", "", ""] if "*" in txt else
+                    [p[0], p[1], p[2], p[3], "", p[4]] if len(p) >= 5 else
+                    ["", p[0], p[1], p[2], "", p[3]] if len(p) == 4 else
+                    [""] * 6
+                )
+                col_nums = [val for l in datos for val in l.strip().split()]
                 fila_vals = col_txt + col_nums
-                
-                # Escribir valores en batch
                 for col, val in enumerate(fila_vals[:24], 1):
-                    if 3 <= col <= 24 and val:
-                        try:
-                            n = float(val.replace(",", "."))
-                            escribir(hoja, fila, col, n, True)
-                            continue
-                        except ValueError:
-                            pass
-                    escribir(hoja, fila, col, val, False)
-                
-                # Escribir valores fijos
-                for col_offset, val in enumerate([torno, mes, dia, anio], start=25):
-                    celda = hoja.cell(row=fila, column=col_offset)
-                    celda.value = val
-                    celda.alignment = ALIGN_R
-                
+                    try:
+                        n = float(val.replace(",", ".")) if 3 <= col <= 24 and val else val
+                        escribir(hoja, fila, col, n, isinstance(n, float))
+                    except:
+                        escribir(hoja, fila, col, val)
+                for col, val in zip(range(25, 29), [torno, mes, dia, anio]):
+                    hoja.cell(row=fila, column=col, value=val).alignment = ALIGN_R
                 fila += 1
-            
             f_fin = fila - 1
             tipo_bloque = "PODADO" if "PODADO" in txt.upper() else "REGULAR"
             bloques_detectados.append((tipo_bloque, f_fin))
-            
             if len(subs) > 1:
                 for f in range(f_ini, f_fin + 1):
                     hoja.cell(row=f, column=30, value=f"=AC{f}*D{f}/D{f_fin}")
-            
-            fila_autosuma = fila - 1
+            fila_autosuma = fila - 1  # porque después del último subbloque, fila ya se incrementó una más
             for col in range(25, 30):
                 hoja.cell(row=fila_autosuma, column=col, value="")
-            
             celda_autosuma = hoja.cell(row=fila_autosuma, column=30)
             celda_autosuma.value = f"=SUM(AD{f_ini}:AD{fila_autosuma - 1})"
             celda_autosuma.fill = FILL_AMARILLO
-            celda_origen = f"AD{fila_autosuma}"
-            
+            celda_origen = f"AD{fila_autosuma}" # Guarda el valor que había antes en la celda de autosuma
             bloque_texto = " ".join(b).upper()
             tipo_bloque = "PODADO" if "PODADO" in bloque_texto else "REGULAR"
-            valor_d_celda = hoja.cell(row=f_fin, column=4)
-            valor_d = float(str(valor_d_celda.value).replace(",", ".")) if valor_d_celda.value and str(valor_d_celda.value).replace(',', '').replace('.', '').isdigit() else 0.0
-            
+            valor_d = hoja.cell(row=f_fin, column=4).value
+            try:
+                valor_d = float(str(valor_d).replace(",", ".")) if valor_d else 0
+            except:
+                valor_d = 0
             bloques_detectados.append((tipo_bloque, valor_d))
-            
             if tipo_bloque != "PODADO":
                 for col in range(25, 30):
                     hoja.cell(row=f_fin, column=col, value="")
-            
-            # Obtener valor AE usando la misma instancia de Excel
-            valor_ae = obtener_valor_ae_directo(excel_app, RUTA_ENTRADA, celda_origen)
-            if valor_ae is None:
+            wb.save(RUTA_ENTRADA)
+            shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO)) # asegurar que temp tenga los datos
+            temp_path, valor_ae = crear_archivo_temporal_con_ae(celda_origen)
+            if not temp_path:
                 return None, None
-            sumas_ad_por_bloque.append(valor_ae)
-
-        # Guardar solo al final del procesamiento
+            sumas_ad_por_bloque.append(valor_ae)  # Guardar el valor real desde AE
         backup_path = os.path.join(CARPETA, "Reporte IR Tornos copia_de_seguridad.xlsx")
-        wb.save(RUTA_ENTRADA)
         shutil.copy(RUTA_ENTRADA, backup_path)
+        wb.save(RUTA_ENTRADA)
         shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
         return bloques_detectados, sumas_ad_por_bloque
     except Exception as e:
@@ -222,10 +177,8 @@ def procesar_datos(entrada, torno, mes, dia, anio):
     finally:
         if 'wb' in locals():
             wb.close()
-        excel_app.Quit()
-        pythoncom.CoUninitialize()
 
-def obtener_valor_ae_directo(celda_origen):
+def crear_archivo_temporal_con_ae(celda_origen):
     pythoncom.CoInitialize()
     excel = win32.Dispatch("Excel.Application")
     excel.Visible = False
@@ -254,8 +207,6 @@ def obtener_valor_ae_directo(celda_origen):
         return None, 0.0
     finally:
         pythoncom.CoUninitialize()
-
-
 def escribir(hoja, f, c, v, num=False):
     celda = hoja.cell(row=f, column=c, value=v)
     celda.border, celda.alignment = BORDER, ALIGN_R
