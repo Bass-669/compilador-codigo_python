@@ -1,4 +1,4 @@
-name: Compilar EXE Python con Nuitka
+name: Build Python EXE
 
 on:
   push:
@@ -11,60 +11,37 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - name: Descargar repositorio
+    - name: Checkout repository
       uses: actions/checkout@v2
 
-    - name: Configurar Python
+    - name: Set up Python
       uses: actions/setup-python@v2
       with:
         python-version: '3.11'
 
-    - name: Instalar dependencias
+    - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install nuitka openpyxl tkcalendar xlwings pywin32 ordered-set zstandard
-
-    - name: Verificar disponibilidad de tkinter
-      run: python -c "import tkinter; print('tkinter está disponible')"
+        pip install pyinstaller openpyxl
+        pip install tkcalendar
+        pip install xlwings
+        pip install pywin32
 
     - name: Crear carpeta reportes
       run: mkdir reportes
 
-    - name: Compilar EXE con Nuitka
-      shell: cmd
-      run: |
-        python -m nuitka ^
-          --standalone ^
-          --windows-console-mode=disable ^
-          --output-dir=dist ^
-          --output-filename=procesador_excel_gui.exe ^
-          --enable-plugin=tk-inter ^
-          --include-package=openpyxl ^
-          --include-package=xlwings ^
-          --include-module=win32com ^
-          --remove-output ^
-          --assume-yes-for-downloads ^
-          codigo_python.py
-
-    - name: Verificar si el EXE fue generado
-      shell: cmd
-      run: if not exist dist\procesador_excel_gui.exe exit 1
+    - name: Build EXE
+      run: pyinstaller --onefile --windowed --name=procesador_excel_gui --hidden-import=openpyxl --hidden-import=tkinter --exclude-module=numpy codigo_python.py
 
     - name: Crear archivo LEEME
-      run: echo "Este archivo fue generado automáticamente con Nuitka. Es seguro y no contiene malware." > dist\LEEME.txt
+      run: echo "Este archivo fue generado automáticamente. Es seguro y no contiene malware." > dist\LEEME.txt
 
-    - name: Comprimir carpeta standalone en ZIP
-      shell: pwsh
-      run: |
-        Compress-Archive -Path `
-          dist/procesador_excel_gui.exe, `
-          dist/procesador_excel_gui.dist/*, `
-          dist/LEEME.txt `
-          -DestinationPath dist/procesador_excel_gui.zip
+    - name: Comprimir EXE en ZIP
+      run: powershell Compress-Archive -Path dist\procesador_excel_gui.exe,dist\LEEME.txt -DestinationPath dist\procesador_excel_gui.zip
 
-    - name: Subir artefacto ZIP
+    - name: Upload ZIP artifact
       uses: actions/upload-artifact@v4
       with:
-        name: procesador_excel_gui_nuitka_standalone
+        name: procesador_excel_gui
         path: dist/procesador_excel_gui.zip
         retention-days: 1
