@@ -48,14 +48,12 @@ jobs:
           --windows-console-mode=disable ^
           --output-dir=dist ^
           --output-filename=procesador_excel_gui.exe ^
-          --include-data-files=./reportes/Reporte IR Tornos.xlsx=reportes/Reporte IR Tornos.xlsx ^
           --enable-plugin=tk-inter ^
           --include-package=openpyxl ^
           --include-package=xlwings ^
           --include-module=win32com ^
           --remove-output ^
           --assume-yes-for-downloads ^
-          --windows-icon-from-ico=icono.ico ^
           --tk-library-dir=%tk_path%\tk8.6 ^
           --tcl-library-dir=%tk_path% ^
           codigo_python.py
