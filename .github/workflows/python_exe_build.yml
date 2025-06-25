@@ -27,7 +27,7 @@ jobs:
     - name: Crear carpeta reportes
       run: mkdir reportes
 
-    - name: Build EXE with Nuitka (Optimizado)
+    - name: Build EXE with Nuitka
       run: |
         python -m nuitka `
           --standalone `
@@ -35,11 +35,11 @@ jobs:
           --windows-console-mode=disable `
           --output-dir=dist `
           --output-filename=procesador_excel_gui.exe `
+          --include-data-files=./reportes/Reporte IR Tornos.xlsx=reportes/Reporte IR Tornos.xlsx `
           --enable-plugin=tk-inter `
           --include-package=openpyxl `
           --include-package=xlwings `
           --include-module=win32com `
-          --include-package-data=pywin32 `
           --remove-output `
           --assume-yes-for-downloads `
           codigo_python.py
