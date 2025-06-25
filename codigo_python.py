@@ -79,23 +79,16 @@ def cerrar_carga():
 
 def ejecutar(txt, torno, mes, dia, anio):
     try:
-        # Actualizar barra al inicio del procesamiento
-        barra['value'] = 30
+        barra['value'] = 30 # Actualizar barra al inicio del procesamiento
         ventana_carga.update_idletasks()
-        
         bloques, porcentajes = procesar_datos(txt, torno, mes, dia, anio)
-        
-        # Actualizar barra después de procesar datos
-        barra['value'] = 70
+        barra['value'] = 70 # Actualizar barra después de procesar datos
         ventana_carga.update_idletasks()
-        
         if bloques is not None and porcentajes is not None:
             fecha(mes, dia, anio, torno, bloques, porcentajes)
         else:
             messagebox.showwarning("Advertencia", "No se pudo procesar los datos.")
-        
-        # Completar barra al final
-        barra['value'] = 100
+        barra['value'] = 100 # Completar barra al final
     except Exception as e:
         messagebox.showerror("Error", f"Ocurrió un error en ejecutar():\n{e}")
     finally:
@@ -185,34 +178,47 @@ def procesar_datos(entrada, torno, mes, dia, anio):
         if 'wb' in locals():
             wb.close()
 
-def crear_archivo_temporal_con_ae(celda_origen):
+def crear_archivo_temporal_con_ae(celdas_origen):
     pythoncom.CoInitialize()
     excel = win32.Dispatch("Excel.Application")
     excel.Visible = False
     excel.DisplayAlerts = False
+    valores_ae = []
+    
     try:
         wb = excel.Workbooks.Open(RUTA_ENTRADA)
         hoja = wb.Sheets("IR diario ")
-        fila = int(''.join(filter(str.isdigit, celda_origen))) # Obtener número de fila desde celda_origen
-        hoja.Range(celda_origen).Copy() # Copiar la celda con fórmula de AD{fila}
-        celda_destino = f"AE{fila}" # Pegar solo el valor en AE{fila}
-        hoja.Range(celda_destino).PasteSpecial(Paste=-4163)  # xlPasteValues
-        valor_pego = hoja.Range(celda_destino).Value
+        
+        # Forzar cálculo completo antes de copiar valores
+        excel.Calculation = -4105  # xlCalculationAutomatic
+        wb.Calculate()
+        
+        for celda_ref in celdas_origen:
+            fila = int(''.join(filter(str.isdigit, celda_ref)))
+            origen = f"AD{fila}"
+            destino = f"AE{fila}"
+            
+            # Copiar fórmula y pegar como valor
+            hoja.Range(origen).Copy()
+            hoja.Range(destino).PasteSpecial(Paste=-4163)  # xlPasteValues
+            
+            # Obtener valor inmediatamente después de pegar
+            valores_ae.append(hoja.Range(destino).Value or 0.0)
+        
+        # Guardar temporalmente solo para extraer valores
         temp_path = os.path.join(BASE_DIR, CARPETA, "temp_report.xlsx")
         wb.SaveAs(temp_path)
-        wb.Close(False)
-        excel.Quit()
-        wb_temp = openpyxl.load_workbook(temp_path, data_only=True)
-        hoja_temp = wb_temp["IR diario "]
-        valor_final = hoja_temp.cell(row=fila, column=31).value
-        wb_temp.close()
-        return temp_path, float(valor_final) if valor_final else 0.0
+        
+        return valores_ae
+        
     except Exception as e:
-        excel.Quit()
-        pythoncom.CoUninitialize()
-        messagebox.showerror("Error", f"No se pudo generar archivo temporal:\n{e}")
-        return None, 0.0
+        messagebox.showerror("Error", f"Error en evaluación COM:\n{str(e)}")
+        return [0.0] * len(celdas_origen)
     finally:
+        try:
+            if 'wb' in locals(): wb.Close(False)
+        except: pass
+        excel.Quit()
         pythoncom.CoUninitialize()
 
 def escribir(hoja, f, c, v, num=False):
@@ -277,10 +283,10 @@ def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque
         elif tipo_bloque == "REGULAR":
             fila_valor = 18 if torno == 1 else 19
         else:
-            continue  # ignorar bloques con tipo desconocido
+            continue # ignorar bloques con tipo desconocido
         celda = hoja.cell(row=fila_valor, column=col_dia)
         celda.value = valor_ae / 100 if valor_ae > 1 else valor_ae  # Porcentaje en decimal
-        celda.number_format = '0.00%'  # Formato de porcentaje con 2 decimales
+        celda.number_format = '0.00%'
 
 def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
     pythoncom.CoInitialize()
@@ -288,7 +294,6 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
     nueva = f"IR {mes} {anio}"
     hoja_anterior = None
     hoja_nueva_existia = False
-    
     try:
         excel = win32.gencache.EnsureDispatch('Excel.Application')
         excel.Visible = False
@@ -296,30 +301,24 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
         wb = excel.Workbooks.Open(RUTA_ENTRADA, UpdateLinks=0)
         nombres_hojas = [h.Name for h in wb.Sheets]
         hoja_nueva_existia = nueva in nombres_hojas
-        
         if not hoja_nueva_existia:
             hojas_ir = [h for h in nombres_hojas if h.startswith("IR ") and len(h.split()) == 3]
-            
             def total_meses(nombre):
                 try:
                     _, mes_str, anio_str = nombre.split()
                     return int(anio_str) * 12 + MESES_NUM[mes_str]
                 except:
                     return -1
-                    
             hojas_ir_ordenadas = sorted(hojas_ir, key=total_meses)
             total_nueva = int(anio) * 12 + MESES_NUM[mes]
-            
             for h in hojas_ir_ordenadas:
                 if total_meses(h) < total_nueva:
                     hoja_anterior = h
                 else:
                     break
-                    
             if not hoja_anterior:
                 messagebox.showwarning("Orden inválido", f"No se encontró hoja anterior para insertar '{nueva}'")
                 return
-                
             idx_anterior = [h.Name for h in wb.Sheets].index(hoja_anterior)
             insert_idx = min(idx_anterior + 2, wb.Sheets.Count)
             wb.Sheets(hoja_anterior).Copy(After=wb.Sheets(insert_idx - 1))
@@ -340,38 +339,27 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
         except:
             pass
         pythoncom.CoUninitialize()
-        
     try:
         wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
         hoja_nueva = wb2[nueva]
         col_dia = dia + 1  # columna B es 2, día 1 → columna 2
-        
         if not hoja_nueva_existia:
             filas_fechas = [2, 3, 4, 7, 8, 9, 12, 13, 14, 17, 18, 19, 22, 27, 31, 37]
             for fila in filas_fechas:
                 for col in range(2, 33):
                     hoja_nueva.cell(row=fila, column=col, value="")
-                    
         nueva_fecha = f"{dia:02d}/{MESES_NUM[mes]:02d}/{anio}"
         for fila in [2, 7, 12, 17, 22, 27, 31, 37]:
             hoja_nueva.cell(row=fila, column=col_dia, value=nueva_fecha)
-            
-        # Extraer solo los valores para escribir (segundo elemento de cada par)
         valores_para_escribir = [val for i, (tipo, val) in enumerate(bloques_detectados) if i % 2 == 1]
         tipos_para_escribir = [tipo for i, (tipo, val) in enumerate(bloques_detectados) if i % 2 == 1]
-        
         for (tipo_bloque, valor), valor_ae in zip(zip(tipos_para_escribir, valores_para_escribir), sumas_ad_por_bloque):
             escribir_valor_bloque(hoja_nueva, col_dia, torno, valor, tipo_bloque)
-            
         escribir_valores_resumen_bloques(hoja_nueva, col_dia, torno, sumas_ad_por_bloque, tipos_para_escribir)
-        
         wb2.save(RUTA_ENTRADA)
         wb2.close()
-        
-        # Rotar etiquetas solo si es hoja nueva
-        if not hoja_nueva_existia:
+        if not hoja_nueva_existia: # Rotar etiquetas solo si es hoja nueva
             rotar_etiquetas_graficos(RUTA_ENTRADA, nueva)
-            
         shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
         mensaje = "✅ Valores actualizados correctamente." if hoja_nueva_existia else f"✅ Hoja '{nueva}' creada correctamente."
         messagebox.showinfo("Éxito", mensaje)
@@ -382,36 +370,25 @@ def rotar_etiquetas_graficos(ruta_archivo, nombre_hoja):
     pythoncom.CoInitialize()
     excel = None
     try:
-        # Iniciar Excel en segundo plano
-        excel = win32.Dispatch("Excel.Application")
+        excel = win32.Dispatch("Excel.Application") # Iniciar Excel en segundo plano
         excel.Visible = False
         excel.DisplayAlerts = False
         excel.ScreenUpdating = False  # Optimizar rendimiento
-        
-        # Abrir el libro de trabajo
         wb = excel.Workbooks.Open(ruta_archivo)
         sheet = wb.Sheets(nombre_hoja)
-        
-        # Procesar todos los gráficos en la hoja
-        for chart_obj in sheet.ChartObjects():
+        for chart_obj in sheet.ChartObjects(): # Procesar todos los gráficos en la hoja
             try:
                 chart = chart_obj.Chart
-                # Obtener eje X (eje 1 en Excel)
                 x_axis = chart.Axes(1)
-                # Rotar etiquetas a 45 grados
-                x_axis.TickLabels.Orientation = 45
+                x_axis.TickLabels.Orientation = 45 # Rotar etiquetas a 45 grados
             except Exception as e:
-                # Algunos objetos pueden no ser gráficos, ignorar errores
                 print(f"Advertencia: Error en gráfico - {str(e)}")
                 continue
-        
-        # Guardar y cerrar
         wb.Save()
         wb.Close(True)
     except Exception as e:
         print(f"Error crítico al rotar etiquetas: {str(e)}")
     finally:
-        # Limpieza garantizada
         try:
             if 'wb' in locals():
                 wb.Close(False)
