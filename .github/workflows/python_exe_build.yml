@@ -35,7 +35,6 @@ jobs:
       run: |
         python -m nuitka ^
           --standalone ^
-          --onefile ^
           --windows-console-mode=disable ^
           --output-dir=dist ^
           --output-filename=procesador_excel_gui.exe ^
@@ -50,12 +49,12 @@ jobs:
     - name: Crear archivo LEEME
       run: echo "Este archivo fue generado automáticamente con Nuitka. Es seguro y no contiene malware." > dist\LEEME.txt
 
-    - name: Comprimir EXE en ZIP
-      run: powershell Compress-Archive -Path dist\procesador_excel_gui.exe,dist\LEEME.txt -DestinationPath dist\procesador_excel_gui.zip
+    - name: Comprimir carpeta standalone en ZIP
+      run: powershell Compress-Archive -Path dist\procesador_excel_gui.dist\*,dist\procesador_excel_gui.exe,dist\LEEME.txt -DestinationPath dist\procesador_excel_gui.zip
 
     - name: Subir artefacto ZIP
       uses: actions/upload-artifact@v4
       with:
-        name: procesador_excel_gui_nuitka_optimized
+        name: procesador_excel_gui_nuitka_standalone
         path: dist/procesador_excel_gui.zip
         retention-days: 1
