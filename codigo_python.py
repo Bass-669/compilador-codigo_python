@@ -225,26 +225,36 @@ def procesar_datos(entrada, torno, mes, dia, anio):
         excel_app.Quit()
         pythoncom.CoUninitialize()
 
-def obtener_valor_ae_directo(excel_app, ruta_archivo, celda_origen):
+def crear_archivo_temporal_con_ae(celda_origen):
+    pythoncom.CoInitialize()
+    excel = win32.Dispatch("Excel.Application")
+    excel.Visible = False
+    excel.DisplayAlerts = False
     try:
-        wb = excel_app.Workbooks.Open(ruta_archivo)
+        wb = excel.Workbooks.Open(RUTA_ENTRADA)
         hoja = wb.Sheets("IR diario ")
-        fila = int(''.join(filter(str.isdigit, celda_origen)))
-        celda_ae = f"AE{fila}"
-        origen = hoja.Range(celda_origen)
-        origen.Copy()
-        destino = hoja.Range(celda_ae)
-        destino.PasteSpecial(Paste=-4163)  # xlPasteValues
-        excel_app.CutCopyMode = False
-        # Forzar cálculo antes de leer el valor
-        excel_app.Calculate()
-        valor_ae = destino.Value
+        fila = int(''.join(filter(str.isdigit, celda_origen))) # Obtener número de fila desde celda_origen
+        hoja.Range(celda_origen).Copy() # Copiar la celda con fórmula de AD{fila}
+        celda_destino = f"AE{fila}" # Pegar solo el valor en AE{fila}
+        hoja.Range(celda_destino).PasteSpecial(Paste=-4163)  # xlPasteValues
+        valor_pego = hoja.Range(celda_destino).Value
+        temp_path = os.path.join(BASE_DIR, CARPETA, "temp_report.xlsx")
+        wb.SaveAs(temp_path)
         wb.Close(False)
-        return float(valor_ae) if valor_ae else 0.0
-        
+        excel.Quit()
+        wb_temp = openpyxl.load_workbook(temp_path, data_only=True)
+        hoja_temp = wb_temp["IR diario "]
+        valor_final = hoja_temp.cell(row=fila, column=31).value
+        wb_temp.close()
+        return temp_path, float(valor_final) if valor_final else 0.0
     except Exception as e:
-        messagebox.showerror("Error", f"Error obteniendo valor AE:\n{e}")
-        return None
+        excel.Quit()
+        pythoncom.CoUninitialize()
+        messagebox.showerror("Error", f"No se pudo generar archivo temporal:\n{e}")
+        return None, 0.0
+    finally:
+        pythoncom.CoUninitialize()
+
 
 def escribir(hoja, f, c, v, num=False):
     celda = hoja.cell(row=f, column=c, value=v)
