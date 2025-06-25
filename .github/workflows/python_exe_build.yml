@@ -32,14 +32,14 @@ jobs:
         python -m nuitka `
           --standalone `
           --onefile `
-          --windows-disable-console `
+          --windows-console-mode=disable `
           --output-dir=dist `
           --output-filename=procesador_excel_gui.exe `
           --enable-plugin=tk-inter `
           --include-package=openpyxl `
           --include-package=xlwings `
-          --include-package=pywin32 `
-          --include-data-dir=reportes=reportes `
+          --include-module=win32com `
+          --include-package-data=pywin32 `
           --remove-output `
           --assume-yes-for-downloads `
           codigo_python.py
