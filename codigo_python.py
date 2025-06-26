@@ -79,22 +79,21 @@ def cerrar_carga():
 
 def ejecutar(txt, torno, mes, dia, anio):
     try:
-        barra['value'] = 30  # Actualizar barra al inicio del procesamiento
+        barra['value'] = 30
         ventana_carga.update_idletasks()
         
         bloques, porcentajes = procesar_datos(txt, torno, mes, dia, anio)
-        barra['value'] = 50  # Actualizar progreso
+        barra['value'] = 50
         
-        # Primero asignar rendimientos
-        asignar_rendimiento_a_ir(dia, mes, anio, torno)
-        barra['value'] = 70  # Actualizar progreso
+        asignar_rendimiento_a_ir(dia, mes, anio, torno)  # Sin mes_num, usa mes directamente
+        barra['value'] = 70
         
         if bloques is not None and porcentajes is not None:
             fecha(mes, dia, anio, torno, bloques, porcentajes)
         else:
             messagebox.showwarning("Advertencia", "No se pudo procesar los datos.")
         
-        barra['value'] = 100  # Completar barra al final
+        barra['value'] = 100
     except Exception as e:
         messagebox.showerror("Error", f"Ocurrió un error en ejecutar():\n{e}")
     finally:
@@ -411,14 +410,6 @@ def rotar_etiquetas_graficos(ruta_archivo, nombre_hoja):
 
 #-----------------------------------------------------------------------
 def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
-    """
-    Extrae Rendimiento_Acumulado del archivo Peeling Query.
-    Args:
-        dia, mes, anio: Fecha ingresada en el código principal.
-        torno_1, torno_2: WorkIds de los tornos (default 3011 y 3012).
-    Retorna:
-        {3011: rendimiento_torno1, 3012: rendimiento_torno2}
-    """
     pythoncom.CoInitialize()
     excel = win32.Dispatch("Excel.Application")
     excel.Visible = False
@@ -432,25 +423,24 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
             return None
 
         wb_peeling = excel.Workbooks.Open(ruta_peeling)
-        hoja_peeling = wb_peeling.Sheets(1)  # Asume que los datos están en la primera hoja
+        hoja_peeling = wb_peeling.Sheets(1)  # Primera hoja
 
-        # 2. Convertir mes a formato numérico (ej: "Enero" → 1)
-        mes_num = MESES_NUM.get(mes, 1)  # Usa tu diccionario MESES_NUM
+        # 2. Convertir mes a número (usando tu diccionario MESES_NUM)
+        mes_num = MESES_NUM.get(mes, 1)  # Ej: "Enero" → 1
+        fecha_buscar = f"{anio}-{mes_num:02d}-{dia:02d}"  # Formato: "2025-01-01"
 
-        # 3. Buscar la fecha en formato Excel (ej: "2025-05-01")
-        fecha_buscar = datetime(anio, mes_num, dia).strftime("%Y-%m-%d")
         rendimientos = {}
-        
-        # 4. Recorrer filas (asumiendo encabezados en fila 1)
         ultima_fila = hoja_peeling.UsedRange.Rows.Count
+        
         for fila in range(2, ultima_fila + 1):
-            fecha_celda = hoja_peeling.Cells(fila, 1).Value  # Columna A: Fecha
-            if fecha_celda and fecha_celda.strftime("%Y-%m-%d") == fecha_buscar:
-                work_id = int(hoja_peeling.Cells(fila, 2).Value)  # Columna B: WorkId
-                rendimiento_formula = hoja_peeling.Cells(fila, 12).Formula  # Columna L: Rendimiento_Acumulado
+            # 3. Leer fecha como texto y comparar
+            fecha_celda = str(hoja_peeling.Cells(fila, 1).Value).strip()
+            if fecha_celda == fecha_buscar:
+                work_id = int(hoja_peeling.Cells(fila, 2).Value)
+                rendimiento_formula = hoja_peeling.Cells(fila, 12).Formula
 
-                # 5. Obtener valor REAL (similar a AD → AE)
                 if rendimiento_formula:
+                    # 4. Obtener valor real (similar a AD → AE)
                     temp_path = os.path.join(BASE_DIR, "temp_peeling.xlsx")
                     hoja_peeling.Cells(fila, 12).Copy()
                     hoja_peeling.Range("X1").PasteSpecial(Paste=-4163)  # Pegar valor
@@ -474,35 +464,43 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
 
 def asignar_rendimiento_a_ir(dia, mes, anio, torno):
     """
-    Compara la fecha y asigna el Rendimiento_Acumulado al archivo IR.
+    Asigna el rendimiento al archivo IR.
     Args:
-        dia, mes, anio: Fecha ingresada en el código principal.
-        torno: Número de torno (1 o 2).
+        dia, mes (str): Mes en español (ej: "Enero").
+        anio (int): Año.
+        torno (int): 1 o 2.
     """
     # 1. Obtener rendimientos
     rendimientos = obtener_rendimientos_peeling(dia, mes, anio)
     if not rendimientos:
-        messagebox.showwarning("Advertencia", f"No hay datos para {dia}/{mes_num}/{anio}")
+        messagebox.showwarning("Advertencia", f"No hay datos para {dia}/{mes}/{anio}")
         return
+
     # 2. Filtrar por torno
     work_id = 3011 if torno == 1 else 3012
     rendimiento = rendimientos.get(work_id, 0.0)
+
     # 3. Escribir en el archivo IR
     try:
         wb = openpyxl.load_workbook(RUTA_ENTRADA)
         nombre_hoja = f"IR {mes} {anio}"
         if nombre_hoja not in wb.sheetnames:
             raise ValueError(f"No existe la hoja {nombre_hoja}")
+
         hoja = wb[nombre_hoja]
         col_dia = dia + 1  # Columna B = día 1
+
         # Fila según torno (ajusta según tu estructura)
         fila = 13 if torno == 1 else 18
         hoja.cell(row=fila, column=col_dia, value=rendimiento / 100)  # Convertir a porcentaje
         hoja.cell(row=fila, column=col_dia).number_format = '0.00%'
+
         wb.save(RUTA_ENTRADA)
         messagebox.showinfo("Éxito", f"Rendimiento asignado a Torno {torno}: {rendimiento:.2f}%")
     except Exception as e:
         messagebox.showerror("Error", f"No se pudo guardar en el IR:\n{str(e)}")
+
+
 
 ventana = tk.Tk()
 ventana.title("Ingresar datos")
