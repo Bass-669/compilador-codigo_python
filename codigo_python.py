@@ -184,29 +184,70 @@ def crear_archivo_temporal_con_ae(celda_origen):
     excel.Visible = False
     excel.DisplayAlerts = False
     try:
+        # Mensaje de depuración 1: Mostrar la celda_origen recibida
+        messagebox.showinfo("DEBUG - Paso 1", f"Celda origen recibida: {celda_origen}")
+
         wb = excel.Workbooks.Open(RUTA_ENTRADA)
         hoja = wb.Sheets("IR diario ")
-        fila = int(''.join(filter(str.isdigit, celda_origen))) # Obtener número de fila desde celda_origen
-        hoja.Range(celda_origen).Copy() # Copiar la celda con fórmula de AD{fila}
-        celda_destino = f"AE{fila}" # Pegar solo el valor en AE{fila}
+        
+        # Mensaje de depuración 2: Verificar si la hoja existe
+        messagebox.showinfo("DEBUG - Paso 2", f"Hoja 'IR diario ' cargada correctamente")
+
+        # Extraer número de fila de la celda_origen (ej: "AD123" -> 123)
+        try:
+            fila = int(''.join(filter(str.isdigit, celda_origen)))
+            messagebox.showinfo("DEBUG - Paso 3", f"Fila extraída: {fila}")
+        except Exception as e:
+            messagebox.showerror("DEBUG - Error", f"No se pudo extraer fila de {celda_origen}\nError: {e}")
+            return None, 0.0
+
+        # Mensaje de depuración 3: Mostrar rango a copiar
+        messagebox.showinfo("DEBUG - Paso 4", f"Copiando rango: {celda_origen}")
+
+        hoja.Range(celda_origen).Copy()  # Copiar celda con fórmula
+        
+        celda_destino = f"AE{fila}"
+        messagebox.showinfo("DEBUG - Paso 5", f"Pegando valor en: {celda_destino}")
+        
         hoja.Range(celda_destino).PasteSpecial(Paste=-4163)  # xlPasteValues
         valor_pego = hoja.Range(celda_destino).Value
+        
+        # Mensaje de depuración 4: Mostrar valor pegado
+        messagebox.showinfo("DEBUG - Paso 6", f"Valor pegado en {celda_destino}: {valor_pego}")
+
         temp_path = os.path.join(BASE_DIR, CARPETA, "temp_report.xlsx")
         wb.SaveAs(temp_path)
+        messagebox.showinfo("DEBUG - Paso 7", f"Archivo temporal guardado en: {temp_path}")
+
         wb.Close(False)
         excel.Quit()
+
+        # Mensaje de depuración 5: Verificar archivo temporal
+        if not os.path.exists(temp_path):
+            messagebox.showerror("DEBUG - Error", "No se creó el archivo temporal")
+            return None, 0.0
+
         wb_temp = openpyxl.load_workbook(temp_path, data_only=True)
         hoja_temp = wb_temp["IR diario "]
         valor_final = hoja_temp.cell(row=fila, column=31).value
+        
+        # Mensaje de depuración 6: Valor final leído
+        messagebox.showinfo("DEBUG - Paso 8", f"Valor final leído (AE{fila}): {valor_final}")
+
         wb_temp.close()
         return temp_path, float(valor_final) if valor_final else 0.0
+
     except Exception as e:
+        messagebox.showerror("DEBUG - Error Crítico", 
+            f"Error en crear_archivo_temporal_con_ae():\n"
+            f"Tipo: {type(e).__name__}\n"
+            f"Mensaje: {str(e)}\n"
+            f"Celda origen: {celda_origen}")
         excel.Quit()
-        pythoncom.CoUninitialize()
-        messagebox.showerror("Error", f"No se pudo generar archivo temporal:\n{e}")
         return None, 0.0
     finally:
         pythoncom.CoUninitialize()
+
 def escribir(hoja, f, c, v, num=False):
     celda = hoja.cell(row=f, column=c, value=v)
     celda.border, celda.alignment = BORDER, ALIGN_R
