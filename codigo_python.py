@@ -426,18 +426,16 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
         wb_peeling = excel.Workbooks.Open(ruta_peeling)
         hoja_peeling = wb_peeling.Sheets(1)  # Primera hoja
 
-        # 2. Preparar todas las posibles representaciones de la fecha
+        # 2. Preparar la fecha objetivo en formato texto CON comillas
         mes_num = MESES_NUM[mes]
-        fecha_objetivo = f"{anio}-{mes_num:02d}-{dia:02d}"  # Formato original YYYY-MM-DD
-        fecha_objetivo_invertida = f"{dia:02d}-{mes_num:02d}-{anio}"  # Formato DD-MM-YYYY
-        fecha_objetivo_sin_ceros = f"{anio}-{mes_num}-{dia}"  # YYYY-M-D
-        fecha_objetivo_excel = datetime(int(anio), mes_num, int(dia))  # Para comparación como fecha Excel
+        fecha_objetivo = f'"{anio}-{mes_num:02d}-{dia:02d}"'  # Con comillas incluidas
+        fecha_objetivo_sin_comillas = f"{anio}-{mes_num:02d}-{dia:02d}"  # Sin comillas por si acaso
 
         rendimientos = {}
         ultima_fila = hoja_peeling.UsedRange.Rows.Count
         fecha_encontrada = False
         
-        # 3. Búsqueda optimizada
+        # 3. Búsqueda optimizada para texto con comillas
         for fila in range(2, ultima_fila + 1):
             celda = hoja_peeling.Cells(fila, 1)
             valor_celda = celda.Value
@@ -445,23 +443,8 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
             if valor_celda is None:
                 continue
                 
-            # Primero comparamos como texto (formato original YYYY-MM-DD)
-            if str(valor_celda).strip() in [fecha_objetivo, fecha_objetivo_sin_ceros]:
-                fecha_encontrada = True
-            # Luego comparamos formato DD-MM-YYYY (cuando Excel lo ha convertido)
-            elif str(valor_celda).strip() == fecha_objetivo_invertida:
-                fecha_encontrada = True
-            # Finalmente comparamos como fecha de Excel (valor numérico)
-            elif isinstance(valor_celda, (int, float)):
-                try:
-                    fecha_celda = (datetime(1899, 12, 30) + 
-                                  timedelta(days=int(valor_celda)))
-                    if fecha_celda.date() == fecha_objetivo_excel.date():
-                        fecha_encontrada = True
-                except:
-                    continue
-
-            if fecha_encontrada:
+            # Comparación directa del texto (incluyendo comillas)
+            if str(valor_celda).strip() in [fecha_objetivo, fecha_objetivo_sin_comillas]:
                 try:
                     work_id = int(hoja_peeling.Cells(fila, 2).Value)
                     rendimiento = float(hoja_peeling.Cells(fila, 12).Value)
@@ -473,24 +456,25 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
                         
                     if len(rendimientos) == 2:
                         break
+                        
+                    fecha_encontrada = True
                 except Exception as e:
-                    fecha_encontrada = False
                     continue
 
         if not fecha_encontrada:
-            # Mostrar diagnóstico de las primeras filas
+            # Mostrar diagnóstico más detallado
             muestra_ejemplo = []
             for fila in range(2, min(7, ultima_fila + 1)):
                 celda = hoja_peeling.Cells(fila, 1)
                 muestra_ejemplo.append(
-                    f"Fila {fila}: Valor='{celda.Value}', "
+                    f"Fila {fila}: Valor={repr(celda.Value)}, "  # repr muestra las comillas literalmente
                     f"Tipo={type(celda.Value).__name__}, "
                     f"Formato={celda.NumberFormat}"
                 )
             
             messagebox.showwarning("Diagnóstico", 
-                f"No se encontró la fecha {fecha_objetivo} o {fecha_objetivo_invertida}\n\n"
-                "Ejemplos de las primeras filas:\n" + 
+                f"No se encontró la fecha {fecha_objetivo}\n\n"
+                "Ejemplos reales de las primeras filas:\n" + 
                 "\n".join(muestra_ejemplo))
             return None
 
@@ -501,12 +485,13 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
             f"Error al procesar archivo Peeling:\n{str(e)}\n\n"
             "Solución:\n"
             "1. Verifique que el archivo no esté abierto en Excel\n"
-            "2. Confirme que las fechas sean visibles\n"
-            "3. Revise los permisos del archivo")
+            "2. Confirme que las fechas tengan exactamente este formato: \"YYYY-MM-DD\"\n"
+            "3. Revise que no haya espacios adicionales")
         return None
     finally:
         excel.Quit()
         pythoncom.CoUninitialize()
+
 
 def asignar_rendimiento_a_ir(dia, mes, anio, torno):
     try:
