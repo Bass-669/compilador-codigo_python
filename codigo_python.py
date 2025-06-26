@@ -417,151 +417,190 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
     excel.DisplayAlerts = False
     
     try:
-        # 1. Abrir archivo
+        # 1. Verificar y abrir archivo Peeling
         ruta_peeling = os.path.join(BASE_DIR, "Nueva_Peeling_Query_202050501_arauco.xlsx")
         if not os.path.exists(ruta_peeling):
-            messagebox.showerror("Error", f"No se encontró el archivo:\n{ruta_peeling}")
+            messagebox.showerror("Error", f"Archivo Peeling no encontrado:\n{ruta_peeling}")
             return None
 
         wb_peeling = excel.Workbooks.Open(ruta_peeling)
-        hoja_peeling = wb_peeling.Sheets(1)
+        hoja_peeling = wb_peeling.Sheets(1)  # Primera hoja
 
-        # 2. Preparar fecha objetivo en múltiples formatos
-        mes_num = MESES_NUM.get(mes, 1)
-        fecha_objetivo = datetime.date(int(anio), mes_num, int(dia))
+        # 2. Preparar fecha objetivo
+        try:
+            mes_num = MESES_NUM[mes]
+            fecha_objetivo = datetime.date(int(anio), mes_num, int(dia))
+        except (ValueError, KeyError) as e:
+            messagebox.showerror("Error", f"Fecha inválida: {dia}/{mes}/{anio}\nError: {str(e)}")
+            return None
+
+        # 3. Diagnóstico inicial (primeras 3 celdas)
+        debug_info = []
+        for fila in range(2, 5):
+            celda = hoja_peeling.Cells(fila, 1)
+            valor = celda.Value
+            debug_info.append(f"Fila {fila}: {valor} (Tipo: {type(valor).__name__})")
         
-        # Todos los formatos posibles que podrían estar en Excel
-        formatos_posibles = [
-            # Formatos internacionales
-            f"{anio}-{mes_num:02d}-{dia:02d}",  # YYYY-MM-DD
-            f"{anio}/{mes_num:02d}/{dia:02d}",   # YYYY/MM/DD
-            # Formatos locales
-            f"{dia:02d}/{mes_num:02d}/{anio}",   # DD/MM/AAAA
-            f"{dia:02d}-{mes_num:02d}-{anio}",   # DD-MM-AAAA
-            # Formatos en texto
-            f"{dia} de {mes} de {anio}",        # 12 de Junio de 2025
-            f"{dia}/{mes_num}/{anio}",           # DD/M/AAAA (sin ceros)
-            # Formatos de Excel (serial)
-            int((datetime.datetime(anio, mes_num, dia) - datetime.datetime(1899, 12, 30)).days)
-        ]
+        messagebox.showinfo("DEBUG", "Primeras celdas:\n" + "\n".join(debug_info))  # Log para consola
 
         rendimientos = {}
         ultima_fila = hoja_peeling.UsedRange.Rows.Count
         fecha_encontrada = False
         
+        # 4. Búsqueda optimizada
         for fila in range(2, ultima_fila + 1):
             celda = hoja_peeling.Cells(fila, 1)
             valor_celda = celda.Value
             
-            # Caso 1: Celda vacía
-            if valor_celda is None:
+            if valor_celda is None:  # Celda vacía
                 continue
                 
-            # Caso 2: Es un número serial de Excel
-            if isinstance(valor_celda, (int, float)):
+            fecha_celda = None
+            
+            # Intento de conversión según tipo de dato
+            if isinstance(valor_celda, (int, float)):  # Serial date de Excel
                 try:
-                    # Convertir serial Excel a fecha
-                    fecha_excel = datetime.datetime(1899, 12, 30) + datetime.timedelta(days=int(valor_celda))
-                    if fecha_excel.date() == fecha_objetivo:
-                        fecha_encontrada = True
-                        work_id = int(hoja_peeling.Cells(fila, 2).Value)
-                        # ... procesar rendimientos
-                        continue
+                    # Conversión mejorada para fechas Excel (Windows)
+                    fecha_celda = (datetime.datetime(1899, 12, 30) + 
+                                  datetime.timedelta(days=int(valor_celda))).date()
                 except Exception as e:
-                    print(f"Error convirtiendo serial {valor_celda}: {e}")
+                    messagebox.showinfo("DEBUG", f"Error conversión serial date fila {fila}: {str(e)}")
                     continue
-                    
-            # Caso 3: Es texto
-            valor_texto = str(valor_celda).strip()
-            
-            # Normalización avanzada
-            valor_normalizado = (valor_texto
-                               .replace("-", "/")
-                               .replace(".", "/")
-                               .replace(" de ", "/")
-                               .replace(" ", ""))
-            
-            # Comparar con todos los formatos de texto
-            for formato in formatos_posibles[:5]:  # Solo los formatos de texto
-                formato_normalizado = (str(formato)
-                                     .replace("-", "/")
-                                     .replace(" de ", "/")
-                                     .replace(" ", ""))
+            else:  # Texto u otro formato
+                valor_texto = str(valor_celda).strip()
+                # Lista de formatos de fecha a probar
+                formatos_fecha = [
+                    "%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", 
+                    "%d-%m-%Y", "%Y/%m/%d", "%d.%m.%Y",
+                    "%Y%m%d", "%d %b %Y", "%d %B %Y"
+                ]
                 
-                if valor_normalizado == formato_normalizado:
+                for fmt in formatos_fecha:
+                    try:
+                        fecha_celda = datetime.datetime.strptime(valor_texto, fmt).date()
+                        break  # Si encuentra un formato que funciona, sale del loop
+                    except ValueError:
+                        continue
+
+            # Verificar si coincide con la fecha objetivo
+            if fecha_celda == fecha_objetivo:
+                try:
                     fecha_encontrada = True
                     work_id = int(hoja_peeling.Cells(fila, 2).Value)
-                    # ... procesar rendimientos
-                    break
+                    rendimiento = float(hoja_peeling.Cells(fila, 12).Value)
+                    
+                    # Asignar según el torno correspondiente
+                    if work_id == torno_1:
+                        rendimientos['torno_1'] = rendimiento
+                    elif work_id == torno_2:
+                        rendimientos['torno_2'] = rendimiento
+                        
+                    # Si ya encontramos ambos tornos, salir del loop
+                    if len(rendimientos) == 2:
+                        break
+                except Exception as e:
+                    messagebox.showinfo("DEBUG",f"Error procesando fila {fila}: {str(e)}")
+                    continue
 
         if not fecha_encontrada:
-            # Mensaje mejorado con sugerencias
-            messagebox.showwarning(
-                "Advertencia",
-                f"No se encontraron datos para {fecha_objetivo}\n\n"
-                "Posibles causas:\n"
-                "1. La fecha no existe en el archivo\n"
-                "2. El formato de fecha es diferente\n"
-                "3. Hay filtros aplicados en Excel\n"
-                "4. La hoja consultada no es la correcta"
-            )
+            messagebox.showwarning("Advertencia", 
+                f"No se encontró la fecha {fecha_objetivo} en el archivo Peeling.\n\n"
+                "Información para diagnóstico:\n" + 
+                "\n".join(debug_info) + 
+                f"\n\nTotal filas revisadas: {ultima_fila}")
             return None
 
         return rendimientos
 
     except Exception as e:
-        messagebox.showerror("Error", 
-            f"Error crítico al leer Peeling Query:\n{str(e)}\n\n"
-            "Sugerencias:\n"
-            "1. Verifique que el archivo no esté corrupto\n"
-            "2. Confirme que Excel pueda abrir el archivo manualmente\n"
+        messagebox.showerror("Error Crítico", 
+            f"Error al procesar archivo Peeling:\n{str(e)}\n\n"
+            "Solución:\n"
+            "1. Verifique que el archivo no esté abierto en Excel\n"
+            "2. Confirme que el formato de fechas es consistente\n"
             "3. Revise los permisos del archivo")
         return None
     finally:
         excel.Quit()
         pythoncom.CoUninitialize()
 
-
 def asignar_rendimiento_a_ir(dia, mes, anio, torno):
-    # Convertir mes a número
-    mes_num = MESES_NUM.get(mes, 1)
-    fecha_buscar = f"{anio}-{mes_num:02d}-{dia:02d}"
-
-    # Mostrar fecha que se intentará buscar (DEPURACIÓN)
-    messagebox.showinfo("DEBUG", f"Iniciando búsqueda para: {fecha_buscar}")
-
-    rendimientos = obtener_rendimientos_peeling(dia, mes, anio)
-    if not rendimientos:
-        messagebox.showwarning("Advertencia", 
-            f"No hay datos para {fecha_buscar}.\n"
-            f"Revisa que la fecha exista en el archivo Peeling Query."
-        )
-        return
-
-    # 2. Filtrar por torno
-    work_id = 3011 if torno == 1 else 3012
-    rendimiento = rendimientos.get(work_id, 0.0)
-
-    # 3. Escribir en el archivo IR
     try:
-        wb = openpyxl.load_workbook(RUTA_ENTRADA)
-        nombre_hoja = f"IR {mes} {anio}"
-        if nombre_hoja not in wb.sheetnames:
-            raise ValueError(f"No existe la hoja {nombre_hoja}")
+        # Validación de parámetros
+        if not isinstance(dia, int) or dia < 1 or dia > 31:
+            raise ValueError("Día inválido")
+        if mes not in MESES_NUM:
+            raise ValueError("Mes inválido")
+        if not isinstance(anio, int) or anio < 2000:
+            raise ValueError("Año inválido")
+        if torno not in (1, 2):
+            raise ValueError("Torno debe ser 1 o 2")
 
-        hoja = wb[nombre_hoja]
-        col_dia = dia + 1  # Columna B = día 1
+        # Obtener rendimientos del archivo Peeling
+        rendimientos = obtener_rendimientos_peeling(dia, mes, anio)
+        if not rendimientos:
+            return  # El mensaje de error ya fue mostrado por obtener_rendimientos_peeling
 
-        # Fila según torno (ajusta según tu estructura)
-        fila = 13 if torno == 1 else 18
-        hoja.cell(row=fila, column=col_dia, value=rendimiento / 100)  # Convertir a porcentaje
-        hoja.cell(row=fila, column=col_dia).number_format = '0.00%'
+        # Obtener el rendimiento específico para el torno
+        rendimiento = rendimientos.get(f'torno_{torno}')
+        if rendimiento is None:
+            messagebox.showwarning("Advertencia", 
+                f"No se encontró rendimiento para el Torno {torno} en la fecha especificada")
+            return
 
-        wb.save(RUTA_ENTRADA)
-        messagebox.showinfo("Éxito", f"Rendimiento asignado a Torno {torno}: {rendimiento:.2f}%")
+        # Procesar archivo IR
+        try:
+            # Cargar archivo IR con openpyxl
+            wb = openpyxl.load_workbook(RUTA_ENTRADA)
+            nombre_hoja = f"IR {mes} {anio}"
+            
+            if nombre_hoja not in wb.sheetnames:
+                # Intentar crear la hoja si no existe
+                try:
+                    wb.create_sheet(nombre_hoja)
+                    # Aquí podrías copiar la estructura de otra hoja si es necesario
+                except Exception as e:
+                    raise ValueError(f"No se pudo crear la hoja {nombre_hoja}: {str(e)}")
+
+            hoja = wb[nombre_hoja]
+            col_dia = dia + 1  # Columna B = día 1
+            
+            # Determinar fila según torno (ajusta según tu estructura real)
+            fila_rendimiento = 13 if torno == 1 else 18
+            fila_fecha = 2  # Fila donde se escriben las fechas
+            
+            # Escribir fecha si no existe
+            if not hoja.cell(row=fila_fecha, column=col_dia).value:
+                hoja.cell(row=fila_fecha, column=col_dia, 
+                         value=f"{dia:02d}/{MESES_NUM[mes]:02d}/{anio}")
+            
+            # Escribir rendimiento (convertir a porcentaje decimal)
+            celda_rendimiento = hoja.cell(row=fila_rendimiento, column=col_dia, 
+                                         value=rendimiento / 100)
+            celda_rendimiento.number_format = '0.00%'
+            
+            # Guardar cambios
+            wb.save(RUTA_ENTRADA)
+            
+            # Mensaje de éxito detallado
+            messagebox.showinfo("Éxito", 
+                f"Rendimiento asignado correctamente:\n"
+                f"Fecha: {dia}/{mes}/{anio}\n"
+                f"Torno: {torno}\n"
+                f"Valor: {rendimiento:.2f}%")
+                
+        except Exception as e:
+            messagebox.showerror("Error", 
+                f"No se pudo actualizar el archivo IR:\n{str(e)}\n\n"
+                "Verifique:\n"
+                "1. Que el archivo no esté abierto en Excel\n"
+                "2. Que tenga permisos de escritura\n"
+                "3. La estructura de la hoja IR")
+                
+    except ValueError as e:
+        messagebox.showerror("Error de Validación", f"Parámetros inválidos:\n{str(e)}")
     except Exception as e:
-        messagebox.showerror("Error", f"No se pudo guardar en el IR:\n{str(e)}")
-
+        messagebox.showerror("Error Inesperado", f"Error no esperado:\n{str(e)}")
 
 
 ventana = tk.Tk()
