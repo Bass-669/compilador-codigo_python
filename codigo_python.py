@@ -565,59 +565,53 @@ def asignar_rendimiento_a_ir(dia, mes, anio, torno):
                 f"No se encontró rendimiento para el Torno {torno} en la fecha especificada")
             return
 
-        # Procesar archivo IR
+        # Mostrar mensaje de confirmación ANTES de guardar
+        mensaje = (
+            "✅ Datos encontrados:\n\n"
+            f"📅 Fecha: {dia:02d}/{mes_num:02d}/{anio}\n"
+            f"⚙️ Torno: {torno}\n"
+            f"📊 Rendimiento: {rendimiento:.2f}%\n\n"
+            "¿Desea continuar con el guardado?"
+        )
+        
+        if not messagebox.askyesno("Confirmación", mensaje):
+            return
+
+        # Procesar archivo IR (guardado)
         try:
-            # Cargar archivo IR con openpyxl
             wb = openpyxl.load_workbook(RUTA_ENTRADA)
             nombre_hoja = f"IR {mes} {anio}"
             
             if nombre_hoja not in wb.sheetnames:
-                # Intentar crear la hoja si no existe
-                try:
-                    wb.create_sheet(nombre_hoja)
-                    # Aquí podrías copiar la estructura de otra hoja si es necesario
-                except Exception as e:
-                    raise ValueError(f"No se pudo crear la hoja {nombre_hoja}: {str(e)}")
+                wb.create_sheet(nombre_hoja)
 
             hoja = wb[nombre_hoja]
-            col_dia = dia + 1  # Columna B = día 1
+            col_dia = dia + 1
             
-            # Determinar fila según torno (ajusta según tu estructura real)
-            fila_rendimiento = 13 if torno == 1 else 18
-            fila_fecha = 2  # Fila donde se escriben las fechas
-            
-            # Escribir fecha si no existe
-            if not hoja.cell(row=fila_fecha, column=col_dia).value:
-                hoja.cell(row=fila_fecha, column=col_dia, 
-                         value=f"{dia:02d}/{MESES_NUM[mes]:02d}/{anio}")
-            
-            # Escribir rendimiento (convertir a porcentaje decimal)
-            celda_rendimiento = hoja.cell(row=fila_rendimiento, column=col_dia, 
-                                         value=rendimiento / 100)
+            # Escribir datos
+            hoja.cell(row=2, column=col_dia, value=f"{dia:02d}/{mes_num:02d}/{anio}")
+            celda_rendimiento = hoja.cell(
+                row=13 if torno == 1 else 18, 
+                column=col_dia, 
+                value=rendimiento / 100
+            )
             celda_rendimiento.number_format = '0.00%'
             
-            # Guardar cambios
             wb.save(RUTA_ENTRADA)
             
-            # Mensaje de éxito detallado
+            # Mensaje final de éxito
             messagebox.showinfo("Éxito", 
-                f"Rendimiento asignado correctamente:\n"
-                f"Fecha: {dia}/{mes}/{anio}\n"
-                f"Torno: {torno}\n"
-                f"Valor: {rendimiento:.2f}%")
+                "Datos guardados correctamente en:\n"
+                f"📂 Archivo: {os.path.basename(RUTA_ENTRADA)}\n"
+                f"📑 Hoja: {nombre_hoja}")
                 
         except Exception as e:
             messagebox.showerror("Error", 
-                f"No se pudo actualizar el archivo IR:\n{str(e)}\n\n"
-                "Verifique:\n"
-                "1. Que el archivo no esté abierto en Excel\n"
-                "2. Que tenga permisos de escritura\n"
-                "3. La estructura de la hoja IR")
+                f"Error al guardar:\n{str(e)}\n\n"
+                "Los datos se encontraron pero no se guardaron.")
                 
-    except ValueError as e:
-        messagebox.showerror("Error de Validación", f"Parámetros inválidos:\n{str(e)}")
     except Exception as e:
-        messagebox.showerror("Error Inesperado", f"Error no esperado:\n{str(e)}")
+        messagebox.showerror("Error", f"Error inesperado:\n{str(e)}")
 
 
 ventana = tk.Tk()
