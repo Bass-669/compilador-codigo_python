@@ -426,33 +426,18 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
         wb_peeling = excel.Workbooks.Open(ruta_peeling)
         hoja_peeling = wb_peeling.Sheets(1)  # Primera hoja
 
-        # 2. Preparar fecha objetivo en varios formatos posibles
-        try:
-            mes_num = MESES_NUM[mes]
-            fecha_objetivo = datetime(int(anio), mes_num, int(dia))
-            
-            # Formatos de fecha posibles (como strings)
-            formatos_posibles = [
-                f"{dia}/{mes_num}/{anio}",       # 15/6/2023
-                f"{dia}-{mes_num}-{anio}",       # 15-6-2023
-                f"{dia}.{mes_num}.{anio}",       # 15.6.2023
-                f"{dia:02d}/{mes_num:02d}/{anio}",  # 15/06/2023
-                f"{dia:02d}-{mes_num:02d}-{anio}",  # 15-06-2023
-                f"{dia:02d}.{mes_num:02d}.{anio}",  # 15.06.2023
-                f"{anio}-{mes_num:02d}-{dia:02d}",  # 2023-06-15
-                fecha_objetivo.strftime("%d-%b-%y"),  # 15-Jun-23
-                fecha_objetivo.strftime("%d/%b/%y"),  # 15/Jun/23
-                fecha_objetivo.strftime("%d %b %y"),  # 15 Jun 23
-            ]
-        except (ValueError, KeyError) as e:
-            messagebox.showerror("Error", f"Fecha inválida: {dia}/{mes}/{anio}\nError: {str(e)}")
-            return None
+        # 2. Preparar todas las posibles representaciones de la fecha
+        mes_num = MESES_NUM[mes]
+        fecha_objetivo = f"{anio}-{mes_num:02d}-{dia:02d}"  # Formato original YYYY-MM-DD
+        fecha_objetivo_invertida = f"{dia:02d}-{mes_num:02d}-{anio}"  # Formato DD-MM-YYYY
+        fecha_objetivo_sin_ceros = f"{anio}-{mes_num}-{dia}"  # YYYY-M-D
+        fecha_objetivo_excel = datetime(int(anio), mes_num, int(dia))  # Para comparación como fecha Excel
 
         rendimientos = {}
         ultima_fila = hoja_peeling.UsedRange.Rows.Count
         fecha_encontrada = False
         
-        # 3. Búsqueda optimizada por texto primero
+        # 3. Búsqueda optimizada
         for fila in range(2, ultima_fila + 1):
             celda = hoja_peeling.Cells(fila, 1)
             valor_celda = celda.Value
@@ -460,11 +445,23 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
             if valor_celda is None:
                 continue
                 
-            # Primero intentamos comparación directa como texto
-            valor_texto = str(valor_celda).strip()
-            
-            # Comparamos con todos los formatos posibles
-            if valor_texto in formatos_posibles:
+            # Primero comparamos como texto (formato original YYYY-MM-DD)
+            if str(valor_celda).strip() in [fecha_objetivo, fecha_objetivo_sin_ceros]:
+                fecha_encontrada = True
+            # Luego comparamos formato DD-MM-YYYY (cuando Excel lo ha convertido)
+            elif str(valor_celda).strip() == fecha_objetivo_invertida:
+                fecha_encontrada = True
+            # Finalmente comparamos como fecha de Excel (valor numérico)
+            elif isinstance(valor_celda, (int, float)):
+                try:
+                    fecha_celda = (datetime(1899, 12, 30) + 
+                                  timedelta(days=int(valor_celda)))
+                    if fecha_celda.date() == fecha_objetivo_excel.date():
+                        fecha_encontrada = True
+                except:
+                    continue
+
+            if fecha_encontrada:
                 try:
                     work_id = int(hoja_peeling.Cells(fila, 2).Value)
                     rendimiento = float(hoja_peeling.Cells(fila, 12).Value)
@@ -476,46 +473,25 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
                         
                     if len(rendimientos) == 2:
                         break
-                        
-                    fecha_encontrada = True
                 except Exception as e:
+                    fecha_encontrada = False
                     continue
 
-        # Si no encontramos por texto, intentamos parsear como fecha de Excel
         if not fecha_encontrada:
-            for fila in range(2, ultima_fila + 1):
+            # Mostrar diagnóstico de las primeras filas
+            muestra_ejemplo = []
+            for fila in range(2, min(7, ultima_fila + 1)):
                 celda = hoja_peeling.Cells(fila, 1)
-                valor_celda = celda.Value
-                
-                if valor_celda is None:
-                    continue
-                    
-                # Intento de conversión de serial date de Excel
-                if isinstance(valor_celda, (int, float)):
-                    try:
-                        # Corrección para fechas de Excel (Windows)
-                        fecha_celda = (datetime(1899, 12, 30) + 
-                                      timedelta(days=int(valor_celda)))
-                        if fecha_celda.date() == fecha_objetivo.date():
-                            work_id = int(hoja_peeling.Cells(fila, 2).Value)
-                            rendimiento = float(hoja_peeling.Cells(fila, 12).Value)
-                            
-                            if work_id == torno_1:
-                                rendimientos['torno_1'] = rendimiento
-                            elif work_id == torno_2:
-                                rendimientos['torno_2'] = rendimiento
-                                
-                            if len(rendimientos) == 2:
-                                break
-                                
-                            fecha_encontrada = True
-                    except:
-                        continue
-
-        if not fecha_encontrada:
-            messagebox.showwarning("Advertencia", 
-                f"No se encontró la fecha {fecha_objetivo.date()} en el archivo Peeling.\n"
-                f"Formatos buscados: {', '.join(formatos_posibles)}")
+                muestra_ejemplo.append(
+                    f"Fila {fila}: Valor='{celda.Value}', "
+                    f"Tipo={type(celda.Value).__name__}, "
+                    f"Formato={celda.NumberFormat}"
+                )
+            
+            messagebox.showwarning("Diagnóstico", 
+                f"No se encontró la fecha {fecha_objetivo} o {fecha_objetivo_invertida}\n\n"
+                "Ejemplos de las primeras filas:\n" + 
+                "\n".join(muestra_ejemplo))
             return None
 
         return rendimientos
@@ -525,7 +501,7 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
             f"Error al procesar archivo Peeling:\n{str(e)}\n\n"
             "Solución:\n"
             "1. Verifique que el archivo no esté abierto en Excel\n"
-            "2. Confirme que el formato de fechas es consistente\n"
+            "2. Confirme que las fechas sean visibles\n"
             "3. Revise los permisos del archivo")
         return None
     finally:
