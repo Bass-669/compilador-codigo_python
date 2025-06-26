@@ -425,52 +425,61 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
         wb_peeling = excel.Workbooks.Open(ruta_peeling)
         hoja_peeling = wb_peeling.Sheets(1)
 
-        # 2. Convertir la fecha objetivo a múltiples formatos posibles
+        # 2. Preparar fecha objetivo
         mes_num = MESES_NUM.get(mes, 1)
         fecha_objetivo = datetime.date(int(anio), mes_num, int(dia))
         
-        # Formatos posibles (texto)
+        # 3. Formatos posibles
         formatos_texto = [
             f"{anio}-{mes_num:02d}-{dia:02d}",  # YYYY-MM-DD
             f"{dia}/{mes_num}/{anio}",           # DD/MM/AAAA
             f"{dia}-{mes_num}-{anio}",           # DD-MM-AAAA
-            f"{mes_num}/{dia}/{anio}",           # MM/DD/AAAA (US)
+            f"{mes_num}/{dia}/{anio}",           # MM/DD/AAAA
             f"{dia:02d}/{mes_num:02d}/{anio}",   # DD/MM/AAAA con ceros
-            f"{dia}.{mes_num}.{anio}",           # DD.MM.AAAA
-            f"{dia} de {mes} de {anio}",         # 12 de Junio de 2025
         ]
 
         rendimientos = {}
         ultima_fila = hoja_peeling.UsedRange.Rows.Count
+        fecha_encontrada = False
         
         for fila in range(2, ultima_fila + 1):
-            # 3. Obtener valor de la celda y manejar diferentes tipos
             celda = hoja_peeling.Cells(fila, 1)
             valor_celda = celda.Value
             
-            # Caso 1: La celda contiene una fecha de Excel (número serial)
+            # Caso 1: Valor es None o vacío
+            if valor_celda is None:
+                continue
+                
+            # Caso 2: Es una fecha de Excel (número serial)
             if isinstance(valor_celda, (int, float)):
                 try:
-                    fecha_excel = datetime.datetime(1899, 12, 30) + datetime.timedelta(days=valor_celda)
+                    # Convertir serial de Excel a fecha
+                    fecha_excel = datetime.datetime(1899, 12, 30) + datetime.timedelta(days=int(valor_celda))
                     if fecha_excel.date() == fecha_objetivo:
+                        fecha_encontrada = True
                         work_id = int(hoja_peeling.Cells(fila, 2).Value)
                         # ... procesar rendimientos
-                        continue
-                except Exception:
-                    pass
-            
-            # Caso 2: La celda contiene texto
-            valor_texto = str(valor_celda).strip() if valor_celda is not None else ""
-            
-            # Normalizar el texto (remover espacios extra, unificar separadores)
-            valor_texto = valor_texto.replace("-", "/").replace(".", "/").strip()
-            
-            # Comparar con todos los formatos de texto posibles
-            for formato in formatos_texto:
-                if valor_texto == formato.replace("-", "/").replace(".", "/").strip():
-                    work_id = int(hoja_peeling.Cells(fila, 2).Value)
-                    # ... procesar rendimientos
-                    break
+                except Exception as e:
+                    print(f"Error convirtiendo serial de fecha: {e}")
+                    continue
+                    
+            # Caso 3: Es texto
+            else:
+                valor_texto = str(valor_celda).strip()
+                # Normalizar separadores
+                valor_normalizado = valor_texto.replace("-", "/").replace(".", "/")
+                
+                for formato in formatos_texto:
+                    if valor_normalizado == formato.replace("-", "/"):
+                        fecha_encontrada = True
+                        work_id = int(hoja_peeling.Cells(fila, 2).Value)
+                        # ... procesar rendimientos
+                        break
+
+        if not fecha_encontrada:
+            messagebox.showwarning("Advertencia", 
+                f"No hay datos para {fecha_objetivo}. Revisa que la fecha exista en el archivo Peeling Query.")
+            return None
 
         return rendimientos
 
