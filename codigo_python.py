@@ -413,9 +413,9 @@ def rotar_etiquetas_graficos(ruta_archivo, nombre_hoja):
 def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
     pythoncom.CoInitialize()
     excel = win32.Dispatch("Excel.Application")
-    excel.Visible = False  # Excel en segundo plano
+    excel.Visible = False
     excel.DisplayAlerts = False
-    excel.ScreenUpdating = False  # Mejor rendimiento
+    excel.ScreenUpdating = False
     
     try:
         # 1. Verificar y abrir archivo Peeling
@@ -426,82 +426,112 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
 
         wb_peeling = excel.Workbooks.Open(ruta_peeling)
         
-        # 2. Acceder a Sheet2 y forzar formato de texto
+        # 2. Acceso robusto a Sheet2 con verificación de formato
         try:
             hoja_peeling = wb_peeling.Sheets("Sheet2")
-            hoja_peeling.Columns(1).NumberFormat = "@"  # Formato texto
+            # Forzar recálculo y refrescar datos
+            excel.Calculation = -4105  # xlCalculationAutomatic
+            wb_peeling.RefreshAll()
+            time.sleep(2)  # Esperar a que se actualicen los datos
         except Exception as e:
             messagebox.showerror("Error", 
                 f"No se encontró la hoja 'Sheet2'.\n"
                 f"Hojas disponibles: {[sh.Name for sh in wb_peeling.Sheets]}")
             return None
 
-        # 3. Preparar todos los formatos posibles de fecha
+        # 3. Configuración de búsqueda optimizada
         mes_num = MESES_NUM[mes]
-        fecha_objetivo = f"{anio}-{mes_num:02d}-{dia:02d}"  # Formato base
-        formatos_busqueda = {
-            fecha_objetivo,  # 2025-06-14
-            f"'{fecha_objetivo}'",  # '2025-06-14'
-            f'"{fecha_objetivo}"',  # "2025-06-14"
-            f"{dia}/{mes_num}/{anio}",  # 14/6/2025
-            f"{dia}/{mes_num:02d}/{anio}",  # 14/06/2025
-            f"{dia}-{mes_num}-{anio}",  # 14-6-2025
-            f"{dia}-{mes_num:02d}-{anio}",  # 14-06-2025
+        fecha_objetivo = f"{anio}-{mes_num:02d}-{dia:02d}"
+        
+        # Todos los formatos posibles encontrados en diagnóstico
+        formatos_equivalentes = {
+            fecha_objetivo,
+            f"'{fecha_objetivo}'",
+            f'"{fecha_objetivo}"',
+            f"{anio}-{mes_num}-{dia}",  # Sin ceros iniciales
+            f"{dia}/{mes_num}/{anio}",
+            f"{dia}-{mes_num}-{anio}",
+            f"{anio}/{mes_num}/{dia}",  # Formato alternativo
+            f"{dia}.{mes_num}.{anio}"   # Formato con puntos
         }
 
         rendimientos = {}
         ultima_fila = hoja_peeling.UsedRange.Rows.Count
         fecha_encontrada = False
         
-        # 4. Búsqueda optimizada con manejo de errores
+        # 4. Búsqueda exhaustiva con diagnóstico integrado
+        diagnostic_data = []
         for fila in range(2, ultima_fila + 1):
             try:
-                valor_celda = str(hoja_peeling.Cells(fila, 1).Value).strip()
-                valor_limpio = valor_celda.strip('\'"')  # Elimina comillas
+                celda = hoja_peeling.Cells(fila, 1)
+                valor_crudo = celda.Value
+                valor_texto = str(valor_crudo).strip() if valor_crudo is not None else ""
+                valor_limpio = valor_texto.strip('\'"')
                 
-                if valor_limpio in formatos_busqueda:
-                    work_id = int(hoja_peeling.Cells(fila, 2).Value)
-                    rendimiento = float(hoja_peeling.Cells(fila, 12).Value)
-                    
-                    if work_id == torno_1:
-                        rendimientos['torno_1'] = rendimiento
-                    elif work_id == torno_2:
-                        rendimientos['torno_2'] = rendimiento
+                # Guardar datos para diagnóstico (primeras 50 filas)
+                if fila <= 50:
+                    work_id = hoja_peeling.Cells(fila, 2).Value
+                    rendimiento = hoja_peeling.Cells(fila, 12).Value
+                    diagnostic_data.append(f"Fila {fila}: {valor_texto} | WorkID: {work_id} | Rend: {rendimiento}")
+                
+                # Comparación flexible
+                if valor_limpio in formatos_equivalentes:
+                    try:
+                        work_id = int(hoja_peeling.Cells(fila, 2).Value)
+                        rendimiento = float(hoja_peeling.Cells(fila, 12).Value)
                         
-                    if len(rendimientos) == 2:
-                        break
-                        
-                    fecha_encontrada = True
+                        if work_id == torno_1:
+                            rendimientos['torno_1'] = rendimiento
+                        elif work_id == torno_2:
+                            rendimientos['torno_2'] = rendimiento
+                            
+                        if len(rendimientos) == 2:
+                            fecha_encontrada = True
+                            break
+                    except Exception as e:
+                        continue
             except:
                 continue
 
         if not fecha_encontrada:
-            # Crear reporte de diagnóstico sin abrir Excel
-            diagnostico = []
-            for fila in range(2, min(20, ultima_fila + 1)):  # Primeras 20 filas
-                try:
-                    fecha = str(hoja_peeling.Cells(fila, 1).Value)
-                    work_id = hoja_peeling.Cells(fila, 2).Value
-                    rendimiento = hoja_peeling.Cells(fila, 12).Value
-                    diagnostico.append(f"Fila {fila}: {fecha} | WorkID: {work_id} | Rend: {rendimiento}")
-                except:
-                    continue
+            # Mostrar diagnóstico completo con scroll
+            diagnostico_texto = "\n".join(diagnostic_data)
+            root = tk.Tk()
+            root.title("Diagnóstico Completo - Sheet2")
             
-            messagebox.showwarning("Diagnóstico", 
-                f"No se encontró {fecha_objetivo} en Sheet2\n\n"
-                "Primeras filas encontradas:\n" + 
-                "\n".join(diagnostico[:30]))  # Muestra solo 10 registros
+            text_frame = tk.Frame(root)
+            text_frame.pack(fill=tk.BOTH, expand=True)
+            
+            scrollbar = tk.Scrollbar(text_frame)
+            scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+            
+            text = tk.Text(text_frame, wrap=tk.NONE, 
+                          yscrollcommand=scrollbar.set,
+                          width=120, height=30)
+            text.pack(fill=tk.BOTH, expand=True)
+            
+            scrollbar.config(command=text.yview)
+            
+            text.insert(tk.END, f"Búsqueda de: {fecha_objetivo}\n")
+            text.insert(tk.END, f"Formatos equivalentes buscados:\n")
+            text.insert(tk.END, "\n".join(formatos_equivalentes) + "\n\n")
+            text.insert(tk.END, f"Primeras {len(diagnostic_data)} filas:\n")
+            text.insert(tk.END, diagnostico_texto)
+            
+            tk.Button(root, text="Cerrar", command=root.destroy).pack(pady=10)
+            root.mainloop()
+            
             return None
 
         return rendimientos
 
     except Exception as e:
-        messagebox.showerror("Error", 
+        messagebox.showerror("Error Crítico", 
             f"Error al procesar Sheet2:\n{str(e)}\n\n"
-            "Verifique:\n"
-            "1. Que la fecha existe en Sheet2\n"
-            "2. Que no hay filtros aplicados\n"
-            "3. El formato real de las celdas")
+            "Recomendaciones:\n"
+            "1. Verifique manualmente el archivo\n"
+            "2. Revise filtros o formatos especiales\n"
+            "3. Confirme que los datos no son dinámicos")
         return None
     finally:
         try:
