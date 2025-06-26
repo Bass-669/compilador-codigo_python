@@ -425,25 +425,32 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
         wb_peeling = excel.Workbooks.Open(ruta_peeling)
         hoja_peeling = wb_peeling.Sheets(1)  # Primera hoja
 
-        # 2. Convertir mes a número (ej: "Junio" → 6) y generar fecha en formato YYYY-MM-DD
-        mes_num = MESES_NUM.get(mes, 1)  # Asegúrate de que MESES_NUM esté definido: {"Enero": 1, ..., "Junio": 6, ...}
-        fecha_buscar = f"{anio}-{mes_num:02d}-{dia:02d}"  # Ej: "2025-06-07"
+        # 2. Convertir mes a número y generar fecha en formato YYYY-MM-DD
+        mes_num = MESES_NUM.get(mes, 1)
+        fecha_buscar = f"{anio}-{mes_num:02d}-{dia:02d}"  # Ej: 2025-06-08
+
+        # 3. Mostrar la fecha buscada (DEPURACIÓN)
+        messagebox.showinfo("DEBUG", f"Buscando fecha: {fecha_buscar}")
 
         rendimientos = {}
         ultima_fila = hoja_peeling.UsedRange.Rows.Count
         
         for fila in range(2, ultima_fila + 1):
-            # 3. Leer fecha directamente como texto (ya está en YYYY-MM-DD)
+            # 4. Leer fecha como texto y comparar
             fecha_celda = str(hoja_peeling.Cells(fila, 1).Value).strip()
+            
+            # Mostrar fecha encontrada en Excel (DEPURACIÓN)
+            messagebox.showinfo("DEBUG", f"Fila {fila}: Fecha en Excel = {fecha_celda}")
+
             if fecha_celda == fecha_buscar:
-                work_id = int(hoja_peeling.Cells(fila, 2).Value)  # Columna B: WorkId
-                rendimiento_formula = hoja_peeling.Cells(fila, 12).Formula  # Columna L: Rendimiento_Acumulado
+                work_id = int(hoja_peeling.Cells(fila, 2).Value)
+                rendimiento_formula = hoja_peeling.Cells(fila, 12).Formula
 
                 if rendimiento_formula:
-                    # 4. Obtener valor real (similar a AD → AE)
+                    # 5. Obtener valor real
                     temp_path = os.path.join(BASE_DIR, "temp_peeling.xlsx")
                     hoja_peeling.Cells(fila, 12).Copy()
-                    hoja_peeling.Range("X1").PasteSpecial(Paste=-4163)  # Pegar valor (xlPasteValues)
+                    hoja_peeling.Range("X1").PasteSpecial(Paste=-4163)
                     rendimiento_valor = hoja_peeling.Range("X1").Value
                     wb_peeling.SaveAs(temp_path)
 
@@ -463,17 +470,19 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
         pythoncom.CoUninitialize()
 
 def asignar_rendimiento_a_ir(dia, mes, anio, torno):
-    """
-    Asigna el rendimiento al archivo IR.
-    Args:
-        dia, mes (str): Mes en español (ej: "Enero").
-        anio (int): Año.
-        torno (int): 1 o 2.
-    """
-    # 1. Obtener rendimientos
+    # Convertir mes a número
+    mes_num = MESES_NUM.get(mes, 1)
+    fecha_buscar = f"{anio}-{mes_num:02d}-{dia:02d}"
+
+    # Mostrar fecha que se intentará buscar (DEPURACIÓN)
+    messagebox.showinfo("DEBUG", f"Iniciando búsqueda para: {fecha_buscar}")
+
     rendimientos = obtener_rendimientos_peeling(dia, mes, anio)
     if not rendimientos:
-        messagebox.showwarning("Advertencia", f"No hay datos para {dia}/{mes}/{anio}")
+        messagebox.showwarning("Advertencia", 
+            f"No hay datos para {fecha_buscar}.\n"
+            f"Revisa que la fecha exista en el archivo Peeling Query."
+        )
         return
 
     # 2. Filtrar por torno
