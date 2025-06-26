@@ -425,25 +425,25 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
         wb_peeling = excel.Workbooks.Open(ruta_peeling)
         hoja_peeling = wb_peeling.Sheets(1)  # Primera hoja
 
-        # 2. Convertir mes a número (usando tu diccionario MESES_NUM)
-        mes_num = MESES_NUM.get(mes, 1)  # Ej: "Enero" → 1
-        fecha_buscar = f"{anio}-{mes_num:02d}-{dia:02d}"  # Formato: "2025-01-01"
+        # 2. Convertir mes a número (ej: "Junio" → 6) y generar fecha en formato YYYY-MM-DD
+        mes_num = MESES_NUM.get(mes, 1)  # Asegúrate de que MESES_NUM esté definido: {"Enero": 1, ..., "Junio": 6, ...}
+        fecha_buscar = f"{anio}-{mes_num:02d}-{dia:02d}"  # Ej: "2025-06-07"
 
         rendimientos = {}
         ultima_fila = hoja_peeling.UsedRange.Rows.Count
         
         for fila in range(2, ultima_fila + 1):
-            # 3. Leer fecha como texto y comparar
+            # 3. Leer fecha directamente como texto (ya está en YYYY-MM-DD)
             fecha_celda = str(hoja_peeling.Cells(fila, 1).Value).strip()
             if fecha_celda == fecha_buscar:
-                work_id = int(hoja_peeling.Cells(fila, 2).Value)
-                rendimiento_formula = hoja_peeling.Cells(fila, 12).Formula
+                work_id = int(hoja_peeling.Cells(fila, 2).Value)  # Columna B: WorkId
+                rendimiento_formula = hoja_peeling.Cells(fila, 12).Formula  # Columna L: Rendimiento_Acumulado
 
                 if rendimiento_formula:
                     # 4. Obtener valor real (similar a AD → AE)
                     temp_path = os.path.join(BASE_DIR, "temp_peeling.xlsx")
                     hoja_peeling.Cells(fila, 12).Copy()
-                    hoja_peeling.Range("X1").PasteSpecial(Paste=-4163)  # Pegar valor
+                    hoja_peeling.Range("X1").PasteSpecial(Paste=-4163)  # Pegar valor (xlPasteValues)
                     rendimiento_valor = hoja_peeling.Range("X1").Value
                     wb_peeling.SaveAs(temp_path)
 
@@ -453,7 +453,7 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
                         rendimientos[torno_2] = float(rendimiento_valor) if rendimiento_valor else 0.0
 
         wb_peeling.Close(False)
-        return rendimientos
+        return rendimientos if rendimientos else None
 
     except Exception as e:
         messagebox.showerror("Error", f"Fallo al leer Peeling Query:\n{str(e)}")
