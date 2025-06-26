@@ -413,8 +413,9 @@ def rotar_etiquetas_graficos(ruta_archivo, nombre_hoja):
 def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
     pythoncom.CoInitialize()
     excel = win32.Dispatch("Excel.Application")
-    excel.Visible = False
+    excel.Visible = False  # Excel en segundo plano
     excel.DisplayAlerts = False
+    excel.ScreenUpdating = False  # Mejor rendimiento
     
     try:
         # 1. Verificar y abrir archivo Peeling
@@ -425,36 +426,40 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
 
         wb_peeling = excel.Workbooks.Open(ruta_peeling)
         
-        # 2. Acceder específicamente a la hoja Sheet2
+        # 2. Acceder a Sheet2 y forzar formato de texto
         try:
             hoja_peeling = wb_peeling.Sheets("Sheet2")
+            hoja_peeling.Columns(1).NumberFormat = "@"  # Formato texto
         except Exception as e:
             messagebox.showerror("Error", 
-                f"No se encontró la hoja 'Sheet2' en el archivo Peeling.\n"
-                f"Hoja disponibles: {[sh.Name for sh in wb_peeling.Sheets]}")
+                f"No se encontró la hoja 'Sheet2'.\n"
+                f"Hojas disponibles: {[sh.Name for sh in wb_peeling.Sheets]}")
             return None
 
-        # 3. Preparar la fecha objetivo en formato texto (con y sin comillas)
+        # 3. Preparar todos los formatos posibles de fecha
         mes_num = MESES_NUM[mes]
-        fecha_objetivo_con_comillas = f'"{anio}-{mes_num:02d}-{dia:02d}"'
-        fecha_objetivo_sin_comillas = f"{anio}-{mes_num:02d}-{dia:02d}"
+        fecha_objetivo = f"{anio}-{mes_num:02d}-{dia:02d}"  # Formato base
+        formatos_busqueda = {
+            fecha_objetivo,  # 2025-06-14
+            f"'{fecha_objetivo}'",  # '2025-06-14'
+            f'"{fecha_objetivo}"',  # "2025-06-14"
+            f"{dia}/{mes_num}/{anio}",  # 14/6/2025
+            f"{dia}/{mes_num:02d}/{anio}",  # 14/06/2025
+            f"{dia}-{mes_num}-{anio}",  # 14-6-2025
+            f"{dia}-{mes_num:02d}-{anio}",  # 14-06-2025
+        }
 
         rendimientos = {}
         ultima_fila = hoja_peeling.UsedRange.Rows.Count
         fecha_encontrada = False
         
-        # 4. Búsqueda optimizada en Sheet2
+        # 4. Búsqueda optimizada con manejo de errores
         for fila in range(2, ultima_fila + 1):
-            celda = hoja_peeling.Cells(fila, 1)
-            valor_celda = celda.Value
-            
-            if valor_celda is None:
-                continue
+            try:
+                valor_celda = str(hoja_peeling.Cells(fila, 1).Value).strip()
+                valor_limpio = valor_celda.strip('\'"')  # Elimina comillas
                 
-            # Comparación flexible (con/sin comillas, con/sin espacios)
-            valor_limpio = str(valor_celda).strip().strip('"\'')
-            if valor_limpio == fecha_objetivo_sin_comillas:
-                try:
+                if valor_limpio in formatos_busqueda:
                     work_id = int(hoja_peeling.Cells(fila, 2).Value)
                     rendimiento = float(hoja_peeling.Cells(fila, 12).Value)
                     
@@ -467,40 +472,44 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
                         break
                         
                     fecha_encontrada = True
-                except Exception as e:
-                    continue
+            except:
+                continue
 
         if not fecha_encontrada:
-            # Diagnóstico detallado de Sheet2
-            muestra_ejemplo = []
-            for fila in range(2, min(7, ultima_fila + 1)):
-                celda = hoja_peeling.Cells(fila, 1)
-                muestra_ejemplo.append(
-                    f"Fila {fila}: Valor={repr(celda.Value)}, "
-                    f"WorkID={hoja_peeling.Cells(fila, 2).Value}, "
-                    f"Rendimiento={hoja_peeling.Cells(fila, 12).Value}"
-                )
+            # Crear reporte de diagnóstico sin abrir Excel
+            diagnostico = []
+            for fila in range(2, min(20, ultima_fila + 1)):  # Primeras 20 filas
+                try:
+                    fecha = str(hoja_peeling.Cells(fila, 1).Value)
+                    work_id = hoja_peeling.Cells(fila, 2).Value
+                    rendimiento = hoja_peeling.Cells(fila, 12).Value
+                    diagnostico.append(f"Fila {fila}: {fecha} | WorkID: {work_id} | Rend: {rendimiento}")
+                except:
+                    continue
             
-            messagebox.showwarning("Diagnóstico Sheet2", 
-                f"No se encontró la fecha {fecha_objetivo_sin_comillas} en Sheet2\n\n"
-                "Primeras filas de Sheet2:\n" + 
-                "\n".join(muestra_ejemplo))
+            messagebox.showwarning("Diagnóstico", 
+                f"No se encontró {fecha_objetivo} en Sheet2\n\n"
+                "Primeras filas encontradas:\n" + 
+                "\n".join(diagnostico[:10]))  # Muestra solo 10 registros
             return None
 
         return rendimientos
 
     except Exception as e:
-        messagebox.showerror("Error Crítico", 
-            f"Error al procesar Sheet2 del archivo Peeling:\n{str(e)}\n\n"
-            "Solución:\n"
-            "1. Verifique que exista la hoja 'Sheet2'\n"
-            "2. Confirme que las fechas estén en la columna A\n"
-            "3. Revise que los WorkID y rendimientos estén en las columnas correctas")
+        messagebox.showerror("Error", 
+            f"Error al procesar Sheet2:\n{str(e)}\n\n"
+            "Verifique:\n"
+            "1. Que la fecha existe en Sheet2\n"
+            "2. Que no hay filtros aplicados\n"
+            "3. El formato real de las celdas")
         return None
     finally:
-        excel.Quit()
+        try:
+            wb_peeling.Close(False)
+            excel.Quit()
+        except:
+            pass
         pythoncom.CoUninitialize()
-
 
 def asignar_rendimiento_a_ir(dia, mes, anio, torno):
     try:
