@@ -490,7 +490,7 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
             messagebox.showwarning("Diagnóstico", 
                 f"No se encontró {fecha_objetivo} en Sheet2\n\n"
                 "Primeras filas encontradas:\n" + 
-                "\n".join(diagnostico[:10]))  # Muestra solo 10 registros
+                "\n".join(diagnostico[:30]))  # Muestra solo 10 registros
             return None
 
         return rendimientos
