@@ -423,41 +423,62 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
             return None
 
         wb_peeling = excel.Workbooks.Open(ruta_peeling)
-        hoja_peeling = wb_peeling.Sheets(1)  # Primera hoja
+        hoja_peeling = wb_peeling.Sheets(1)
 
         # 2. Convertir mes a número y generar fecha en formato YYYY-MM-DD
         mes_num = MESES_NUM.get(mes, 1)
-        fecha_buscar = f"{anio}-{mes_num:02d}-{dia:02d}"  # Ej: 2025-06-08
+        fecha_buscar = f"{anio}-{mes_num:02d}-{dia:02d}"  # Ej: 2025-06-09
 
-        # 3. Mostrar la fecha buscada (DEPURACIÓN)
+        # 3. Mostrar fecha buscada
         messagebox.showinfo("DEBUG", f"Buscando fecha: {fecha_buscar}")
 
         rendimientos = {}
         ultima_fila = hoja_peeling.UsedRange.Rows.Count
+        encontrados = 0  # Contador de coincidencias
         
         for fila in range(2, ultima_fila + 1):
-            # 4. Leer fecha como texto y comparar
             fecha_celda = str(hoja_peeling.Cells(fila, 1).Value).strip()
             
-            # Mostrar fecha encontrada en Excel (DEPURACIÓN)
-            messagebox.showinfo("DEBUG", f"Fila {fila}: Fecha en Excel = {fecha_celda}")
-
             if fecha_celda == fecha_buscar:
                 work_id = int(hoja_peeling.Cells(fila, 2).Value)
                 rendimiento_formula = hoja_peeling.Cells(fila, 12).Formula
 
                 if rendimiento_formula:
-                    # 5. Obtener valor real
+                    # 4. Obtener valor real del rendimiento
                     temp_path = os.path.join(BASE_DIR, "temp_peeling.xlsx")
                     hoja_peeling.Cells(fila, 12).Copy()
                     hoja_peeling.Range("X1").PasteSpecial(Paste=-4163)
                     rendimiento_valor = hoja_peeling.Range("X1").Value
                     wb_peeling.SaveAs(temp_path)
 
+                    # 5. Mostrar rendimiento encontrado (DEPURACIÓN)
+                    messagebox.showinfo(
+                        "DEBUG - Rendimiento Encontrado",
+                        f"Fecha: {fecha_celda}\n"
+                        f"Torno: {'1' if work_id == 3011 else '2'}\n"
+                        f"Rendimiento: {rendimiento_valor}%"
+                    )
+
                     if work_id == torno_1:
                         rendimientos[torno_1] = float(rendimiento_valor) if rendimiento_valor else 0.0
                     elif work_id == torno_2:
                         rendimientos[torno_2] = float(rendimiento_valor) if rendimiento_valor else 0.0
+                    encontrados += 1
+
+        # 6. Resumen final (DEPURACIÓN)
+        if encontrados > 0:
+            messagebox.showinfo(
+                "DEBUG - Resumen",
+                f"Se encontraron {encontrados} registros para {fecha_buscar}:\n"
+                f"- Torno 1: {rendimientos.get(3011, 'N/A')}%\n"
+                f"- Torno 2: {rendimientos.get(3012, 'N/A')}%"
+            )
+        else:
+            messagebox.showwarning(
+                "DEBUG - Sin coincidencias",
+                f"No se encontraron datos para {fecha_buscar}.\n"
+                f"Última fecha revisada: {fecha_celda}"
+            )
 
         wb_peeling.Close(False)
         return rendimientos if rendimientos else None
@@ -468,6 +489,7 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
     finally:
         excel.Quit()
         pythoncom.CoUninitialize()
+
 
 def asignar_rendimiento_a_ir(dia, mes, anio, torno):
     # Convertir mes a número
