@@ -426,88 +426,96 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
         wb_peeling = excel.Workbooks.Open(ruta_peeling)
         hoja_peeling = wb_peeling.Sheets(1)  # Primera hoja
 
-        # 2. Preparar fecha objetivo
+        # 2. Preparar fecha objetivo en varios formatos posibles
         try:
             mes_num = MESES_NUM[mes]
-            fecha_objetivo = datetime.date(int(anio), mes_num, int(dia))
+            fecha_objetivo = datetime(int(anio), mes_num, int(dia))
+            
+            # Formatos de fecha posibles (como strings)
+            formatos_posibles = [
+                f"{dia}/{mes_num}/{anio}",       # 15/6/2023
+                f"{dia}-{mes_num}-{anio}",       # 15-6-2023
+                f"{dia}.{mes_num}.{anio}",       # 15.6.2023
+                f"{dia:02d}/{mes_num:02d}/{anio}",  # 15/06/2023
+                f"{dia:02d}-{mes_num:02d}-{anio}",  # 15-06-2023
+                f"{dia:02d}.{mes_num:02d}.{anio}",  # 15.06.2023
+                f"{anio}-{mes_num:02d}-{dia:02d}",  # 2023-06-15
+                fecha_objetivo.strftime("%d-%b-%y"),  # 15-Jun-23
+                fecha_objetivo.strftime("%d/%b/%y"),  # 15/Jun/23
+                fecha_objetivo.strftime("%d %b %y"),  # 15 Jun 23
+            ]
         except (ValueError, KeyError) as e:
             messagebox.showerror("Error", f"Fecha inválida: {dia}/{mes}/{anio}\nError: {str(e)}")
             return None
-
-        # 3. Diagnóstico inicial (primeras 3 celdas)
-        debug_info = []
-        for fila in range(2, 5):
-            celda = hoja_peeling.Cells(fila, 1)
-            valor = celda.Value
-            debug_info.append(f"Fila {fila}: {valor} (Tipo: {type(valor).__name__})")
-        
-        messagebox.showinfo("DEBUG", "Primeras celdas:\n" + "\n".join(debug_info))  # Log para consola
 
         rendimientos = {}
         ultima_fila = hoja_peeling.UsedRange.Rows.Count
         fecha_encontrada = False
         
-        # 4. Búsqueda optimizada
+        # 3. Búsqueda optimizada por texto primero
         for fila in range(2, ultima_fila + 1):
             celda = hoja_peeling.Cells(fila, 1)
             valor_celda = celda.Value
             
-            if valor_celda is None:  # Celda vacía
+            if valor_celda is None:
                 continue
                 
-            fecha_celda = None
+            # Primero intentamos comparación directa como texto
+            valor_texto = str(valor_celda).strip()
             
-            # Intento de conversión según tipo de dato
-            if isinstance(valor_celda, (int, float)):  # Serial date de Excel
+            # Comparamos con todos los formatos posibles
+            if valor_texto in formatos_posibles:
                 try:
-                    # Conversión mejorada para fechas Excel (Windows)
-                    fecha_celda = (datetime.datetime(1899, 12, 30) + 
-                                  datetime.timedelta(days=int(valor_celda))).date()
-                except Exception as e:
-                    messagebox.showinfo("DEBUG", f"Error conversión serial date fila {fila}: {str(e)}")
-                    continue
-            else:  # Texto u otro formato
-                valor_texto = str(valor_celda).strip()
-                # Lista de formatos de fecha a probar
-                formatos_fecha = [
-                    "%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", 
-                    "%d-%m-%Y", "%Y/%m/%d", "%d.%m.%Y",
-                    "%Y%m%d", "%d %b %Y", "%d %B %Y"
-                ]
-                
-                for fmt in formatos_fecha:
-                    try:
-                        fecha_celda = datetime.datetime.strptime(valor_texto, fmt).date()
-                        break  # Si encuentra un formato que funciona, sale del loop
-                    except ValueError:
-                        continue
-
-            # Verificar si coincide con la fecha objetivo
-            if fecha_celda == fecha_objetivo:
-                try:
-                    fecha_encontrada = True
                     work_id = int(hoja_peeling.Cells(fila, 2).Value)
                     rendimiento = float(hoja_peeling.Cells(fila, 12).Value)
                     
-                    # Asignar según el torno correspondiente
                     if work_id == torno_1:
                         rendimientos['torno_1'] = rendimiento
                     elif work_id == torno_2:
                         rendimientos['torno_2'] = rendimiento
                         
-                    # Si ya encontramos ambos tornos, salir del loop
                     if len(rendimientos) == 2:
                         break
+                        
+                    fecha_encontrada = True
                 except Exception as e:
-                    messagebox.showinfo("DEBUG",f"Error procesando fila {fila}: {str(e)}")
                     continue
+
+        # Si no encontramos por texto, intentamos parsear como fecha de Excel
+        if not fecha_encontrada:
+            for fila in range(2, ultima_fila + 1):
+                celda = hoja_peeling.Cells(fila, 1)
+                valor_celda = celda.Value
+                
+                if valor_celda is None:
+                    continue
+                    
+                # Intento de conversión de serial date de Excel
+                if isinstance(valor_celda, (int, float)):
+                    try:
+                        # Corrección para fechas de Excel (Windows)
+                        fecha_celda = (datetime(1899, 12, 30) + 
+                                      timedelta(days=int(valor_celda)))
+                        if fecha_celda.date() == fecha_objetivo.date():
+                            work_id = int(hoja_peeling.Cells(fila, 2).Value)
+                            rendimiento = float(hoja_peeling.Cells(fila, 12).Value)
+                            
+                            if work_id == torno_1:
+                                rendimientos['torno_1'] = rendimiento
+                            elif work_id == torno_2:
+                                rendimientos['torno_2'] = rendimiento
+                                
+                            if len(rendimientos) == 2:
+                                break
+                                
+                            fecha_encontrada = True
+                    except:
+                        continue
 
         if not fecha_encontrada:
             messagebox.showwarning("Advertencia", 
-                f"No se encontró la fecha {fecha_objetivo} en el archivo Peeling.\n\n"
-                "Información para diagnóstico:\n" + 
-                "\n".join(debug_info) + 
-                f"\n\nTotal filas revisadas: {ultima_fila}")
+                f"No se encontró la fecha {fecha_objetivo.date()} en el archivo Peeling.\n"
+                f"Formatos buscados: {', '.join(formatos_posibles)}")
             return None
 
         return rendimientos
