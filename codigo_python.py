@@ -424,18 +424,26 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
             return None
 
         wb_peeling = excel.Workbooks.Open(ruta_peeling)
-        hoja_peeling = wb_peeling.Sheets(1)  # Primera hoja
+        
+        # 2. Acceder específicamente a la hoja Sheet2
+        try:
+            hoja_peeling = wb_peeling.Sheets("Sheet2")
+        except Exception as e:
+            messagebox.showerror("Error", 
+                f"No se encontró la hoja 'Sheet2' en el archivo Peeling.\n"
+                f"Hoja disponibles: {[sh.Name for sh in wb_peeling.Sheets]}")
+            return None
 
-        # 2. Preparar la fecha objetivo en formato texto CON comillas
+        # 3. Preparar la fecha objetivo en formato texto (con y sin comillas)
         mes_num = MESES_NUM[mes]
-        fecha_objetivo = f'"{anio}-{mes_num:02d}-{dia:02d}"'  # Con comillas incluidas
-        fecha_objetivo_sin_comillas = f"{anio}-{mes_num:02d}-{dia:02d}"  # Sin comillas por si acaso
+        fecha_objetivo_con_comillas = f'"{anio}-{mes_num:02d}-{dia:02d}"'
+        fecha_objetivo_sin_comillas = f"{anio}-{mes_num:02d}-{dia:02d}"
 
         rendimientos = {}
         ultima_fila = hoja_peeling.UsedRange.Rows.Count
         fecha_encontrada = False
         
-        # 3. Búsqueda optimizada para texto con comillas
+        # 4. Búsqueda optimizada en Sheet2
         for fila in range(2, ultima_fila + 1):
             celda = hoja_peeling.Cells(fila, 1)
             valor_celda = celda.Value
@@ -443,8 +451,9 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
             if valor_celda is None:
                 continue
                 
-            # Comparación directa del texto (incluyendo comillas)
-            if str(valor_celda).strip() in [fecha_objetivo, fecha_objetivo_sin_comillas]:
+            # Comparación flexible (con/sin comillas, con/sin espacios)
+            valor_limpio = str(valor_celda).strip().strip('"\'')
+            if valor_limpio == fecha_objetivo_sin_comillas:
                 try:
                     work_id = int(hoja_peeling.Cells(fila, 2).Value)
                     rendimiento = float(hoja_peeling.Cells(fila, 12).Value)
@@ -462,19 +471,19 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
                     continue
 
         if not fecha_encontrada:
-            # Mostrar diagnóstico más detallado
+            # Diagnóstico detallado de Sheet2
             muestra_ejemplo = []
             for fila in range(2, min(7, ultima_fila + 1)):
                 celda = hoja_peeling.Cells(fila, 1)
                 muestra_ejemplo.append(
-                    f"Fila {fila}: Valor={repr(celda.Value)}, "  # repr muestra las comillas literalmente
-                    f"Tipo={type(celda.Value).__name__}, "
-                    f"Formato={celda.NumberFormat}"
+                    f"Fila {fila}: Valor={repr(celda.Value)}, "
+                    f"WorkID={hoja_peeling.Cells(fila, 2).Value}, "
+                    f"Rendimiento={hoja_peeling.Cells(fila, 12).Value}"
                 )
             
-            messagebox.showwarning("Diagnóstico", 
-                f"No se encontró la fecha {fecha_objetivo}\n\n"
-                "Ejemplos reales de las primeras filas:\n" + 
+            messagebox.showwarning("Diagnóstico Sheet2", 
+                f"No se encontró la fecha {fecha_objetivo_sin_comillas} en Sheet2\n\n"
+                "Primeras filas de Sheet2:\n" + 
                 "\n".join(muestra_ejemplo))
             return None
 
@@ -482,11 +491,11 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
 
     except Exception as e:
         messagebox.showerror("Error Crítico", 
-            f"Error al procesar archivo Peeling:\n{str(e)}\n\n"
+            f"Error al procesar Sheet2 del archivo Peeling:\n{str(e)}\n\n"
             "Solución:\n"
-            "1. Verifique que el archivo no esté abierto en Excel\n"
-            "2. Confirme que las fechas tengan exactamente este formato: \"YYYY-MM-DD\"\n"
-            "3. Revise que no haya espacios adicionales")
+            "1. Verifique que exista la hoja 'Sheet2'\n"
+            "2. Confirme que las fechas estén en la columna A\n"
+            "3. Revise que los WorkID y rendimientos estén en las columnas correctas")
         return None
     finally:
         excel.Quit()
