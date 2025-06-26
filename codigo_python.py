@@ -543,68 +543,82 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
 
 def asignar_rendimiento_a_ir(dia, mes, anio, torno):
     try:
-        # Validación de parámetros
+        # 1. Validación de parámetros (mejorada)
         if not isinstance(dia, int) or dia < 1 or dia > 31:
             raise ValueError("Día inválido")
         if mes not in MESES_NUM:
-            raise ValueError("Mes inválido")
+            raise ValueError(f"Mes inválido: {mes}. Meses válidos: {list(MESES_NUM.keys())}")
         if not isinstance(anio, int) or anio < 2000:
             raise ValueError("Año inválido")
         if torno not in (1, 2):
             raise ValueError("Torno debe ser 1 o 2")
 
-        # Definir mes_num aquí mismo
-        mes_num = MESES_NUM[mes]  # <--- ESTA ES LA LÍNEA QUE FALTABA
+        # 2. Definición CORRECTA de mes_num (aquí estaba el error principal)
+        mes_num = MESES_NUM[mes]  # Conversión directa del nombre del mes a número
 
-        # Obtener rendimientos del archivo Peeling
+        # 3. Obtener rendimientos (con verificación adicional)
         rendimientos = obtener_rendimientos_peeling(dia, mes, anio)
         if not rendimientos:
-            return
+            messagebox.showwarning("Advertencia", "No se obtuvieron rendimientos del archivo Peeling")
+            return None
 
-        # Resto del código permanece igual...
-        rendimiento = rendimientos.get(f'torno_{torno}')
-        if rendimiento is None:
+        # 4. Procesamiento de rendimientos (con manejo de errores mejorado)
+        try:
+            rendimiento = rendimientos[f'torno_{torno}']  # Acceso directo al diccionario
+        except KeyError:
             messagebox.showwarning("Advertencia", 
-                f"No se encontró rendimiento para el Torno {torno} en la fecha especificada")
-            return
+                f"No se encontró rendimiento para el Torno {torno} en {dia}/{mes}/{anio}")
+            return None
 
-        # Mostrar mensaje de confirmación
-        mensaje = (
-            "✅ Datos encontrados:\n\n"
-            f"📅 Fecha: {dia:02d}/{mes_num:02d}/{anio}\n"
-            f"⚙️ Torno: {torno}\n"
-            f"📊 Rendimiento: {rendimiento:.2f}%\n\n"
-            "¿Desea continuar con el guardado?"
+        # 5. Mostrar confirmación (con formato mejorado)
+        mensaje_confirmacion = (
+            "Datos encontrados:\n\n"
+            f"• Fecha: {dia:02d}/{mes_num:02d}/{anio}\n"
+            f"• Torno: {torno}\n"
+            f"• Rendimiento: {rendimiento:.2f}%\n\n"
+            "¿Desea guardar estos datos?"
         )
-        
-        if not messagebox.askyesno("Confirmación", mensaje):
-            return
 
-        # Procesar archivo IR
-        wb = openpyxl.load_workbook(RUTA_ENTRADA)
-        nombre_hoja = f"IR {mes} {anio}"
-        
-        if nombre_hoja not in wb.sheetnames:
-            wb.create_sheet(nombre_hoja)
+        if not messagebox.askyesno("Confirmar", mensaje_confirmacion):
+            return None
 
-        hoja = wb[nombre_hoja]
-        col_dia = dia + 1
-        
-        # Escribir datos (aquí usamos mes_num que ahora está definido)
-        hoja.cell(row=2, column=col_dia, value=f"{dia:02d}/{mes_num:02d}/{anio}")
-        celda_rendimiento = hoja.cell(
-            row=13 if torno == 1 else 18, 
-            column=col_dia, 
-            value=rendimiento / 100
-        )
-        celda_rendimiento.number_format = '0.00%'
-        
-        wb.save(RUTA_ENTRADA)
-        
-        messagebox.showinfo("Éxito", "Datos guardados correctamente")
+        # 6. Guardado en archivo IR (con manejo de errores robusto)
+        try:
+            wb = openpyxl.load_workbook(RUTA_ENTRADA)
             
+            # Crear hoja si no existe
+            nombre_hoja = f"IR {mes} {anio}"
+            if nombre_hoja not in wb.sheetnames:
+                wb.create_sheet(nombre_hoja)
+                # Aquí podrías copiar formato de otra hoja si es necesario
+
+            hoja = wb[nombre_hoja]
+            col_dia = dia + 1  # Columna B es 2 (dia 1)
+
+            # Escribir fecha
+            hoja.cell(row=2, column=col_dia, value=f"{dia:02d}/{mes_num:02d}/{anio}")
+            
+            # Escribir rendimiento (convertido a decimal)
+            fila_rendimiento = 13 if torno == 1 else 18
+            celda = hoja.cell(row=fila_rendimiento, column=col_dia, value=rendimiento/100)
+            celda.number_format = '0.00%'
+
+            wb.save(RUTA_ENTRADA)
+            
+            messagebox.showinfo("Éxito", "Datos guardados correctamente")
+            return True
+            
+        except Exception as e:
+            messagebox.showerror("Error al guardar", 
+                f"No se pudo guardar en el archivo:\n{str(e)}\n"
+                f"Ruta: {RUTA_ENTRADA}")
+            return False
+
     except Exception as e:
-        messagebox.showerror("Error", f"Error inesperado:\n{str(e)}")
+        messagebox.showerror("Error crítico", 
+            f"Error inesperado:\n{str(e)}\n\n"
+            f"Detalles: {type(e).__name__} en línea {e.__traceback__.tb_lineno}")
+        return None
 
 
 ventana = tk.Tk()
