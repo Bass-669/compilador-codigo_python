@@ -409,6 +409,7 @@ def rotar_etiquetas_graficos(ruta_archivo, nombre_hoja):
         pythoncom.CoUninitialize()
 
 #-----------------------------------------------------------------------
+
 def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
     pythoncom.CoInitialize()
     excel = win32.Dispatch("Excel.Application")
@@ -425,17 +426,23 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
         wb_peeling = excel.Workbooks.Open(ruta_peeling)
         hoja_peeling = wb_peeling.Sheets(1)
 
-        # 2. Preparar fecha objetivo
+        # 2. Preparar fecha objetivo en múltiples formatos
         mes_num = MESES_NUM.get(mes, 1)
         fecha_objetivo = datetime.date(int(anio), mes_num, int(dia))
         
-        # 3. Formatos posibles
-        formatos_texto = [
+        # Todos los formatos posibles que podrían estar en Excel
+        formatos_posibles = [
+            # Formatos internacionales
             f"{anio}-{mes_num:02d}-{dia:02d}",  # YYYY-MM-DD
-            f"{dia}/{mes_num}/{anio}",           # DD/MM/AAAA
-            f"{dia}-{mes_num}-{anio}",           # DD-MM-AAAA
-            f"{mes_num}/{dia}/{anio}",           # MM/DD/AAAA
-            f"{dia:02d}/{mes_num:02d}/{anio}",   # DD/MM/AAAA con ceros
+            f"{anio}/{mes_num:02d}/{dia:02d}",   # YYYY/MM/DD
+            # Formatos locales
+            f"{dia:02d}/{mes_num:02d}/{anio}",   # DD/MM/AAAA
+            f"{dia:02d}-{mes_num:02d}-{anio}",   # DD-MM-AAAA
+            # Formatos en texto
+            f"{dia} de {mes} de {anio}",        # 12 de Junio de 2025
+            f"{dia}/{mes_num}/{anio}",           # DD/M/AAAA (sin ceros)
+            # Formatos de Excel (serial)
+            int((datetime.datetime(anio, mes_num, dia) - datetime.datetime(1899, 12, 30)).days)
         ]
 
         rendimientos = {}
@@ -446,45 +453,69 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
             celda = hoja_peeling.Cells(fila, 1)
             valor_celda = celda.Value
             
-            # Caso 1: Valor es None o vacío
+            # Caso 1: Celda vacía
             if valor_celda is None:
                 continue
                 
-            # Caso 2: Es una fecha de Excel (número serial)
+            # Caso 2: Es un número serial de Excel
             if isinstance(valor_celda, (int, float)):
                 try:
-                    # Convertir serial de Excel a fecha
+                    # Convertir serial Excel a fecha
                     fecha_excel = datetime.datetime(1899, 12, 30) + datetime.timedelta(days=int(valor_celda))
                     if fecha_excel.date() == fecha_objetivo:
                         fecha_encontrada = True
                         work_id = int(hoja_peeling.Cells(fila, 2).Value)
                         # ... procesar rendimientos
+                        continue
                 except Exception as e:
-                    print(f"Error convirtiendo serial de fecha: {e}")
+                    print(f"Error convirtiendo serial {valor_celda}: {e}")
                     continue
                     
             # Caso 3: Es texto
-            else:
-                valor_texto = str(valor_celda).strip()
-                # Normalizar separadores
-                valor_normalizado = valor_texto.replace("-", "/").replace(".", "/")
+            valor_texto = str(valor_celda).strip()
+            
+            # Normalización avanzada
+            valor_normalizado = (valor_texto
+                               .replace("-", "/")
+                               .replace(".", "/")
+                               .replace(" de ", "/")
+                               .replace(" ", ""))
+            
+            # Comparar con todos los formatos de texto
+            for formato in formatos_posibles[:5]:  # Solo los formatos de texto
+                formato_normalizado = (str(formato)
+                                     .replace("-", "/")
+                                     .replace(" de ", "/")
+                                     .replace(" ", ""))
                 
-                for formato in formatos_texto:
-                    if valor_normalizado == formato.replace("-", "/"):
-                        fecha_encontrada = True
-                        work_id = int(hoja_peeling.Cells(fila, 2).Value)
-                        # ... procesar rendimientos
-                        break
+                if valor_normalizado == formato_normalizado:
+                    fecha_encontrada = True
+                    work_id = int(hoja_peeling.Cells(fila, 2).Value)
+                    # ... procesar rendimientos
+                    break
 
         if not fecha_encontrada:
-            messagebox.showwarning("Advertencia", 
-                f"No hay datos para {fecha_objetivo}. Revisa que la fecha exista en el archivo Peeling Query.")
+            # Mensaje mejorado con sugerencias
+            messagebox.showwarning(
+                "Advertencia",
+                f"No se encontraron datos para {fecha_objetivo}\n\n"
+                "Posibles causas:\n"
+                "1. La fecha no existe en el archivo\n"
+                "2. El formato de fecha es diferente\n"
+                "3. Hay filtros aplicados en Excel\n"
+                "4. La hoja consultada no es la correcta"
+            )
             return None
 
         return rendimientos
 
     except Exception as e:
-        messagebox.showerror("Error", f"Fallo al leer Peeling Query:\n{str(e)}")
+        messagebox.showerror("Error", 
+            f"Error crítico al leer Peeling Query:\n{str(e)}\n\n"
+            "Sugerencias:\n"
+            "1. Verifique que el archivo no esté corrupto\n"
+            "2. Confirme que Excel pueda abrir el archivo manualmente\n"
+            "3. Revise los permisos del archivo")
         return None
     finally:
         excel.Quit()
