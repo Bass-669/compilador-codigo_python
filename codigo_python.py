@@ -183,69 +183,44 @@ def crear_archivo_temporal_con_ae(celda_origen):
     excel = win32.Dispatch("Excel.Application")
     excel.Visible = False
     excel.DisplayAlerts = False
+    temp_path = os.path.join(BASE_DIR, CARPETA, "temp_report.xlsx")
+    
     try:
-        # Mensaje de depuración 1: Mostrar la celda_origen recibida
-        messagebox.showinfo("DEBUG - Paso 1", f"Celda origen recibida: {celda_origen}")
-
+        # 1. Abrir el archivo
         wb = excel.Workbooks.Open(RUTA_ENTRADA)
         hoja = wb.Sheets("IR diario ")
-        
-        # Mensaje de depuración 2: Verificar si la hoja existe
-        messagebox.showinfo("DEBUG - Paso 2", f"Hoja 'IR diario ' cargada correctamente")
 
-        # Extraer número de fila de la celda_origen (ej: "AD123" -> 123)
-        try:
-            fila = int(''.join(filter(str.isdigit, celda_origen)))
-            messagebox.showinfo("DEBUG - Paso 3", f"Fila extraída: {fila}")
-        except Exception as e:
-            messagebox.showerror("DEBUG - Error", f"No se pudo extraer fila de {celda_origen}\nError: {e}")
-            return None, 0.0
+        # 2. Extraer número de fila (ej: "AD43448" -> 43448)
+        fila = int(''.join(filter(str.isdigit, celda_origen)))
 
-        # Mensaje de depuración 3: Mostrar rango a copiar
-        messagebox.showinfo("DEBUG - Paso 4", f"Copiando rango: {celda_origen}")
+        # 3. Obtener el valor de AD43448 y asignarlo directamente a AE43448
+        valor_ad = hoja.Range(celda_origen).Value
+        if valor_ad is not None:
+            try:
+                # Convertir a float (manejando comas/puntos)
+                valor_ae = float(str(valor_ad).replace(",", "."))
+                hoja.Range(f"AE{fila}").Value = valor_ae  # ¡Asignación directa aquí!
+            except ValueError as e:
+                messagebox.showerror("Error", f"Valor no numérico en {celda_origen}: {valor_ad}")
+                return None, 0.0
 
-        hoja.Range(celda_origen).Copy()  # Copiar celda con fórmula
-        
-        celda_destino = f"AE{fila}"
-        messagebox.showinfo("DEBUG - Paso 5", f"Pegando valor en: {celda_destino}")
-        
-        hoja.Range(celda_destino).PasteSpecial(Paste=-4163)  # xlPasteValues
-        valor_pego = hoja.Range(celda_destino).Value
-        
-        # Mensaje de depuración 4: Mostrar valor pegado
-        messagebox.showinfo("DEBUG - Paso 6", f"Valor pegado en {celda_destino}: {valor_pego}")
-
-        temp_path = os.path.join(BASE_DIR, CARPETA, "temp_report.xlsx")
-        wb.SaveAs(temp_path)
-        messagebox.showinfo("DEBUG - Paso 7", f"Archivo temporal guardado en: {temp_path}")
-
+        # 4. Guardar el archivo temporal (asegura que los cambios persistan)
+        wb.SaveAs(temp_path, FileFormat=51)  # FileFormat=51 es .xlsx
         wb.Close(False)
-        excel.Quit()
 
-        # Mensaje de depuración 5: Verificar archivo temporal
-        if not os.path.exists(temp_path):
-            messagebox.showerror("DEBUG - Error", "No se creó el archivo temporal")
-            return None, 0.0
-
+        # 5. Leer el valor desde el archivo temporal
         wb_temp = openpyxl.load_workbook(temp_path, data_only=True)
         hoja_temp = wb_temp["IR diario "]
-        valor_final = hoja_temp.cell(row=fila, column=31).value
-        
-        # Mensaje de depuración 6: Valor final leído
-        messagebox.showinfo("DEBUG - Paso 8", f"Valor final leído (AE{fila}): {valor_final}")
-
+        valor_final = hoja_temp.cell(row=fila, column=31).value  # Columna AE=31
         wb_temp.close()
+
         return temp_path, float(valor_final) if valor_final else 0.0
 
     except Exception as e:
-        messagebox.showerror("DEBUG - Error Crítico", 
-            f"Error en crear_archivo_temporal_con_ae():\n"
-            f"Tipo: {type(e).__name__}\n"
-            f"Mensaje: {str(e)}\n"
-            f"Celda origen: {celda_origen}")
-        excel.Quit()
+        messagebox.showerror("Error", f"Fallo al guardar en AE{fila}:\n{str(e)}")
         return None, 0.0
     finally:
+        excel.Quit()
         pythoncom.CoUninitialize()
 
 def escribir(hoja, f, c, v, num=False):
