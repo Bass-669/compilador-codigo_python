@@ -111,12 +111,6 @@ def ejecutar(txt, torno, mes, dia, anio):
 
     except Exception as e:
         messagebox.showerror("Error Crítico", f"Error en ejecutar():\n{str(e)}")
-    finally:
-        cerrar_carga()
-        try:
-            ventana.destroy()
-        except:
-            pass
         
     finally:
         cerrar_carga()
