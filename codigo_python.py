@@ -283,27 +283,37 @@ def crear_archivo_temporal_con_ae(celda_origen):
     excel = win32.Dispatch("Excel.Application")
     excel.Visible = False
     excel.DisplayAlerts = False
+    temp_path = os.path.join(BASE_DIR, CARPETA, "temp_report.xlsx")
+    
     try:
+        # 1. Extraer número de fila
+        fila = int(''.join(filter(str.isdigit, celda_origen)))
+        
+        # 2. Abrir archivo principal
         wb = excel.Workbooks.Open(RUTA_ENTRADA)
         hoja = wb.Sheets("IR diario ")
-        fila = int(''.join(filter(str.isdigit, celda_origen)))
-        hoja.Range(celda_origen).Copy()
-        celda_destino = f"AE{fila}"
-        hoja.Range(celda_destino).PasteSpecial(Paste=-4163)  # xlPasteValues
-        valor_pego = hoja.Range(celda_destino).Value
-        temp_path = os.path.join(BASE_DIR, CARPETA, "temp_report.xlsx")
-        wb.SaveAs(temp_path)
-        wb.Close(False)
+        
+        # 3. Obtener valor de AD{fila}
+        valor_ad = hoja.Range(celda_origen).Value
+        
+        # 4. Escribir directamente en AE{fila} (sin copiar/pegar)
+        hoja.Range(f"AE{fila}").Value = valor_ad
+        
+        # 5. Guardar como temporal (sin cerrar el archivo aún)
+        wb.SaveAs(temp_path, FileFormat=51)  # FileFormat=51 es .xlsx
+        
+        # 6. Leer el valor AE{fila} directamente desde el objeto Excel
+        valor_ae = hoja.Range(f"AE{fila}").Value
+        
+        # 7. Cerrar todo correctamente
+        wb.Close(SaveChanges=False)  # No guardar cambios otra vez
         excel.Quit()
-        wb_temp = openpyxl.load_workbook(temp_path, data_only=True)
-        hoja_temp = wb_temp["IR diario "]
-        valor_final = hoja_temp.cell(row=fila, column=31).value
-        wb_temp.close()
-        return temp_path, float(valor_final) if valor_final else 0.0
+        
+        # 8. Convertir el valor a float
+        return temp_path, float(valor_ae) if valor_ae is not None else 0.0
+        
     except Exception as e:
-        excel.Quit()
-        pythoncom.CoUninitialize()
-        messagebox.showerror("Error", f"No se pudo generar archivo temporal:\n{e}")
+        messagebox.showerror("Error", f"Error en archivo temporal:\n{str(e)}")
         return None, 0.0
     finally:
         pythoncom.CoUninitialize()
