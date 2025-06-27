@@ -90,6 +90,7 @@ def ejecutar(txt, torno, mes, dia, anio):
         
         fecha(mes, dia, anio, torno, bloques, porcentajes)
         barra['value'] = 100
+
     except Exception as e:
         messagebox.showerror("Error", f"Ocurrió un error en ejecutar():\n{e}")
     finally:
@@ -428,64 +429,57 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
     excel.ScreenUpdating = False
     
     try:
-        # 1. Verificar y abrir archivo Peeling
+        # 1. Verificar y abrir archivo Peeling (con mensaje de error crítico)
         ruta_peeling = os.path.join(BASE_DIR, "Nueva_Peeling_Query_202050501_arauco.xlsx")
         if not os.path.exists(ruta_peeling):
-            messagebox.showerror("Error", f"Archivo Peeling no encontrado:\n{ruta_peeling}")
+            messagebox.showerror("Error Crítico", 
+                f"Archivo Peeling no encontrado en:\n{ruta_peeling}\n"
+                "Este archivo es esencial para el proceso.")
             return None
 
-        wb_peeling = excel.Workbooks.Open(ruta_peeling)
-        
-        # 2. Acceso robusto a Sheet2 con verificación de formato
         try:
-            hoja_peeling = wb_peeling.Sheets("Sheet2")
-            # Forzar recálculo y refrescar datos
-            excel.Calculation = -4105  # xlCalculationAutomatic
-            wb_peeling.RefreshAll()
-            time.sleep(2)  # Esperar a que se actualicen los datos
+            wb_peeling = excel.Workbooks.Open(ruta_peeling)
         except Exception as e:
             messagebox.showerror("Error", 
-                f"No se encontró la hoja 'Sheet2'.\n"
+                f"No se pudo abrir el archivo Peeling:\n{str(e)}\n"
+                "¿Está abierto en otro programa?")
+            return None
+        
+        # 2. Acceso a Sheet2 con manejo de error específico
+        try:
+            hoja_peeling = wb_peeling.Sheets("Sheet2")
+            excel.Calculation = -4105  # xlCalculationAutomatic
+            wb_peeling.RefreshAll()
+            time.sleep(2)
+        except:
+            messagebox.showerror("Error de Estructura", 
+                "No se encontró la hoja 'Sheet2' en el archivo Peeling.\n"
                 f"Hojas disponibles: {[sh.Name for sh in wb_peeling.Sheets]}")
             return None
 
-        # 3. Configuración de búsqueda optimizada
+        # 3. Búsqueda optimizada pero con formatos flexibles
         mes_num = MESES_NUM[mes]
-        fecha_objetivo = f"{anio}-{mes_num:02d}-{dia:02d}"
-        
-        # Todos los formatos posibles encontrados en diagnóstico
-        formatos_equivalentes = {
-            fecha_objetivo,
-            f"'{fecha_objetivo}'",
-            f'"{fecha_objetivo}"',
-            f"{anio}-{mes_num}-{dia}",  # Sin ceros iniciales
-            f"{dia}/{mes_num}/{anio}",
-            f"{dia}-{mes_num}-{anio}",
-            f"{anio}/{mes_num}/{dia}",  # Formato alternativo
-            f"{dia}.{mes_num}.{anio}"   # Formato con puntos
-        }
+        formatos_fecha = [
+            f"{anio}-{mes_num:02d}-{dia:02d}",  # Formato estándar
+            f"{dia}/{mes_num}/{anio}",          # Formato alternativo 1
+            f"{dia}-{mes_num}-{anio}",          # Formato alternativo 2
+            f"{anio}/{mes_num}/{dia}"           # Formato alternativo 3
+        ]
 
         rendimientos = {}
         ultima_fila = hoja_peeling.UsedRange.Rows.Count
-        fecha_encontrada = False
         
-        # 4. Búsqueda exhaustiva con diagnóstico integrado
-        diagnostic_data = []
         for fila in range(2, ultima_fila + 1):
             try:
                 celda = hoja_peeling.Cells(fila, 1)
                 valor_crudo = celda.Value
-                valor_texto = str(valor_crudo).strip() if valor_crudo is not None else ""
-                valor_limpio = valor_texto.strip('\'"')
+                if valor_crudo is None:
+                    continue
+                    
+                valor_texto = str(valor_crudo).strip().strip('\'"')
                 
-                # Guardar datos para diagnóstico (primeras 50 filas)
-                if fila <= 50:
-                    work_id = hoja_peeling.Cells(fila, 2).Value
-                    rendimiento = hoja_peeling.Cells(fila, 12).Value
-                    diagnostic_data.append(f"Fila {fila}: {valor_texto} | WorkID: {work_id} | Rend: {rendimiento}")
-                
-                # Comparación flexible
-                if valor_limpio in formatos_equivalentes:
+                # Comparación con formatos válidos
+                if any(valor_texto == fmt for fmt in formatos_fecha):
                     try:
                         work_id = int(hoja_peeling.Cells(fila, 2).Value)
                         rendimiento = float(hoja_peeling.Cells(fila, 12).Value)
@@ -496,52 +490,31 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
                             rendimientos['torno_2'] = rendimiento
                             
                         if len(rendimientos) == 2:
-                            fecha_encontrada = True
                             break
-                    except Exception as e:
+                    except:
                         continue
             except:
                 continue
 
-        if not fecha_encontrada:
-            # Mostrar diagnóstico completo con scroll
-            diagnostico_texto = "\n".join(diagnostic_data)
-            root = tk.Tk()
-            root.title("Diagnóstico Completo - Sheet2")
-            
-            text_frame = tk.Frame(root)
-            text_frame.pack(fill=tk.BOTH, expand=True)
-            
-            scrollbar = tk.Scrollbar(text_frame)
-            scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-            
-            text = tk.Text(text_frame, wrap=tk.NONE, 
-                          yscrollcommand=scrollbar.set,
-                          width=120, height=30)
-            text.pack(fill=tk.BOTH, expand=True)
-            
-            scrollbar.config(command=text.yview)
-            
-            text.insert(tk.END, f"Búsqueda de: {fecha_objetivo}\n")
-            text.insert(tk.END, f"Formatos equivalentes buscados:\n")
-            text.insert(tk.END, "\n".join(formatos_equivalentes) + "\n\n")
-            text.insert(tk.END, f"Primeras {len(diagnostic_data)} filas:\n")
-            text.insert(tk.END, diagnostico_texto)
-            
-            tk.Button(root, text="Cerrar", command=root.destroy).pack(pady=10)
-            root.mainloop()
-            
+        # 4. Manejo de resultados con retroalimentación útil
+        if not rendimientos:
+            # Mensaje detallado solo si no se encontraron datos
+            messagebox.showwarning("Datos no encontrados",
+                f"No se encontraron rendimientos para:\n"
+                f"Fecha: {dia}/{mes_num}/{anio}\n"
+                f"Tornos buscados: {torno_1} y {torno_2}\n\n"
+                "Verifique que la fecha existe en el reporte Peeling.")
             return None
 
         return rendimientos
 
     except Exception as e:
-        messagebox.showerror("Error Crítico", 
-            f"Error al procesar Sheet2:\n{str(e)}\n\n"
+        messagebox.showerror("Error Inesperado", 
+            f"Error crítico al procesar el archivo Peeling:\n{str(e)}\n\n"
             "Recomendaciones:\n"
-            "1. Verifique manualmente el archivo\n"
-            "2. Revise filtros o formatos especiales\n"
-            "3. Confirme que los datos no son dinámicos")
+            "1. Cierre el archivo si está abierto\n"
+            "2. Verifique que no esté corrupto\n"
+            "3. Revise el formato de los datos")
         return None
     finally:
         try:
@@ -553,81 +526,56 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
 
 def asignar_rendimiento_a_ir(dia, mes, anio, torno):
     try:
-        # 1. Validación de parámetros (mejorada)
+        # Validación de parámetros
         if not isinstance(dia, int) or dia < 1 or dia > 31:
-            raise ValueError("Día inválido")
+            return None
         if mes not in MESES_NUM:
-            raise ValueError(f"Mes inválido: {mes}. Meses válidos: {list(MESES_NUM.keys())}")
+            return None
         if not isinstance(anio, int) or anio < 2000:
-            raise ValueError("Año inválido")
+            return None
         if torno not in (1, 2):
-            raise ValueError("Torno debe ser 1 o 2")
+            return None
 
-        # 2. Definición CORRECTA de mes_num (aquí estaba el error principal)
-        mes_num = MESES_NUM[mes]  # Conversión directa del nombre del mes a número
+        mes_num = MESES_NUM[mes]
 
-        # 3. Obtener rendimientos (con verificación adicional)
+        # Obtener rendimientos sin mostrar mensajes al usuario
         rendimientos = obtener_rendimientos_peeling(dia, mes, anio)
         if not rendimientos:
-            messagebox.showwarning("Advertencia", "No se obtuvieron rendimientos del archivo Peeling")
             return None
 
-        # 4. Procesamiento de rendimientos (con manejo de errores mejorado)
         try:
-            rendimiento = rendimientos[f'torno_{torno}']  # Acceso directo al diccionario
+            rendimiento = rendimientos[f'torno_{torno}']
         except KeyError:
-            messagebox.showwarning("Advertencia", 
-                f"No se encontró rendimiento para el Torno {torno} en {dia}/{mes}/{anio}")
             return None
 
-        # 5. Mostrar confirmación (con formato mejorado)
-        mensaje_confirmacion = (
-            "Datos encontrados:\n\n"
-            f"• Fecha: {dia:02d}/{mes_num:02d}/{anio}\n"
-            f"• Torno: {torno}\n"
-            f"• Rendimiento: {rendimiento:.2f}%\n\n"
-            "¿Desea guardar estos datos?"
-        )
-
-        if not messagebox.askyesno("Confirmar", mensaje_confirmacion):
-            return None
-
-        # 6. Guardado en archivo IR (con manejo de errores robusto)
+        # Guardar directamente sin confirmación
         try:
             wb = openpyxl.load_workbook(RUTA_ENTRADA)
-            
-            # Crear hoja si no existe
             nombre_hoja = f"IR {mes} {anio}"
+            
             if nombre_hoja not in wb.sheetnames:
                 wb.create_sheet(nombre_hoja)
-                # Aquí podrías copiar formato de otra hoja si es necesario
 
             hoja = wb[nombre_hoja]
-            col_dia = dia + 1  # Columna B es 2 (dia 1)
+            col_dia = dia + 1
 
             # Escribir fecha
             hoja.cell(row=2, column=col_dia, value=f"{dia:02d}/{mes_num:02d}/{anio}")
             
             # Escribir rendimiento (convertido a decimal)
-            fila_rendimiento = 13 if torno == 1 else 18
+            fila_rendimiento = 32 if torno == 1 else 33  # Ajustado según tu estructura
             celda = hoja.cell(row=fila_rendimiento, column=col_dia, value=rendimiento/100)
             celda.number_format = '0.00%'
 
             wb.save(RUTA_ENTRADA)
-            
-            messagebox.showinfo("Éxito", "Datos guardados correctamente")
             return True
             
         except Exception as e:
-            messagebox.showerror("Error al guardar", 
-                f"No se pudo guardar en el archivo:\n{str(e)}\n"
-                f"Ruta: {RUTA_ENTRADA}")
+            print(f"Error al guardar: {str(e)}")  # Log silencioso
             return False
 
     except Exception as e:
-        messagebox.showerror("Error crítico", 
-            f"Error inesperado:\n{str(e)}\n\n"
-            f"Detalles: {type(e).__name__} en línea {e.__traceback__.tb_lineno}")
+        print(f"Error crítico: {str(e)}")  # Log silencioso
         return None
 
 
