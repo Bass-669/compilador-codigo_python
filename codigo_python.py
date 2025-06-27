@@ -462,18 +462,12 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
 #-----------------------------------------------------------------------
 
 def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
-    """
-    Obtiene rendimientos desde archivo Excel local
-    Devuelve: {'torno_1': rendimiento, 'torno_2': rendimiento} o None
-    """
     try:
-        # 1. Validar y cargar archivo
         ruta_peeling = os.path.join(BASE_DIR, "Nueva_Peeling_Query_202050501_arauco.xlsx")
         if not os.path.exists(ruta_peeling):
             messagebox.showerror("Error", f"Archivo no encontrado:\n{ruta_peeling}")
             return None
 
-        # 2. Leer archivo con formato de fecha YYYY/MM/DD
         wb = openpyxl.load_workbook(ruta_peeling, data_only=True)
         if "Sheet2" not in wb.sheetnames:
             messagebox.showerror("Error", "La hoja 'Sheet2' no existe")
@@ -481,14 +475,22 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
 
         hoja = wb["Sheet2"]
         mes_num = MESES_NUM.get(mes, 0)
-        fecha_buscada = f"{anio}/{mes_num:02d}/{dia:02d}"
-        rendimientos = {}
+        
+        # Búsqueda con múltiples formatos de fecha
+        formatos_fecha = [
+            f"{anio}/{mes_num:02d}/{dia:02d}",  # YYYY/MM/DD
+            f"{dia}/{mes_num}/{anio}",          # DD/MM/YYYY
+            f"{dia}-{mes_num}-{anio}",          # DD-MM-YYYY
+            f"{anio}-{mes_num:02d}-{dia:02d}"   # YYYY-MM-DD
+        ]
 
-        # 3. Buscar datos
+        rendimientos = {}
+        
         for fila in range(2, hoja.max_row + 1):
             fecha_celda = str(hoja.cell(row=fila, column=1).value or "").strip()
             
-            if fecha_celda == fecha_buscada:
+            # Verificar todos los formatos posibles
+            if fecha_celda in formatos_fecha:
                 try:
                     work_id = int(hoja.cell(row=fila, column=2).value)
                     rendimiento = float(hoja.cell(row=fila, column=12).value)
@@ -505,24 +507,24 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
 
         wb.close()
 
-        # 4. Mostrar resultados
-        if rendimientos:
-            messagebox.showinfo("Éxito",
-                f"Datos encontrados para {fecha_buscada}:\n"
-                f"Torno {torno_1}: {rendimientos.get('torno_1', 'N/D')}%\n"
-                f"Torno {torno_2}: {rendimientos.get('torno_2', 'N/D')}%")
-            return rendimientos
-        else:
-            messagebox.showwarning("Advertencia",
-                f"No se encontraron datos para:\n"
-                f"Fecha: {fecha_buscada}\n"
-                f"Tornos: {torno_1}, {torno_2}")
+        if not rendimientos:
+            # Mensaje más informativo
+            messagebox.showwarning("Datos no encontrados",
+                f"No se encontraron rendimientos para:\n\n"
+                f"• Fecha buscada: {anio}/{mes_num:02d}/{dia:02d}\n"
+                f"• Formatos alternativos probados:\n"
+                f"  - {formatos_fecha[1]}\n"
+                f"  - {formatos_fecha[2]}\n"
+                f"• Tornos: {torno_1} y {torno_2}\n\n"
+                "Verifique:\n"
+                "1. Que la fecha existe en el reporte\n"
+                "2. El formato de fecha en el archivo")
             return None
 
+        return rendimientos
+
     except Exception as e:
-        messagebox.showerror("Error Crítico",
-            f"Error al procesar archivo:\n{str(e)}\n"
-            f"Tipo: {type(e).__name__}")
+        messagebox.showerror("Error", f"Error al leer archivo:\n{str(e)}")
         return None
 
 
