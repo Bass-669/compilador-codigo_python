@@ -332,88 +332,135 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
     nueva = f"IR {mes} {anio}"
     hoja_anterior = None
     hoja_nueva_existia = False
+    
     try:
+        # 1. Validación inicial del mes
+        if mes not in MESES_NUM:
+            raise ValueError(f"Nombre de mes no válido: {mes}. Meses válidos: {list(MESES_NUM.keys())}")
+
+        # 2. Configuración de Excel
         excel = win32.gencache.EnsureDispatch('Excel.Application')
         excel.Visible = False
         excel.DisplayAlerts = False
+        
+        # 3. Abrir archivo y verificar hojas
         wb = excel.Workbooks.Open(RUTA_ENTRADA, UpdateLinks=0)
         nombres_hojas = [h.Name for h in wb.Sheets]
         hoja_nueva_existia = nueva in nombres_hojas
+
         if not hoja_nueva_existia:
+            # 4. Lógica mejorada para encontrar hoja anterior
             hojas_ir = [h for h in nombres_hojas if h.startswith("IR ") and len(h.split()) == 3]
+            
+            # Función para ordenar hojas por fecha
             def total_meses(nombre):
                 try:
                     _, mes_str, anio_str = nombre.split()
-                    return int(anio_str) * 12 + MESES_NUM[mes_str]
+                    return int(anio_str) * 12 + MESES_NUM.get(mes_str, 0)
                 except:
                     return -1
+            
             hojas_ir_ordenadas = sorted(hojas_ir, key=total_meses)
             total_nueva = int(anio) * 12 + MESES_NUM[mes]
-            for h in hojas_ir_ordenadas:
+            
+            # Buscar la hoja anterior más reciente
+            for h in reversed(hojas_ir_ordenadas):
                 if total_meses(h) < total_nueva:
                     hoja_anterior = h
-                else:
                     break
+            
+            # Si no se encuentra hoja anterior, usar la última disponible o crear base
             if not hoja_anterior:
-                messagebox.showwarning("Orden inválido", f"No se encontró hoja anterior para insertar '{nueva}'")
-                return
-            idx_anterior = [h.Name for h in wb.Sheets].index(hoja_anterior)
-            insert_idx = min(idx_anterior + 2, wb.Sheets.Count)
-            wb.Sheets(hoja_anterior).Copy(After=wb.Sheets(insert_idx - 1))
+                if hojas_ir_ordenadas:
+                    hoja_anterior = hojas_ir_ordenadas[-1]
+                    messagebox.showwarning(f"Advertencia: Usando última hoja disponible ({hoja_anterior}) como base")
+                else:
+                    # Crear hoja base si no existe ninguna
+                    nueva_hoja = wb.Sheets.Add(After=wb.Sheets(wb.Sheets.Count))
+                    nueva_hoja.Name = "IR Base"
+                    hoja_anterior = "IR Base"
+                    messagebox.showwarning("Creando hoja base nueva")
+            
+            # 5. Crear nueva hoja
+            idx_anterior = nombres_hojas.index(hoja_anterior)
+            insert_idx = min(idx_anterior + 1, wb.Sheets.Count)
+            wb.Sheets(hoja_anterior).Copy(After=wb.Sheets(insert_idx))
             wb.ActiveSheet.Name = nueva
             wb.Save()
+
     except Exception as e:
-        messagebox.showerror("Error", f"No se pudo crear hoja:\n{e}")
+        error_msg = f"No se pudo crear hoja:\n{str(e)}\n\n"
+        error_msg += f"Detalles técnicos:\n"
+        error_msg += f"- Mes: {mes} (¿está en MESES_NUM? {mes in MESES_NUM})\n"
+        error_msg += f"- Hojas IR encontradas: {hojas_ir if 'hojas_ir' in locals() else 'N/A'}\n"
+        error_msg += f"- Hoja anterior seleccionada: {hoja_anterior}"
+        messagebox.showerror("Error Crítico", error_msg)
         return
     finally:
         try:
             if wb:
                 wb.Close(SaveChanges=True)
-        except:
-            pass
-        try:
             if excel:
                 excel.Quit()
         except:
             pass
         pythoncom.CoUninitialize()
+
+    # 6. Procesamiento de datos en la nueva hoja
     try:
         wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
         hoja_nueva = wb2[nueva]
         col_dia = dia + 1  # columna B es 2, día 1 → columna 2
+
+        # Limpiar celdas solo si es hoja nueva
         if not hoja_nueva_existia:
-            filas_fechas = [2, 3, 4, 7, 8, 9, 12, 13, 14, 17, 18, 19, 22, 27, 31, 32, 33, 34, 37]
+            filas_fechas = [2, 3, 4, 7, 8, 9, 12, 13, 14, 17, 18, 19, 22, 27, 31, 37]
             for fila in filas_fechas:
                 for col in range(2, 37):
                     hoja_nueva.cell(row=fila, column=col, value="")
+
+        # Escribir fecha en formato DD/MM/AAAA
         nueva_fecha = f"{dia:02d}/{MESES_NUM[mes]:02d}/{anio}"
         for fila in [2, 7, 12, 17, 22, 27, 31, 37]:
             hoja_nueva.cell(row=fila, column=col_dia, value=nueva_fecha)
+
+        # Procesar bloques de datos
         valores_para_escribir = [val for i, (tipo, val) in enumerate(bloques_detectados) if i % 2 == 1]
         tipos_para_escribir = [tipo for i, (tipo, val) in enumerate(bloques_detectados) if i % 2 == 1]
+
         for (tipo_bloque, valor), valor_ae in zip(zip(tipos_para_escribir, valores_para_escribir), sumas_ad_por_bloque):
             escribir_valor_bloque(hoja_nueva, col_dia, torno, valor, tipo_bloque)
-        escribir_valores_resumen_bloques(hoja_nueva, col_dia, torno, sumas_ad_por_bloque, tipos_para_escribir)
-        # OBTENER Y ESCRIBIR RENDIMIENTO (NUEVO)
-        rendimientos = obtener_rendimientos_peeling(dia, mes, anio)
-        rendimiento = rendimientos.get(f'torno_{torno}') if rendimientos else None
-        escribir_valores_resumen_bloques(
-            hoja_nueva,
-            col_dia,
-            torno,
-            sumas_ad_por_bloque,
-            tipos_para_escribir,
-            rendimiento=rendimiento  # Pasar el rendimiento aquí
-        )
+            escribir_valores_resumen_bloques(hoja_nueva, col_dia, torno, sumas_ad_por_bloque, tipos_para_escribir)
+
+        # 7. Integración con Peeling
+        try:
+            rendimientos = obtener_rendimientos_peeling(dia, mes, anio)
+            if rendimientos:
+                rendimiento = rendimientos.get(f'torno_{torno}')
+                if rendimiento is not None:
+                    escribir_valores_resumen_bloques(
+                        hoja_nueva, col_dia, torno, 
+                        sumas_ad_por_bloque, tipos_para_escribir,
+                        rendimiento
+                    )
+        except Exception as e:
+            messagebox.showwarning(f"Advertencia: Error al integrar Peeling - {str(e)}")
+
         wb2.save(RUTA_ENTRADA)
         wb2.close()
-        if not hoja_nueva_existia: # Rotar etiquetas solo si es hoja nueva
+
+        # Rotar etiquetas solo si es hoja nueva
+        if not hoja_nueva_existia:
             rotar_etiquetas_graficos(RUTA_ENTRADA, nueva)
+
         shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
-        mensaje = "✅ Valores actualizados correctamente." if hoja_nueva_existia else f"✅ Hoja '{nueva}' creada correctamente."
+        
+        mensaje = ("✅ Valores actualizados correctamente." if hoja_nueva_existia 
+                  else f"✅ Hoja '{nueva}' creada correctamente.")
         messagebox.showinfo("Éxito", mensaje)
+
     except Exception as e:
-        messagebox.showwarning("Advertencia", f"No se pudo ajustar hoja:\n{e}")
+        messagebox.showerror("Error", f"Error al actualizar hoja:\n{str(e)}")
 
 def rotar_etiquetas_graficos(ruta_archivo, nombre_hoja):
     pythoncom.CoInitialize()
