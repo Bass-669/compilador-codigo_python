@@ -422,107 +422,60 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
 #-----------------------------------------------------------------------
 
 def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
-    pythoncom.CoInitialize()
-    excel = win32.Dispatch("Excel.Application")
-    excel.Visible = False
-    excel.DisplayAlerts = False
-    excel.ScreenUpdating = False
-    
+    """
+    Versión modificada que trabaja con datos locales sin conexión a SQL Server
+    """
     try:
-        # 1. Verificar y abrir archivo Peeling (con mensaje de error crítico)
+        # 1. Cargar archivo Excel local
         ruta_peeling = os.path.join(BASE_DIR, "Nueva_Peeling_Query_202050501_arauco.xlsx")
         if not os.path.exists(ruta_peeling):
-            messagebox.showerror("Error Crítico", 
-                f"Archivo Peeling no encontrado en:\n{ruta_peeling}\n"
-                "Este archivo es esencial para el proceso.")
+            print(f"Archivo Peeling no encontrado: {ruta_peeling}")
             return None
 
-        try:
-            wb_peeling = excel.Workbooks.Open(ruta_peeling)
-        except Exception as e:
-            messagebox.showerror("Error", 
-                f"No se pudo abrir el archivo Peeling:\n{str(e)}\n"
-                "¿Está abierto en otro programa?")
-            return None
-        
-        # 2. Acceso a Sheet2 con manejo de error específico
-        try:
-            hoja_peeling = wb_peeling.Sheets("Sheet2")
-            excel.Calculation = -4105  # xlCalculationAutomatic
-            wb_peeling.RefreshAll()
-            time.sleep(2)
-        except:
-            messagebox.showerror("Error de Estructura", 
-                "No se encontró la hoja 'Sheet2' en el archivo Peeling.\n"
-                f"Hojas disponibles: {[sh.Name for sh in wb_peeling.Sheets]}")
+        # 2. Usar openpyxl para leer datos sin conexiones activas
+        wb = openpyxl.load_workbook(ruta_peeling, data_only=True)  # data_only=True para obtener valores, no fórmulas
+        if "Sheet2" not in wb.sheetnames:
+            print(f"Hoja 'Sheet2' no encontrada. Hojas disponibles: {wb.sheetnames}")
             return None
 
-        # 3. Búsqueda optimizada pero con formatos flexibles
+        hoja_peeling = wb["Sheet2"]
         mes_num = MESES_NUM[mes]
-        formatos_fecha = [
-            f"{anio}-{mes_num:02d}-{dia:02d}",  # Formato estándar
-            f"{dia}/{mes_num}/{anio}",          # Formato alternativo 1
-            f"{dia}-{mes_num}-{anio}",          # Formato alternativo 2
-            f"{anio}/{mes_num}/{dia}"           # Formato alternativo 3
-        ]
-
-        rendimientos = {}
-        ultima_fila = hoja_peeling.UsedRange.Rows.Count
+        fecha_buscada = f"{dia}/{mes_num}/{anio}"  # Formato esperado en el archivo
         
-        for fila in range(2, ultima_fila + 1):
-            try:
-                celda = hoja_peeling.Cells(fila, 1)
-                valor_crudo = celda.Value
-                if valor_crudo is None:
-                    continue
-                    
-                valor_texto = str(valor_crudo).strip().strip('\'"')
-                
-                # Comparación con formatos válidos
-                if any(valor_texto == fmt for fmt in formatos_fecha):
-                    try:
-                        work_id = int(hoja_peeling.Cells(fila, 2).Value)
-                        rendimiento = float(hoja_peeling.Cells(fila, 12).Value)
-                        
-                        if work_id == torno_1:
-                            rendimientos['torno_1'] = rendimiento
-                        elif work_id == torno_2:
-                            rendimientos['torno_2'] = rendimiento
-                            
-                        if len(rendimientos) == 2:
-                            break
-                    except:
-                        continue
-            except:
-                continue
+        rendimientos = {}
+        max_fila = hoja_peeling.max_row
 
-        # 4. Manejo de resultados con retroalimentación útil
+        # 3. Buscar datos directamente en el Excel
+        for fila in range(2, max_fila + 1):
+            # Leer valores de celda directamente
+            fecha_celda = hoja_peeling.cell(row=fila, column=1).value
+            if fecha_celda and str(fecha_celda).strip() == fecha_buscada:
+                try:
+                    work_id = int(hoja_peeling.cell(row=fila, column=2).value)
+                    rendimiento = float(hoja_peeling.cell(row=fila, column=12).value)
+                    
+                    if work_id == torno_1:
+                        rendimientos['torno_1'] = rendimiento
+                    elif work_id == torno_2:
+                        rendimientos['torno_2'] = rendimiento
+                        
+                    if len(rendimientos) == 2:
+                        break
+                except (ValueError, TypeError):
+                    continue
+
+        wb.close()  # Cerrar el archivo
+        
         if not rendimientos:
-            # Mensaje detallado solo si no se encontraron datos
-            messagebox.showwarning("Datos no encontrados",
-                f"No se encontraron rendimientos para:\n"
-                f"Fecha: {dia}/{mes_num}/{anio}\n"
-                f"Tornos buscados: {torno_1} y {torno_2}\n\n"
-                "Verifique que la fecha existe en el reporte Peeling.")
+            print(f"No se encontraron rendimientos para {fecha_buscada}")
             return None
 
         return rendimientos
 
     except Exception as e:
-        messagebox.showerror("Error Inesperado", 
-            f"Error crítico al procesar el archivo Peeling:\n{str(e)}\n\n"
-            "Recomendaciones:\n"
-            "1. Cierre el archivo si está abierto\n"
-            "2. Verifique que no esté corrupto\n"
-            "3. Revise el formato de los datos")
+        print(f"Error al procesar archivo Peeling: {str(e)}")
         return None
-    finally:
-        try:
-            wb_peeling.Close(False)
-            excel.Quit()
-        except:
-            pass
-        pythoncom.CoUninitialize()
+
 
 def asignar_rendimiento_a_ir(dia, mes, anio, torno):
     try:
