@@ -396,38 +396,65 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
     pythoncom.CoInitialize()
     excel = wb = None
     nueva = f"IR {mes} {anio}"
-    hoja_anterior = None
-    hoja_nueva_existia = False
+    
     try:
+        debug_msg("fecha", "Iniciando Excel...")
         excel = win32.gencache.EnsureDispatch('Excel.Application')
         excel.Visible = False
         excel.DisplayAlerts = False
+        
+        debug_msg("fecha", f"Abriendo archivo: {RUTA_ENTRADA}")
         wb = excel.Workbooks.Open(RUTA_ENTRADA, UpdateLinks=0)
+        
         nombres_hojas = [h.Name for h in wb.Sheets]
+        debug_msg("fecha", f"Hojas existentes: {nombres_hojas}")
+        
         hoja_nueva_existia = nueva in nombres_hojas
+        debug_msg("fecha", f"¿Hoja nueva ya existe? {hoja_nueva_existia}")
+        
         if not hoja_nueva_existia:
             hojas_ir = [h for h in nombres_hojas if h.startswith("IR ") and len(h.split()) == 3]
+            debug_msg("fecha", f"Hojas IR encontradas: {hojas_ir}")
+            
             def total_meses(nombre):
                 try:
                     _, mes_str, anio_str = nombre.split()
                     return int(anio_str) * 12 + MESES_NUM[mes_str]
                 except:
                     return -1
+            
             hojas_ir_ordenadas = sorted(hojas_ir, key=total_meses)
+            debug_msg("fecha", f"Hojas IR ordenadas: {hojas_ir_ordenadas}")
+            
             total_nueva = int(anio) * 12 + MESES_NUM[mes]
+            debug_msg("fecha", f"Total meses nueva hoja: {total_nueva}")
+            
+            hoja_anterior = None
             for h in hojas_ir_ordenadas:
                 if total_meses(h) < total_nueva:
                     hoja_anterior = h
                 else:
                     break
+            
+            debug_msg("fecha", f"Hoja anterior seleccionada: {hoja_anterior}")
+            
             if not hoja_anterior:
                 messagebox.showwarning("Orden inválido", f"No se encontró hoja anterior para insertar '{nueva}'")
                 return
+            
             idx_anterior = [h.Name for h in wb.Sheets].index(hoja_anterior)
             insert_idx = min(idx_anterior + 2, wb.Sheets.Count)
+            debug_msg("fecha", f"Insertando después de índice: {insert_idx}")
+            
+            debug_msg("fecha", "Copiando hoja...")
             wb.Sheets(hoja_anterior).Copy(After=wb.Sheets(insert_idx - 1))
+            
+            debug_msg("fecha", "Renombrando hoja...")
             wb.ActiveSheet.Name = nueva
+            
+            debug_msg("fecha", "Guardando cambios...")
             wb.Save()
+
     except Exception as e:
         messagebox.showerror("Error", f"No se pudo crear hoja:\n{e}")
         return
