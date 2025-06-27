@@ -445,8 +445,8 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
         try:
             if 'wb' in locals():
                 wb.Close(SaveChanges=True)
-            if 'excel' in locals():
-                excel.Quit()
+            # if 'excel' in locals():
+            #     excel.Quit()
         except:
             pass
         pythoncom.CoUninitialize()
