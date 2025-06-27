@@ -205,8 +205,6 @@ def ejecutar(txt, torno, mes, dia, anio):
 
 
 
-
-
 def procesar_datos(entrada, torno, mes, dia, anio):
     bloques_detectados = []
     sumas_ad_por_bloque = []
@@ -219,7 +217,7 @@ def procesar_datos(entrada, torno, mes, dia, anio):
         hoja = wb["IR diario "]
         ultima_fila = None
         
-        # Buscar la última fila con "* * ..."
+        # Buscar última fila con patrón "* * ..."
         for fila in hoja.iter_rows():
             if [str(c.value).strip() if c.value else "" for c in fila[:3]] == ["*", "*", "..."]:
                 ultima_fila = fila[0].row
@@ -232,6 +230,7 @@ def procesar_datos(entrada, torno, mes, dia, anio):
         for b in extraer_bloques(entrada):
             f_ini = fila
             subs = sub_bloques(b)
+            primer_valor_invalido = False
             
             for sub in subs:
                 txt = sub[0] if not re.match(r'^\d', sub[0]) else ""
@@ -249,6 +248,16 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                 col_nums = [val for l in datos for val in l.strip().split()]
                 fila_vals = col_txt + col_nums
                 
+                # Procesar primera fila del bloque
+                if fila == f_ini:
+                    # Verificar si el primer valor en AD es #NIA
+                    primer_valor = hoja.cell(row=fila, column=30).value if fila <= hoja.max_row else None
+                    if primer_valor in ("#NIA", "#N/A", None, ""):
+                        primer_valor_invalido = True
+                        # Reemplazar con 0 en todas las columnas numéricas
+                        for col in range(3, 25):  # Columnas C-X
+                            hoja.cell(row=fila, column=col, value=0)
+                
                 for col, val in enumerate(fila_vals[:24], 1):
                     try:
                         n = float(val.replace(",", ".")) if 3 <= col <= 24 and val else val
@@ -265,63 +274,32 @@ def procesar_datos(entrada, torno, mes, dia, anio):
             tipo_bloque = "PODADO" if "PODADO" in txt.upper() else "REGULAR"
             bloques_detectados.append((tipo_bloque, f_fin))
             
-            if len(subs) > 1:
-                for f in range(f_ini, f_fin + 1):
-                    hoja.cell(row=f, column=30, value=f"=IFERROR(AC{f}*D{f}/D{f_fin}, 0)")
-            
-            fila_autosuma = fila - 1
-            
-            # Verificar si el primer valor es inválido (#NIA, vacío, etc.)
-            primer_valor = hoja.cell(row=f_ini, column=30).value
-            primer_valor_invalido = (
-                primer_valor in (None, "#NIA", "#N/A", "#VALOR!", "") or
-                not isinstance(try_float(primer_valor), (int, float))
-            )
-            
-            # Crear fórmula de autosuma (excluyendo primer valor si es inválido)
-            if primer_valor_invalido and f_ini + 1 <= fila_autosuma - 1:
-                formula_suma = f"=SUM(AD{f_ini + 1}:AD{fila_autosuma - 1})"
-            elif primer_valor_invalido:
-                formula_suma = "0"  # No hay valores válidos para sumar
+            # Procesar autosuma
+            if primer_valor_invalido:
+                # Si el primer valor era inválido, sumar desde f_ini+1
+                if f_ini + 1 <= f_fin:
+                    formula_suma = f"=SUM(AD{f_ini + 1}:AD{f_fin})"
+                else:
+                    formula_suma = "0"
             else:
-                formula_suma = f"=SUM(AD{f_ini}:AD{fila_autosuma - 1})"
+                # Suma normal
+                formula_suma = f"=SUM(AD{f_ini}:AD{f_fin})"
             
-            celda_autosuma = hoja.cell(row=fila_autosuma, column=30, value=formula_suma)
+            celda_autosuma = hoja.cell(row=f_fin, column=30, value=formula_suma)
             celda_autosuma.fill = FILL_AMARILLO
-            celda_origen = f"AD{fila_autosuma}"
             
-            bloque_texto = " ".join(b).upper()
-            tipo_bloque = "PODADO" if "PODADO" in bloque_texto else "REGULAR"
-            valor_d = hoja.cell(row=f_fin, column=4).value
-            
-            try:
-                valor_d = float(str(valor_d).replace(",", ".")) if valor_d else 0
-            except:
-                valor_d = 0
-                
-            bloques_detectados.append((tipo_bloque, valor_d))
-            
-            if tipo_bloque != "PODADO":
-                for col in range(25, 30):
-                    hoja.cell(row=f_fin, column=col, value="")
-            
+            # Resto del procesamiento...
             wb.save(RUTA_ENTRADA)
             shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
             
-            # Solo procesar archivo temporal si hay valores válidos
-            if not primer_valor_invalido or (f_ini + 1 <= fila_autosuma - 1):
-                temp_path, valor_ae = crear_archivo_temporal_con_ae(celda_origen)
-                if not temp_path:
-                    return None, None
-                sumas_ad_por_bloque.append(valor_ae)
-            else:
-                sumas_ad_por_bloque.append(0.0)
+            # Procesar archivo temporal
+            temp_path, valor_ae = crear_archivo_temporal_con_ae(f"AD{f_fin}")
+            sumas_ad_por_bloque.append(valor_ae if valor_ae is not None else 0.0)
         
-        # Crear copia de seguridad
+        # Guardar copia de seguridad
         backup_path = os.path.join(CARPETA, "Reporte IR Tornos copia_de_seguridad.xlsx")
         shutil.copy(RUTA_ENTRADA, backup_path)
         wb.save(RUTA_ENTRADA)
-        shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
         
         return bloques_detectados, sumas_ad_por_bloque
         
@@ -333,12 +311,8 @@ def procesar_datos(entrada, torno, mes, dia, anio):
         if 'wb' in locals():
             wb.close()
 
-def try_float(valor):
-    """Intenta convertir un valor a float, retorna None si falla"""
-    try:
-        return float(str(valor).replace(",", "."))
-    except (ValueError, TypeError):
-        return None
+
+
 def crear_archivo_temporal_con_ae(celda_origen):
     pythoncom.CoInitialize()
     excel = win32.Dispatch("Excel.Application")
