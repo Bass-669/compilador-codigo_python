@@ -363,11 +363,11 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
         fecha_peeling = f"{anio}/{mes_num:02d}/{dia:02d}"  # YYYY/MM/DD (solo para Peeling)
         fecha_principal = f"{dia:02d}/{mes_num:02d}/{anio}"  # DD/MM/YYYY (para Excel principal)
 
-        # Procesamiento con Excel (original)
-        pythoncom.CoInitialize()
-        excel = win32.Dispatch("Excel.Application")
-        excel.Visible = False
-        excel.DisplayAlerts = False
+        # # Procesamiento con Excel (original)
+        # pythoncom.CoInitialize()
+        # excel = win32.Dispatch("Excel.Application")
+        # excel.Visible = False
+        # excel.DisplayAlerts = False
 
         # --- Resto del código ORIGINAL sin cambios ---
         nueva = f"IR {mes} {anio}"
