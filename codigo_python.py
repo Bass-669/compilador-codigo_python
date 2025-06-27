@@ -382,9 +382,9 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
         hoja_nueva = wb2[nueva]
         col_dia = dia + 1  # columna B es 2, día 1 → columna 2
         if not hoja_nueva_existia:
-            filas_fechas = [2, 3, 4, 7, 8, 9, 12, 13, 14, 17, 18, 19, 22, 27, 31, 32, 33, 37]
+            filas_fechas = [2, 3, 4, 7, 8, 9, 12, 13, 14, 17, 18, 19, 22, 27, 31, 32, 33, 34, 37]
             for fila in filas_fechas:
-                for col in range(2, 33):
+                for col in range(2, 37):
                     hoja_nueva.cell(row=fila, column=col, value="")
         nueva_fecha = f"{dia:02d}/{MESES_NUM[mes]:02d}/{anio}"
         for fila in [2, 7, 12, 17, 22, 27, 31, 37]:
@@ -394,6 +394,17 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
         for (tipo_bloque, valor), valor_ae in zip(zip(tipos_para_escribir, valores_para_escribir), sumas_ad_por_bloque):
             escribir_valor_bloque(hoja_nueva, col_dia, torno, valor, tipo_bloque)
         escribir_valores_resumen_bloques(hoja_nueva, col_dia, torno, sumas_ad_por_bloque, tipos_para_escribir)
+        # OBTENER Y ESCRIBIR RENDIMIENTO (NUEVO)
+        rendimientos = obtener_rendimientos_peeling(dia, mes, anio)
+        rendimiento = rendimientos.get(f'torno_{torno}') if rendimientos else None
+        escribir_valores_resumen_bloques(
+            hoja_nueva,
+            col_dia,
+            torno,
+            sumas_ad_por_bloque,
+            tipos_para_escribir,
+            rendimiento=rendimiento  # Pasar el rendimiento aquí
+        )
         wb2.save(RUTA_ENTRADA)
         wb2.close()
         if not hoja_nueva_existia: # Rotar etiquetas solo si es hoja nueva
