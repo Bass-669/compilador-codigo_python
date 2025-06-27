@@ -282,7 +282,21 @@ def escribir_valor_bloque(hoja, col_dia, torno, valor, tipo_bloque):
     celda.value = valor_final
     celda.number_format = '0' # pequeño cambio de 0.00 a 0
 
-def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque, tipos_bloque):
+# def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque, tipos_bloque):
+#     for i, (tipo_bloque, valor_ae) in enumerate(zip(tipos_bloque, valores_ae_por_bloque)):
+#         tipo_bloque = tipo_bloque.strip().upper()
+#         if tipo_bloque == "PODADO":
+#             fila_valor = 13 if torno == 1 else 14
+#         elif tipo_bloque == "REGULAR":
+#             fila_valor = 18 if torno == 1 else 19
+#         else:
+#             continue # ignorar bloques con tipo desconocido
+#         celda = hoja.cell(row=fila_valor, column=col_dia)
+#         celda.value = valor_ae / 100 if valor_ae > 1 else valor_ae  # Porcentaje en decimal
+#         celda.number_format = '0.00%'
+
+def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque, tipos_bloque, rendimiento=None):
+    # Escribir valores de bloques
     for i, (tipo_bloque, valor_ae) in enumerate(zip(tipos_bloque, valores_ae_por_bloque)):
         tipo_bloque = tipo_bloque.strip().upper()
         if tipo_bloque == "PODADO":
@@ -290,10 +304,27 @@ def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque
         elif tipo_bloque == "REGULAR":
             fila_valor = 18 if torno == 1 else 19
         else:
-            continue # ignorar bloques con tipo desconocido
+            continue  # ignorar bloques con tipo desconocido
+        
         celda = hoja.cell(row=fila_valor, column=col_dia)
         celda.value = valor_ae / 100 if valor_ae > 1 else valor_ae  # Porcentaje en decimal
         celda.number_format = '0.00%'
+
+    # Escribir rendimiento si se proporciona
+    if rendimiento is not None:
+        fila_rendimiento = 32 if torno == 1 else 33
+        celda_rendimiento = hoja.cell(row=fila_rendimiento, column=col_dia)
+        
+        # Asegurar que el rendimiento sea un valor numérico válido
+        try:
+            valor_rendimiento = float(rendimiento)
+            celda_rendimiento.value = valor_rendimiento / 100 if valor_rendimiento > 1 else valor_rendimiento
+            celda_rendimiento.number_format = '0.00%'
+        except (ValueError, TypeError):
+            # Manejar caso de rendimiento no válido
+            celda_rendimiento.value = None
+            print(f"Advertencia: Valor de rendimiento no válido: {rendimiento}")
+
 
 def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
     pythoncom.CoInitialize()
@@ -351,7 +382,7 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
         hoja_nueva = wb2[nueva]
         col_dia = dia + 1  # columna B es 2, día 1 → columna 2
         if not hoja_nueva_existia:
-            filas_fechas = [2, 3, 4, 7, 8, 9, 12, 13, 14, 17, 18, 19, 22, 27, 31, 37]
+            filas_fechas = [2, 3, 4, 7, 8, 9, 12, 13, 14, 17, 18, 19, 22, 27, 31, 32, 33, 37]
             for fila in filas_fechas:
                 for col in range(2, 33):
                     hoja_nueva.cell(row=fila, column=col, value="")
