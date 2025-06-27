@@ -423,33 +423,31 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
 
 def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
     """
-    Versión modificada que trabaja con datos locales sin conexión a SQL Server
+    Obtiene rendimientos desde archivo Excel local y muestra resultados en messagebox
     """
     try:
         # 1. Cargar archivo Excel local
         ruta_peeling = os.path.join(BASE_DIR, "Nueva_Peeling_Query_202050501_arauco.xlsx")
         if not os.path.exists(ruta_peeling):
-            print(f"Archivo Peeling no encontrado: {ruta_peeling}")
+            messagebox.showerror("Error", f"Archivo Peeling no encontrado:\n{ruta_peeling}")
             return None
 
-        # 2. Usar openpyxl para leer datos sin conexiones activas
-        wb = openpyxl.load_workbook(ruta_peeling, data_only=True)  # data_only=True para obtener valores, no fórmulas
+        # 2. Leer datos con openpyxl
+        wb = openpyxl.load_workbook(ruta_peeling, data_only=True)
         if "Sheet2" not in wb.sheetnames:
-            print(f"Hoja 'Sheet2' no encontrada. Hojas disponibles: {wb.sheetnames}")
+            messagebox.showerror("Error", 
+                f"Hoja 'Sheet2' no encontrada.\nHojas disponibles: {', '.join(wb.sheetnames)}")
             return None
 
         hoja_peeling = wb["Sheet2"]
         mes_num = MESES_NUM[mes]
-        fecha_buscada = f"{dia}/{mes_num}/{anio}"  # Formato esperado en el archivo
-        
+        fecha_buscada = f"{dia}/{mes_num}/{anio}"
         rendimientos = {}
-        max_fila = hoja_peeling.max_row
 
-        # 3. Buscar datos directamente en el Excel
-        for fila in range(2, max_fila + 1):
-            # Leer valores de celda directamente
-            fecha_celda = hoja_peeling.cell(row=fila, column=1).value
-            if fecha_celda and str(fecha_celda).strip() == fecha_buscada:
+        # 3. Buscar datos en el Excel
+        for fila in range(2, hoja_peeling.max_row + 1):
+            fecha_celda = str(hoja_peeling.cell(row=fila, column=1).value or "").strip()
+            if fecha_celda == fecha_buscada:
                 try:
                     work_id = int(hoja_peeling.cell(row=fila, column=2).value)
                     rendimiento = float(hoja_peeling.cell(row=fila, column=12).value)
@@ -461,19 +459,33 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
                         
                     if len(rendimientos) == 2:
                         break
-                except (ValueError, TypeError):
+                except (ValueError, TypeError, AttributeError):
                     continue
 
-        wb.close()  # Cerrar el archivo
-        
-        if not rendimientos:
-            print(f"No se encontraron rendimientos para {fecha_buscada}")
+        wb.close()
+
+        # 4. Mostrar resultados en messagebox
+        if rendimientos:
+            mensaje = (
+                f"📅 Fecha: {fecha_buscada}\n\n"
+                f"⚙️ Torno {torno_1}: {rendimientos.get('torno_1', 'N/D')}%\n"
+                f"⚙️ Torno {torno_2}: {rendimientos.get('torno_2', 'N/D')}%\n\n"
+                "Datos obtenidos correctamente del archivo local."
+            )
+            messagebox.showinfo("Resultados Obtenidos", mensaje)
+            return rendimientos
+        else:
+            messagebox.showwarning("Advertencia", 
+                f"No se encontraron rendimientos para:\nFecha: {fecha_buscada}\n"
+                f"Tornos: {torno_1} y {torno_2}")
             return None
 
-        return rendimientos
-
     except Exception as e:
-        print(f"Error al procesar archivo Peeling: {str(e)}")
+        messagebox.showerror("Error Crítico", 
+            f"Error al procesar archivo Peeling:\n{str(e)}\n\n"
+            "Recomendaciones:\n"
+            "1. Verifique que el archivo no esté abierto\n"
+            "2. Revise el formato de los datos")
         return None
 
 
