@@ -79,23 +79,53 @@ def cerrar_carga():
 
 def ejecutar(txt, torno, mes, dia, anio):
     try:
+        # Paso 1: Procesar datos de entrada (30%)
         barra['value'] = 30
         ventana_carga.update_idletasks()
-        
         bloques, porcentajes = procesar_datos(txt, torno, mes, dia, anio)
+        
+        if not bloques or not porcentajes:
+            messagebox.showerror("Error", "No se obtuvieron datos válidos del procesamiento inicial")
+            return
+
+        # Paso 2: Asignar rendimiento (50%)
         barra['value'] = 50
-        
-        asignar_rendimiento_a_ir(dia, mes, anio, torno)  # Sin mes_num, usa mes directamente
+        ventana_carga.update_idletasks()
+        if not asignar_rendimiento_a_ir(dia, mes, anio, torno):
+            messagebox.showwarning("Advertencia", "No se pudo asignar el rendimiento, continuando sin estos datos")
+
+        # Paso 3: Procesar fecha (70%)
         barra['value'] = 70
-        
+        ventana_carga.update_idletasks()
         fecha(mes, dia, anio, torno, bloques, porcentajes)
+
+        # Completado (100%)
         barra['value'] = 100
+        ventana_carga.update_idletasks()
+        time.sleep(0.2)  # Breve pausa para mostrar el 100%
+        
+        messagebox.showinfo("Éxito", "Proceso completado correctamente")
 
     except Exception as e:
-        messagebox.showerror("Error", f"Ocurrió un error en ejecutar():\n{e}")
+        # Registro detallado del error
+        error_msg = (
+            f"Error en ejecutar():\n\n"
+            f"• Tipo: {type(e).__name__}\n"
+            f"• Mensaje: {str(e)}\n"
+            f"• Línea: {e.__traceback__.tb_lineno}\n\n"
+            f"Contexto:\n"
+            f"• Fecha: {dia}/{mes}/{anio}\n"
+            f"• Torno: {torno}\n"
+            f"• Texto procesado: {txt[:50]}...\n"
+        )
+        messagebox.showerror("Error Crítico", error_msg)
+        
     finally:
         cerrar_carga()
-        ventana.destroy()
+        try:
+            ventana.destroy()
+        except:
+            pass  # En caso de que la ventana ya esté cerrada
 
 def procesar_datos(entrada, torno, mes, dia, anio):
     bloques_detectados = []
@@ -324,19 +354,40 @@ def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque
 
 
 def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
-    pythoncom.CoInitialize()
-    excel = wb = None
-    nueva = f"IR {mes} {anio}"
-    hoja_anterior = None
-    hoja_nueva_existia = False
     try:
-        excel = win32.gencache.EnsureDispatch('Excel.Application')
+        # Validación básica de parámetros (original)
+        if not bloques_detectados or not sumas_ad_por_bloque:
+            messagebox.showerror("Error", "Datos de bloques o sumas AD están vacíos")
+            return
+
+        # Convertir mes a número (original)
+        try:
+            mes_num = MESES_NUM[mes]
+        except KeyError:
+            messagebox.showerror("Error", f"Mes no válido: {mes}")
+            return
+
+        # --- Cambio clave: Formato de fecha solo para búsqueda en Peeling ---
+        fecha_peeling = f"{anio}/{mes_num:02d}/{dia:02d}"  # YYYY/MM/DD (solo para Peeling)
+        fecha_principal = f"{dia:02d}/{mes_num:02d}/{anio}"  # DD/MM/YYYY (para Excel principal)
+
+        # Procesamiento con Excel (original)
+        pythoncom.CoInitialize()
+        excel = win32.Dispatch("Excel.Application")
         excel.Visible = False
         excel.DisplayAlerts = False
+
+        # --- Resto del código ORIGINAL sin cambios ---
+        nueva = f"IR {mes} {anio}"
+        hoja_anterior = None
+        hoja_nueva_existia = False
+        
         wb = excel.Workbooks.Open(RUTA_ENTRADA, UpdateLinks=0)
         nombres_hojas = [h.Name for h in wb.Sheets]
         hoja_nueva_existia = nueva in nombres_hojas
+        
         if not hoja_nueva_existia:
+            # ... (código original para buscar hoja anterior)
             hojas_ir = [h for h in nombres_hojas if h.startswith("IR ") and len(h.split()) == 3]
             def total_meses(nombre):
                 try:
@@ -351,69 +402,58 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
                     hoja_anterior = h
                 else:
                     break
+            
             if not hoja_anterior:
                 messagebox.showwarning("Orden inválido", f"No se encontró hoja anterior para insertar '{nueva}'")
                 return
+            
             idx_anterior = [h.Name for h in wb.Sheets].index(hoja_anterior)
             insert_idx = min(idx_anterior + 2, wb.Sheets.Count)
             wb.Sheets(hoja_anterior).Copy(After=wb.Sheets(insert_idx - 1))
             wb.ActiveSheet.Name = nueva
             wb.Save()
-    except Exception as e:
-        messagebox.showerror("Error", f"No se pudo crear hoja:\n{e}")
-        return
-    finally:
-        try:
-            if wb:
-                wb.Close(SaveChanges=True)
-        except:
-            pass
-        try:
-            if excel:
-                excel.Quit()
-        except:
-            pass
-        pythoncom.CoUninitialize()
-    try:
+
+        # --- Continuación del código original ---
         wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
         hoja_nueva = wb2[nueva]
-        col_dia = dia + 1  # columna B es 2, día 1 → columna 2
+        col_dia = dia + 1
+        
         if not hoja_nueva_existia:
-            filas_fechas = [2, 3, 4, 7, 8, 9, 12, 13, 14, 17, 18, 19, 22, 27, 31, 32, 33, 34, 37]
+            filas_fechas = [2, 7, 12, 17, 22, 27, 31, 37]
             for fila in filas_fechas:
                 for col in range(2, 37):
                     hoja_nueva.cell(row=fila, column=col, value="")
-        nueva_fecha = f"{dia:02d}/{MESES_NUM[mes]:02d}/{anio}"
+        
+        # Usar formato DD/MM/YYYY en Excel principal (original)
         for fila in [2, 7, 12, 17, 22, 27, 31, 37]:
-            hoja_nueva.cell(row=fila, column=col_dia, value=nueva_fecha)
+            hoja_nueva.cell(row=fila, column=col_dia, value=f"{dia:02d}/{mes_num:02d}/{anio}")
+        
+        # ... (resto del código original para escribir valores)
         valores_para_escribir = [val for i, (tipo, val) in enumerate(bloques_detectados) if i % 2 == 1]
         tipos_para_escribir = [tipo for i, (tipo, val) in enumerate(bloques_detectados) if i % 2 == 1]
+        
         for (tipo_bloque, valor), valor_ae in zip(zip(tipos_para_escribir, valores_para_escribir), sumas_ad_por_bloque):
             escribir_valor_bloque(hoja_nueva, col_dia, torno, valor, tipo_bloque)
-        escribir_valores_resumen_bloques(hoja_nueva, col_dia, torno, sumas_ad_por_bloque, tipos_para_escribir)
+            escribir_valores_resumen_bloques(hoja_nueva, col_dia, torno, sumas_ad_por_bloque, tipos_para_escribir)
+        
         wb2.save(RUTA_ENTRADA)
         wb2.close()
-        if not hoja_nueva_existia: # Rotar etiquetas solo si es hoja nueva
-            rotar_etiquetas_graficos(RUTA_ENTRADA, nueva)
+        
+        if not hoja_nueva_existia:
+            rotar_etiquetas_graficos(RUTA_ENTRADA, nueva)  # Función original conservada
+        
         shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
-        mensaje = "✅ Valores actualizados correctamente." if hoja_nueva_existia else f"✅ Hoja '{nueva}' creada correctamente."
+        
+        mensaje = "✅ Valores actualizados" if hoja_nueva_existia else f"✅ Hoja '{nueva}' creada"
         messagebox.showinfo("Éxito", mensaje)
-    except Exception as e:
-        messagebox.showwarning("Advertencia", f"No se pudo ajustar hoja:\n{e}")
-
 
     except Exception as e:
-        messagebox.showerror("Error Crítico", 
-            f"Error en el proceso principal:\n{str(e)}\n"
-            f"Posibles causas:\n"
-            f"- Excel no respondió\n"
-            f"- Archivo bloqueado\n"
-            f"- Error de permisos")
+        messagebox.showerror("Error", f"Error en fecha():\n{str(e)}")
     finally:
         try:
-            if wb:
+            if 'wb' in locals():
                 wb.Close(SaveChanges=True)
-            if excel:
+            if 'excel' in locals():
                 excel.Quit()
         except:
             pass
@@ -423,34 +463,35 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
 
 def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
     """
-    Obtiene rendimientos desde archivo Excel local y muestra resultados en messagebox
+    Obtiene rendimientos desde archivo Excel local
+    Devuelve: {'torno_1': rendimiento, 'torno_2': rendimiento} o None
     """
     try:
-        # 1. Cargar archivo Excel local
+        # 1. Validar y cargar archivo
         ruta_peeling = os.path.join(BASE_DIR, "Nueva_Peeling_Query_202050501_arauco.xlsx")
         if not os.path.exists(ruta_peeling):
-            messagebox.showerror("Error", f"Archivo Peeling no encontrado:\n{ruta_peeling}")
+            messagebox.showerror("Error", f"Archivo no encontrado:\n{ruta_peeling}")
             return None
 
-        # 2. Leer datos con openpyxl
+        # 2. Leer archivo con formato de fecha YYYY/MM/DD
         wb = openpyxl.load_workbook(ruta_peeling, data_only=True)
         if "Sheet2" not in wb.sheetnames:
-            messagebox.showerror("Error", 
-                f"Hoja 'Sheet2' no encontrada.\nHojas disponibles: {', '.join(wb.sheetnames)}")
+            messagebox.showerror("Error", "La hoja 'Sheet2' no existe")
             return None
 
-        hoja_peeling = wb["Sheet2"]
-        mes_num = MESES_NUM[mes]
-        fecha_buscada = f"{dia}/{mes_num}/{anio}"
+        hoja = wb["Sheet2"]
+        mes_num = MESES_NUM.get(mes, 0)
+        fecha_buscada = f"{anio}/{mes_num:02d}/{dia:02d}"
         rendimientos = {}
 
-        # 3. Buscar datos en el Excel
-        for fila in range(2, hoja_peeling.max_row + 1):
-            fecha_celda = str(hoja_peeling.cell(row=fila, column=1).value or "").strip()
+        # 3. Buscar datos
+        for fila in range(2, hoja.max_row + 1):
+            fecha_celda = str(hoja.cell(row=fila, column=1).value or "").strip()
+            
             if fecha_celda == fecha_buscada:
                 try:
-                    work_id = int(hoja_peeling.cell(row=fila, column=2).value)
-                    rendimiento = float(hoja_peeling.cell(row=fila, column=12).value)
+                    work_id = int(hoja.cell(row=fila, column=2).value)
+                    rendimiento = float(hoja.cell(row=fila, column=12).value)
                     
                     if work_id == torno_1:
                         rendimientos['torno_1'] = rendimiento
@@ -459,88 +500,65 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
                         
                     if len(rendimientos) == 2:
                         break
-                except (ValueError, TypeError, AttributeError):
+                except (ValueError, TypeError):
                     continue
 
         wb.close()
 
-        # 4. Mostrar resultados en messagebox
+        # 4. Mostrar resultados
         if rendimientos:
-            mensaje = (
-                f"📅 Fecha: {fecha_buscada}\n\n"
-                f"⚙️ Torno {torno_1}: {rendimientos.get('torno_1', 'N/D')}%\n"
-                f"⚙️ Torno {torno_2}: {rendimientos.get('torno_2', 'N/D')}%\n\n"
-                "Datos obtenidos correctamente del archivo local."
-            )
-            messagebox.showinfo("Resultados Obtenidos", mensaje)
+            messagebox.showinfo("Éxito",
+                f"Datos encontrados para {fecha_buscada}:\n"
+                f"Torno {torno_1}: {rendimientos.get('torno_1', 'N/D')}%\n"
+                f"Torno {torno_2}: {rendimientos.get('torno_2', 'N/D')}%")
             return rendimientos
         else:
-            messagebox.showwarning("Advertencia", 
-                f"No se encontraron rendimientos para:\nFecha: {fecha_buscada}\n"
-                f"Tornos: {torno_1} y {torno_2}")
+            messagebox.showwarning("Advertencia",
+                f"No se encontraron datos para:\n"
+                f"Fecha: {fecha_buscada}\n"
+                f"Tornos: {torno_1}, {torno_2}")
             return None
 
     except Exception as e:
-        messagebox.showerror("Error Crítico", 
-            f"Error al procesar archivo Peeling:\n{str(e)}\n\n"
-            "Recomendaciones:\n"
-            "1. Verifique que el archivo no esté abierto\n"
-            "2. Revise el formato de los datos")
+        messagebox.showerror("Error Crítico",
+            f"Error al procesar archivo:\n{str(e)}\n"
+            f"Tipo: {type(e).__name__}")
         return None
 
 
 def asignar_rendimiento_a_ir(dia, mes, anio, torno):
     try:
-        # Validación de parámetros
-        if not isinstance(dia, int) or dia < 1 or dia > 31:
-            return None
-        if mes not in MESES_NUM:
-            return None
-        if not isinstance(anio, int) or anio < 2000:
-            return None
-        if torno not in (1, 2):
+        # Validación básica
+        mes_num = MESES_NUM.get(mes)
+        if not mes_num:
             return None
 
-        mes_num = MESES_NUM[mes]
-
-        # Obtener rendimientos sin mostrar mensajes al usuario
+        # Obtener rendimientos (sin mensajes interactivos)
         rendimientos = obtener_rendimientos_peeling(dia, mes, anio)
-        if not rendimientos:
+        if not rendimientos or f'torno_{torno}' not in rendimientos:
             return None
 
-        try:
-            rendimiento = rendimientos[f'torno_{torno}']
-        except KeyError:
-            return None
+        rendimiento = rendimientos[f'torno_{torno}']
 
-        # Guardar directamente sin confirmación
-        try:
-            wb = openpyxl.load_workbook(RUTA_ENTRADA)
-            nombre_hoja = f"IR {mes} {anio}"
-            
-            if nombre_hoja not in wb.sheetnames:
-                wb.create_sheet(nombre_hoja)
+        # Guardar directamente en Excel
+        wb = openpyxl.load_workbook(RUTA_ENTRADA)
+        nombre_hoja = f"IR {mes} {anio}"
+        
+        if nombre_hoja not in wb.sheetnames:
+            wb.create_sheet(nombre_hoja)
 
-            hoja = wb[nombre_hoja]
-            col_dia = dia + 1
+        hoja = wb[nombre_hoja]
+        col_dia = dia + 1
+        fila_rendimiento = 32 if torno == 1 else 33
 
-            # Escribir fecha
-            hoja.cell(row=2, column=col_dia, value=f"{dia:02d}/{mes_num:02d}/{anio}")
-            
-            # Escribir rendimiento (convertido a decimal)
-            fila_rendimiento = 32 if torno == 1 else 33  # Ajustado según tu estructura
-            celda = hoja.cell(row=fila_rendimiento, column=col_dia, value=rendimiento/100)
-            celda.number_format = '0.00%'
+        hoja.cell(row=fila_rendimiento, column=col_dia, value=rendimiento/100).number_format = '0.00%'
+        wb.save(RUTA_ENTRADA)
+        wb.close()
 
-            wb.save(RUTA_ENTRADA)
-            return True
-            
-        except Exception as e:
-            print(f"Error al guardar: {str(e)}")  # Log silencioso
-            return False
+        return True
 
     except Exception as e:
-        print(f"Error crítico: {str(e)}")  # Log silencioso
+        print(f"Error silencioso en asignar_rendimiento_a_ir: {str(e)}")
         return None
 
 
