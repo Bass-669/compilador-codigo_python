@@ -88,11 +88,7 @@ def ejecutar(txt, torno, mes, dia, anio):
         asignar_rendimiento_a_ir(dia, mes, anio, torno)  # Sin mes_num, usa mes directamente
         barra['value'] = 70
         
-        if bloques is not None and porcentajes is not None:
-            fecha(mes, dia, anio, torno, bloques, porcentajes)
-        else:
-            messagebox.showwarning("Advertencia", "No se pudo procesar los datos.")
-        
+        fecha(mes, dia, anio, torno, bloques, porcentajes)
         barra['value'] = 100
     except Exception as e:
         messagebox.showerror("Error", f"Ocurrió un error en ejecutar():\n{e}")
