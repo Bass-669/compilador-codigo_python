@@ -549,9 +549,9 @@ def asignar_rendimiento_a_ir(dia, mes, anio, torno):
         messagebox.showerror("Error", f"Error al guardar rendimiento: {str(e)}")
         return False
 
-except Exception as e:
-    messagebox.showerror("Error", f"Error general: {str(e)}")
-    return None
+    except Exception as e:
+        messagebox.showerror("Error", f"Error general: {str(e)}")
+        return None
 
 
 ventana = tk.Tk()
