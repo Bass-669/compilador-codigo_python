@@ -232,36 +232,6 @@ def crear_archivo_temporal_con_ae(celda_origen):
             pass
         pythoncom.CoUninitialize()
 
-# def crear_archivo_temporal_con_ae(celda_origen):
-#     pythoncom.CoInitialize()
-#     excel = win32.Dispatch("Excel.Application")
-#     excel.Visible = False
-#     excel.DisplayAlerts = False
-#     try:
-#         wb = excel.Workbooks.Open(RUTA_ENTRADA)
-#         hoja = wb.Sheets("IR diario ")
-#         fila = int(''.join(filter(str.isdigit, celda_origen))) # Obtener número de fila desde celda_origen
-#         hoja.Range(celda_origen).Copy() # Copiar la celda con fórmula de AD{fila}
-#         celda_destino = f"AE{fila}" # Pegar solo el valor en AE{fila}
-#         hoja.Range(celda_destino).PasteSpecial(Paste=-4163)  # xlPasteValues
-#         valor_pego = hoja.Range(celda_destino).Value
-#         temp_path = os.path.join(BASE_DIR, CARPETA, "temp_report.xlsx")
-#         wb.SaveAs(temp_path)
-#         wb.Close(False)
-#         excel.Quit()
-#         wb_temp = openpyxl.load_workbook(temp_path, data_only=True)
-#         hoja_temp = wb_temp["IR diario "]
-#         valor_final = hoja_temp.cell(row=fila, column=31).value
-#         wb_temp.close()
-#         return temp_path, float(valor_final) if valor_final else 0.0
-#     except Exception as e:
-#         excel.Quit()
-#         pythoncom.CoUninitialize()
-#         messagebox.showerror("Error", f"No se pudo generar archivo temporal:\n{e}")
-#         return None, 0.0
-#     finally:
-#         pythoncom.CoUninitialize()
-
 def escribir(hoja, f, c, v, num=False):
     celda = hoja.cell(row=f, column=c, value=v)
     celda.border, celda.alignment = BORDER, ALIGN_R
