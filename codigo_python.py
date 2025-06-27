@@ -24,7 +24,11 @@ FILL_AMARILLO = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type=
 bloques_detectados = []
 sumas_ad_por_bloque = []
 
+def debug_msg(title, message):
+    messagebox.showinfo(f"DEBUG - {title}", message)
+
 def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
+    debug_msg("obtener_rendimientos_peeling", f"Inicio - dia:{dia}, mes:{mes}, anio:{anio}")
     try:
         ruta_peeling = os.path.join(BASE_DIR, "Nueva_Peeling_Query_202050501_arauco.xlsx")
         if not os.path.exists(ruta_peeling):
@@ -76,6 +80,7 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
             wb.close()
 
 def asignar_rendimiento_a_ir(dia, mes, anio, torno):
+    debug_msg("asignar rendimiento a ir", f"Inicio - dia:{dia}, mes:{mes}, anio:{anio}")
     try:
         # Validación básica
         mes_num = MESES_NUM.get(mes)
@@ -196,6 +201,7 @@ def ejecutar(txt, torno, mes, dia, anio):
         ventana.destroy()
 
 def procesar_datos(entrada, torno, mes, dia, anio):
+    debug_msg("procesar_datos", f"Inicio - torno:{torno}, mes:{mes}, dia:{dia}, anio:{anio}")
     bloques_detectados = []
     sumas_ad_por_bloque = []
     if not os.path.exists(RUTA_ENTRADA):
@@ -386,6 +392,7 @@ def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque
         celda.number_format = '0.00%'
 
 def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
+    debug_msg("fecha", f"Inicio - mes:{mes}, dia:{dia}, anio:{anio}, torno:{torno}")
     pythoncom.CoInitialize()
     excel = wb = None
     nueva = f"IR {mes} {anio}"
