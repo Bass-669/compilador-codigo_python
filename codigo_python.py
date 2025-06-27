@@ -79,46 +79,44 @@ def cerrar_carga():
 
 def ejecutar(txt, torno, mes, dia, anio):
     try:
-        # Paso 1: Procesar datos de entrada (30%)
+        # Paso 1: Procesar datos de entrada
         barra['value'] = 30
         ventana_carga.update_idletasks()
         bloques, porcentajes = procesar_datos(txt, torno, mes, dia, anio)
         
         if not bloques or not porcentajes:
-            messagebox.showerror("Error", "No se obtuvieron datos válidos del procesamiento inicial")
+            messagebox.showerror("Error", "No se obtuvieron datos válidos")
             return
 
-        # Paso 2: Asignar rendimiento (50%)
+        # Paso 2: Asignar rendimiento con manejo de espera
         barra['value'] = 50
         ventana_carga.update_idletasks()
+        
         if not asignar_rendimiento_a_ir(dia, mes, anio, torno):
-            messagebox.showwarning("Advertencia", "No se pudo asignar el rendimiento, continuando sin estos datos")
+            messagebox.showwarning("Advertencia", "No se pudo asignar rendimiento")
+        
+        # Espera adicional para asegurar cierre de archivos
+        time.sleep(1)
 
-        # Paso 3: Procesar fecha (70%)
+        # Paso 3: Procesar fecha
         barra['value'] = 70
         ventana_carga.update_idletasks()
         fecha(mes, dia, anio, torno, bloques, porcentajes)
 
-        # Completado (100%)
         barra['value'] = 100
         ventana_carga.update_idletasks()
-        time.sleep(0.2)  # Breve pausa para mostrar el 100%
+        time.sleep(0.5)
         
-        messagebox.showinfo("Éxito", "Proceso completado correctamente")
+        messagebox.showinfo("Éxito", "Proceso completado")
 
     except Exception as e:
-        # Registro detallado del error
-        error_msg = (
-            f"Error en ejecutar():\n\n"
-            f"• Tipo: {type(e).__name__}\n"
-            f"• Mensaje: {str(e)}\n"
-            f"• Línea: {e.__traceback__.tb_lineno}\n\n"
-            f"Contexto:\n"
-            f"• Fecha: {dia}/{mes}/{anio}\n"
-            f"• Torno: {torno}\n"
-            f"• Texto procesado: {txt[:50]}...\n"
-        )
-        messagebox.showerror("Error Crítico", error_msg)
+        messagebox.showerror("Error Crítico", f"Error en ejecutar():\n{str(e)}")
+    finally:
+        cerrar_carga()
+        try:
+            ventana.destroy()
+        except:
+            pass
         
     finally:
         cerrar_carga()
@@ -468,60 +466,49 @@ def obtener_rendimientos_peeling(dia, mes, anio, torno_1=3011, torno_2=3012):
             messagebox.showerror("Error", f"Archivo no encontrado:\n{ruta_peeling}")
             return None
 
-        wb = openpyxl.load_workbook(ruta_peeling, data_only=True)
-        if "Sheet2" not in wb.sheetnames:
-            messagebox.showerror("Error", "La hoja 'Sheet2' no existe")
-            return None
+        # Usar with statement para manejo automático del archivo
+        wb = None
+        try:
+            wb = openpyxl.load_workbook(ruta_peeling, data_only=True, read_only=True)  # Modo read-only
+            if "Sheet2" not in wb.sheetnames:
+                messagebox.showerror("Error", "La hoja 'Sheet2' no existe")
+                return None
 
-        hoja = wb["Sheet2"]
-        mes_num = MESES_NUM.get(mes, 0)
-        
-        # Búsqueda con múltiples formatos de fecha
-        formatos_fecha = [
-            f"{anio}/{mes_num:02d}/{dia:02d}",  # YYYY/MM/DD
-            f"{dia}/{mes_num}/{anio}",          # DD/MM/YYYY
-            f"{dia}-{mes_num}-{anio}",          # DD-MM-YYYY
-            f"{anio}-{mes_num:02d}-{dia:02d}"   # YYYY-MM-DD
-        ]
-
-        rendimientos = {}
-        
-        for fila in range(2, hoja.max_row + 1):
-            fecha_celda = str(hoja.cell(row=fila, column=1).value or "").strip()
+            hoja = wb["Sheet2"]
+            mes_num = MESES_NUM.get(mes, 0)
             
-            # Verificar todos los formatos posibles
-            if fecha_celda in formatos_fecha:
-                try:
-                    work_id = int(hoja.cell(row=fila, column=2).value)
-                    rendimiento = float(hoja.cell(row=fila, column=12).value)
-                    
-                    if work_id == torno_1:
-                        rendimientos['torno_1'] = rendimiento
-                    elif work_id == torno_2:
-                        rendimientos['torno_2'] = rendimiento
+            formatos_fecha = [
+                f"{anio}/{mes_num:02d}/{dia:02d}",
+                f"{dia}/{mes_num}/{anio}",
+                f"{dia}-{mes_num}-{anio}",
+                f"{anio}-{mes_num:02d}-{dia:02d}"
+            ]
+
+            rendimientos = {}
+            
+            for fila in range(2, hoja.max_row + 1):
+                fecha_celda = str(hoja.cell(row=fila, column=1).value or "").strip()
+                
+                if fecha_celda in formatos_fecha:
+                    try:
+                        work_id = int(hoja.cell(row=fila, column=2).value)
+                        rendimiento = float(hoja.cell(row=fila, column=12).value)
                         
-                    if len(rendimientos) == 2:
-                        break
-                except (ValueError, TypeError):
-                    continue
+                        if work_id == torno_1:
+                            rendimientos['torno_1'] = rendimiento
+                        elif work_id == torno_2:
+                            rendimientos['torno_2'] = rendimiento
+                            
+                        if len(rendimientos) == 2:
+                            break
+                    except (ValueError, TypeError):
+                        continue
 
-        wb.close()
+            return rendimientos if rendimientos else None
 
-        if not rendimientos:
-            # Mensaje más informativo
-            messagebox.showwarning("Datos no encontrados",
-                f"No se encontraron rendimientos para:\n\n"
-                f"• Fecha buscada: {anio}/{mes_num:02d}/{dia:02d}\n"
-                f"• Formatos alternativos probados:\n"
-                f"  - {formatos_fecha[1]}\n"
-                f"  - {formatos_fecha[2]}\n"
-                f"• Tornos: {torno_1} y {torno_2}\n\n"
-                "Verifique:\n"
-                "1. Que la fecha existe en el reporte\n"
-                "2. El formato de fecha en el archivo")
-            return None
-
-        return rendimientos
+        finally:
+            if wb:
+                wb.close()  # Cierre explícito
 
     except Exception as e:
         messagebox.showerror("Error", f"Error al leer archivo:\n{str(e)}")
@@ -557,11 +544,20 @@ def asignar_rendimiento_a_ir(dia, mes, anio, torno):
         wb.save(RUTA_ENTRADA)
         wb.close()
 
+        # Pequeña pausa para asegurar el cierre
+        time.sleep(0.5)
+        
         return True
-
+    except PermissionError:
+        messagebox.showerror("Error", "No se pudo guardar - archivo en uso o sin permisos")
+        return False
     except Exception as e:
-        print(f"Error silencioso en asignar_rendimiento_a_ir: {str(e)}")
-        return None
+        messagebox.showerror("Error", f"Error al guardar rendimiento: {str(e)}")
+        return False
+
+except Exception as e:
+    messagebox.showerror("Error", f"Error general: {str(e)}")
+    return None
 
 
 ventana = tk.Tk()
