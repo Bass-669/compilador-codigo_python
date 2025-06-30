@@ -998,13 +998,112 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
 #         return False
 
 
+# def preparar_hoja_mes(mes, dia, anio):
+#     """Crea la hoja del mes si no existe, y limpia los datos del día si es nueva o está vacía."""
+#     nombre_hoja = f"IR {mes} {anio}"
+#     col_dia = dia + 1
+#     hoja_nueva_creada = False
+
+#     # 1. Verificar si ya existe la hoja
+#     try:
+#         wb_check = openpyxl.load_workbook(RUTA_ENTRADA)
+#         if nombre_hoja in wb_check.sheetnames:
+#             wb_check.close()
+#         else:
+#             wb_check.close()
+#             pythoncom.CoInitialize()
+#             excel = wb = None
+#             try:
+#                 excel = win32.gencache.EnsureDispatch('Excel.Application')
+#                 excel.Visible = False
+#                 excel.DisplayAlerts = False
+#                 wb = excel.Workbooks.Open(RUTA_ENTRADA, UpdateLinks=0)
+
+#                 hojas = [h.Name for h in wb.Sheets]
+#                 hojas_ir = [h for h in hojas if h.startswith("IR ") and len(h.split()) == 3]
+
+#                 def total_meses(nombre):
+#                     try:
+#                         _, mes_str, anio_str = nombre.split()
+#                         return int(anio_str) * 12 + MESES_NUM[mes_str]
+#                     except:
+#                         return -1
+
+#                 hojas_ordenadas = sorted(hojas_ir, key=total_meses)
+#                 total_nueva = int(anio) * 12 + MESES_NUM[mes]
+#                 hoja_anterior = None
+#                 for h in hojas_ordenadas:
+#                     if total_meses(h) < total_nueva:
+#                         hoja_anterior = h
+#                     else:
+#                         break
+
+#                 if not hoja_anterior:
+#                     messagebox.showwarning("Orden inválido", f"No se encontró hoja anterior para insertar '{nombre_hoja}'")
+#                     return False
+
+#                 idx_anterior = hojas.index(hoja_anterior)
+#                 insert_idx = min(idx_anterior + 2, wb.Sheets.Count + 1)
+
+#                 # Capturar nombres antes de copiar
+#                 nombres_antes = [s.Name for s in wb.Sheets]
+#                 wb.Sheets(hoja_anterior).Copy(After=wb.Sheets(insert_idx - 1))
+#                 # Detectar hoja recién copiada
+#                 nombres_despues = [s.Name for s in wb.Sheets]
+#                 nueva_temporal = list(set(nombres_despues) - set(nombres_antes))
+#                 if not nueva_temporal:
+#                     messagebox.showerror("Error", "No se pudo identificar hoja copiada")
+#                     return False
+#                 hoja_copiada = wb.Sheets(nueva_temporal[0])
+#                 hoja_copiada.Name = nombre_hoja
+#                 wb.Save()
+#                 hoja_nueva_creada = True
+
+#             except Exception as e:
+#                 messagebox.showerror("Error", f"No se pudo crear hoja nueva:\n{e}")
+#                 return False
+#             finally:
+#                 try:
+#                     if wb: wb.Close(SaveChanges=True)
+#                 except: pass
+#                 try:
+#                     if excel: excel.Quit()
+#                 except: pass
+#                 pythoncom.CoUninitialize()
+#                 time.sleep(1)
+#                 rotar_etiquetas_graficos(RUTA_ENTRADA, nombre_hoja)
+
+#         # 2. Limpiar datos y escribir fecha
+#         wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
+#         hoja = wb2[nombre_hoja]
+
+#         if hoja_nueva_creada or hoja.cell(row=2, column=col_dia).value is None:
+#             filas_fechas = [2, 3, 4, 7, 8, 9, 12, 13, 14, 17, 18, 19, 22, 27, 31, 37]
+#             for fila in filas_fechas:
+#                 for col in range(2, 33):
+#                     celda = hoja.cell(row=fila, column=col)
+#                     if not isinstance(celda, openpyxl.cell.cell.MergedCell):
+#                         celda.value = ""
+
+#             nueva_fecha = f"{dia:02d}/{MESES_NUM[mes]:02d}/{anio}"
+#             for fila in [2, 7, 12, 17, 22, 27, 31, 37]:
+#                 hoja.cell(row=fila, column=col_dia, value=nueva_fecha)
+
+#             wb2.save(RUTA_ENTRADA)
+#         wb2.close()
+#         return True
+
+#     except Exception as e:
+#         messagebox.showerror("Error", f"Error al preparar hoja:\n{e}")
+#         return False # funcional pero falta rotar las etiquetas
+
+
 def preparar_hoja_mes(mes, dia, anio):
-    """Crea la hoja del mes si no existe, y limpia los datos del día si es nueva o está vacía."""
+    """Crea la hoja del mes si no existe, limpia el día y rota etiquetas como en la función fecha() antigua."""
     nombre_hoja = f"IR {mes} {anio}"
     col_dia = dia + 1
     hoja_nueva_creada = False
 
-    # 1. Verificar si ya existe la hoja
     try:
         wb_check = openpyxl.load_workbook(RUTA_ENTRADA)
         if nombre_hoja in wb_check.sheetnames:
@@ -1045,10 +1144,8 @@ def preparar_hoja_mes(mes, dia, anio):
                 idx_anterior = hojas.index(hoja_anterior)
                 insert_idx = min(idx_anterior + 2, wb.Sheets.Count + 1)
 
-                # Capturar nombres antes de copiar
                 nombres_antes = [s.Name for s in wb.Sheets]
                 wb.Sheets(hoja_anterior).Copy(After=wb.Sheets(insert_idx - 1))
-                # Detectar hoja recién copiada
                 nombres_despues = [s.Name for s in wb.Sheets]
                 nueva_temporal = list(set(nombres_despues) - set(nombres_antes))
                 if not nueva_temporal:
@@ -1056,6 +1153,7 @@ def preparar_hoja_mes(mes, dia, anio):
                     return False
                 hoja_copiada = wb.Sheets(nueva_temporal[0])
                 hoja_copiada.Name = nombre_hoja
+
                 wb.Save()
                 hoja_nueva_creada = True
 
@@ -1070,13 +1168,13 @@ def preparar_hoja_mes(mes, dia, anio):
                     if excel: excel.Quit()
                 except: pass
                 pythoncom.CoUninitialize()
-                time.sleep(1)
-                rotar_etiquetas_graficos(RUTA_ENTRADA, nombre_hoja)
 
-        # 2. Limpiar datos y escribir fecha
+            # 💡 Aquí es donde se rotaban etiquetas en tu función original
+            rotar_etiquetas_graficos(RUTA_ENTRADA, nombre_hoja)
+
+        # Limpiar datos del día y escribir fecha
         wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
         hoja = wb2[nombre_hoja]
-
         if hoja_nueva_creada or hoja.cell(row=2, column=col_dia).value is None:
             filas_fechas = [2, 3, 4, 7, 8, 9, 12, 13, 14, 17, 18, 19, 22, 27, 31, 37]
             for fila in filas_fechas:
