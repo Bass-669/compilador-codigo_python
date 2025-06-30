@@ -853,7 +853,7 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                         hoja.cell(row=f, column=30, value=f"=IFERROR(AC{f}*D{f}/D{f_fin}, 0)")
                 
                 # Configurar celda de autosuma (última fila del bloque)
-                for col in range(25, 29):
+                for col in range(25, 30):# 29
                     hoja.cell(row=f_fin, column=col, value="")
                 
                 celda_autosuma = hoja.cell(row=f_fin, column=30)
