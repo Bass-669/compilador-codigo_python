@@ -1297,53 +1297,89 @@ def preparar_hoja_mes(mes, dia, anio):
 
 
 def rotar_etiquetas_graficos(ruta_archivo, nombre_hoja):
-    """Rota etiquetas de eje X en los gráficos de la hoja indicada."""
+    """Rota etiquetas de eje X en los gráficos de la hoja indicada.
+    
+    Args:
+        ruta_archivo (str): Ruta completa al archivo Excel
+        nombre_hoja (str): Nombre de la hoja que contiene los gráficos
+        
+    Returns:
+        bool: True si la operación fue exitosa, False si hubo errores
+    """
     pythoncom.CoInitialize()
     excel = wb = None
+    resultado = False
+    
     try:
-        messagebox.showinfo(f"[INFO] Rotando etiquetas de gráficos en hoja '{nombre_hoja}'...")
+        # Iniciar Excel en modo silencioso
         excel = win32.Dispatch("Excel.Application")
         excel.Visible = False
         excel.DisplayAlerts = False
         excel.ScreenUpdating = False
 
+        # Abrir el libro de trabajo
         wb = excel.Workbooks.Open(os.path.abspath(ruta_archivo))
+        
+        # Verificar si la hoja existe
         if nombre_hoja not in [s.Name for s in wb.Sheets]:
-            messagebox.showinfo(f"[ADVERTENCIA] Hoja '{nombre_hoja}' no encontrada.")
-            return
+            messagebox.showerror("Error", f"No se encontró la hoja '{nombre_hoja}'")
+            return False
 
         sheet = wb.Sheets(nombre_hoja)
         graficos = sheet.ChartObjects()
-        messagebox.showinfo(f"[INFO] Se encontraron {graficos.Count} gráficos.")
-
+        total_graficos = graficos.Count
         rotados = 0
-        for chart_obj in graficos:
+        errores = 0
+
+        # Procesar cada gráfico
+        for i, chart_obj in enumerate(graficos, 1):
             try:
                 chart = chart_obj.Chart
-                if chart.HasAxis(1):  # 1 = xlCategory
+                if chart.HasAxis(1):  # 1 = xlCategory (eje X)
                     x_axis = chart.Axes(1)
                     x_axis.TickLabels.Orientation = 45
                     rotados += 1
             except Exception as e:
-                messagebox.showinfo(f"[ERROR] No se pudo rotar gráfico: {e}")
+                errores += 1
+                print(f"Error en gráfico {i}: {str(e)}")  # Log para depuración
 
+        # Guardar cambios
         wb.Save()
-        messagebox.showinfo(f"[OK] Se rotaron {rotados} gráficos.")
+        
+        # Mostrar resumen al usuario
+        if errores == 0:
+            messagebox.showinfo("Éxito", 
+                f"Se rotaron las etiquetas en {rotados} de {total_graficos} gráficos.")
+            resultado = True
+        else:
+            messagebox.showwarning("Advertencia", 
+                f"Se rotaron {rotados} gráficos, pero hubo {errores} errores.\n"
+                "Revise la consola para más detalles.")
+            resultado = False
+            
     except Exception as e:
-        messagebox.showinfo(f"[CRÍTICO] Error al rotar etiquetas: {e}")
+        messagebox.showerror("Error crítico", 
+            f"No se pudo completar la operación:\n{str(e)}")
+        print(f"Error detallado: {traceback.format_exc()}")  # Log completo
+        resultado = False
+        
     finally:
+        # Limpieza segura de recursos
         try:
             if wb:
-                wb.Close(SaveChanges=True)
-        except:
-            pass
+                wb.Close(SaveChanges=False)  # Ya guardamos antes si fue exitoso
+        except Exception as e:
+            print(f"Error al cerrar libro: {str(e)}")
+            
         try:
             if excel:
                 excel.Quit()
-        except:
-            pass
+        except Exception as e:
+            print(f"Error al cerrar Excel: {str(e)}")
+            
         pythoncom.CoUninitialize()
-
+        
+    return resultado
 
 
 ventana = tk.Tk()
