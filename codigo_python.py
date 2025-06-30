@@ -312,6 +312,130 @@ def ejecutar(txt, torno, mes, dia, anio):
 #             wb.close()
 
 
+# def procesar_datos(entrada, torno, mes, dia, anio):
+#     bloques_detectados = []
+#     sumas_ad_por_bloque = []
+    
+#     if not os.path.exists(RUTA_ENTRADA):
+#         messagebox.showerror("Error", f"No se encontró:\n{RUTA_ENTRADA}")
+#         return None, None
+
+#     try:
+#         wb = openpyxl.load_workbook(RUTA_ENTRADA)
+#         hoja = wb["IR diario "]
+#         ultima_fila = None
+        
+#         # 1. Buscar la última fila con "* * ..."
+#         for fila in hoja.iter_rows():
+#             if [str(c.value).strip() if c.value else "" for c in fila[:3]] == ["*", "*", "..."]:
+#                 ultima_fila = fila[0].row
+                
+#         if not ultima_fila:
+#             raise ValueError("No se encontró el marcador '* * ...'")
+            
+#         fila = ultima_fila + 1
+        
+#         # 2. Procesar cada bloque de datos
+#         for b in extraer_bloques(entrada):
+#             try:
+#                 f_ini = fila
+#                 subs = sub_bloques(b)
+#                 filas_validas = []
+#                 valores_d = []
+                
+#                 # 3. Procesar cada subbloque
+#                 for sub in subs:
+#                     txt = sub[0] if not re.match(r'^\d', sub[0]) else ""
+#                     datos = sub[1:] if txt else sub
+                    
+#                     # Construir datos de columnas
+#                     p = txt.split()
+#                     col_txt = (
+#                         [p[0], p[1], p[2], p[3], "", p[4]] if "*" in txt and len(p) >= 5 and p[0] == "*" else
+#                         ["*", "*", "...", "", "", ""] if "*" in txt else
+#                         [p[0], p[1], p[2], p[3], "", p[4]] if len(p) >= 5 else
+#                         ["", p[0], p[1], p[2], "", p[3]] if len(p) == 4 else
+#                         [""] * 6
+#                     )
+                    
+#                     col_nums = [val for l in datos for val in l.strip().split()]
+#                     fila_vals = col_txt + col_nums
+                    
+#                     # 4. Escribir valores en las celdas
+#                     for col, val in enumerate(fila_vals[:24], 1):
+#                         try:
+#                             n = float(val.replace(",", ".")) if 3 <= col <= 24 and val else val
+#                             escribir(hoja, fila, col, n, isinstance(n, float))
+#                         except:
+#                             escribir(hoja, fila, col, val)
+                    
+#                     # 5. Escribir metadatos (torno, fecha)
+#                     for col, val in zip(range(25, 29), [torno, mes, dia, anio]):
+#                         hoja.cell(row=fila, column=col, value=val).alignment = ALIGN_R
+                    
+#                     # 6. Verificar si la fila es válida
+#                     valor_d = hoja.cell(row=fila, column=4).value
+#                     valor_ad = hoja.cell(row=fila, column=30).value
+                    
+#                     if (valor_d not in (None, "#NIA", "#N/A", "") and 
+#                         str(valor_d).strip() and 
+#                         valor_ad not in (None, "#NIA", "#N/A", "")):
+#                         filas_validas.append(fila)
+#                         valores_d.append(float(str(valor_d).replace(",", ".")))
+                    
+#                     fila += 1
+                
+#                 f_fin = fila - 1
+                
+#                 # 7. Manejar fórmulas proporcionales
+#                 if len(subs) > 1 and filas_validas:
+#                     denominador = sum(valores_d)  # Usamos la suma de todos los valores D válidos
+#                     for f in filas_validas:
+#                         valor_d = float(str(hoja.cell(row=f, column=4).value).replace(",", "."))
+#                         formula = f"=IFERROR(AC{f}*D{f}/{denominador}, 0)"
+#                         hoja.cell(row=f, column=30, value=formula)
+                
+#                 # 8. Crear autosuma (excluyendo celdas inválidas)
+#                 celdas_validas = [f"AD{f}" for f in range(f_ini, f_fin + 1) 
+#                                 if f in filas_validas]
+                
+#                 formula_suma = f"=IFERROR(SUM({','.join(celdas_validas)}), 0)" if celdas_validas else "0"
+#                 celda_autosuma = hoja.cell(row=f_fin, column=30, value=formula_suma)
+#                 celda_autosuma.fill = FILL_AMARILLO
+                
+#                 # 9. Procesar archivo temporal para obtener valor AE
+#                 if filas_validas:
+#                     temp_path, valor_ae = crear_archivo_temporal_con_ae(f"AD{f_fin}")
+#                     sumas_ad_por_bloque.append(valor_ae if valor_ae is not None else 0.0)
+#                 else:
+#                     sumas_ad_por_bloque.append(0.0)
+                
+#                 # 10. Registrar información del bloque
+#                 tipo_bloque = "PODADO" if "PODADO" in " ".join(b).upper() else "REGULAR"
+#                 bloques_detectados.append((tipo_bloque, f_fin))
+                
+#                 # Guardar cambios después de cada bloque
+#                 wb.save(RUTA_ENTRADA)
+                
+#             except Exception as e:
+#                 print(f"Error procesando bloque: {str(e)}")
+#                 continue  # Continuar con el siguiente bloque
+        
+#         # 11. Crear copia de seguridad
+#         backup_path = os.path.join(CARPETA, "Reporte IR Tornos copia_de_seguridad.xlsx")
+#         shutil.copy(RUTA_ENTRADA, backup_path)
+        
+#         return bloques_detectados, sumas_ad_por_bloque
+        
+#     except Exception as e:
+#         messagebox.showerror("Error", f"Error general al procesar:\n{str(e)}")
+#         return None, None
+        
+#     finally:
+#         if 'wb' in locals():
+#             wb.close()
+
+
 def procesar_datos(entrada, torno, mes, dia, anio):
     bloques_detectados = []
     sumas_ad_por_bloque = []
@@ -344,7 +468,7 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                 valores_d = []
                 
                 # 3. Procesar cada subbloque
-                for sub in subs:
+                for i, sub in enumerate(subs):
                     txt = sub[0] if not re.match(r'^\d', sub[0]) else ""
                     datos = sub[1:] if txt else sub
                     
@@ -373,21 +497,22 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                     for col, val in zip(range(25, 29), [torno, mes, dia, anio]):
                         hoja.cell(row=fila, column=col, value=val).alignment = ALIGN_R
                     
-                    # 6. Verificar si la fila es válida
-                    valor_d = hoja.cell(row=fila, column=4).value
-                    valor_ad = hoja.cell(row=fila, column=30).value
-                    
-                    if (valor_d not in (None, "#NIA", "#N/A", "") and 
-                        str(valor_d).strip() and 
-                        valor_ad not in (None, "#NIA", "#N/A", "")):
-                        filas_validas.append(fila)
-                        valores_d.append(float(str(valor_d).replace(",", ".")))
+                    # 6. Verificar si la fila es válida (excepto la última del bloque)
+                    if i < len(subs) - 1:  # No es la última fila del bloque
+                        valor_d = hoja.cell(row=fila, column=4).value
+                        valor_ad = hoja.cell(row=fila, column=30).value if fila <= hoja.max_row else None
+                        
+                        if (valor_d not in (None, "#NIA", "#N/A", "") and 
+                            str(valor_d).strip() and 
+                            valor_ad not in (None, "#NIA", "#N/A", "")):
+                            filas_validas.append(fila)
+                            valores_d.append(float(str(valor_d).replace(",", ".")))
                     
                     fila += 1
                 
                 f_fin = fila - 1
                 
-                # 7. Manejar fórmulas proporcionales
+                # 7. Manejar fórmulas proporcionales (solo en filas válidas)
                 if len(subs) > 1 and filas_validas:
                     denominador = sum(valores_d)  # Usamos la suma de todos los valores D válidos
                     for f in filas_validas:
@@ -395,9 +520,8 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                         formula = f"=IFERROR(AC{f}*D{f}/{denominador}, 0)"
                         hoja.cell(row=f, column=30, value=formula)
                 
-                # 8. Crear autosuma (excluyendo celdas inválidas)
-                celdas_validas = [f"AD{f}" for f in range(f_ini, f_fin + 1) 
-                                if f in filas_validas]
+                # 8. Crear autosuma (excluyendo la última celda del bloque)
+                celdas_validas = [f"AD{f}" for f in filas_validas]  # Ya no incluye f_fin porque no se validó
                 
                 formula_suma = f"=IFERROR(SUM({','.join(celdas_validas)}), 0)" if celdas_validas else "0"
                 celda_autosuma = hoja.cell(row=f_fin, column=30, value=formula_suma)
@@ -434,6 +558,7 @@ def procesar_datos(entrada, torno, mes, dia, anio):
     finally:
         if 'wb' in locals():
             wb.close()
+
 
 def escribir(hoja, fila, col, valor, es_numero=False):
     celda = hoja.cell(row=fila, column=col, value=valor)
