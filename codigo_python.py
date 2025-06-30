@@ -1238,6 +1238,7 @@ def rotar_etiquetas_graficos(ruta_archivo, nombre_hoja):
     pythoncom.CoInitialize()
     excel = None
     wb = None
+    messagebox.showinfo(f"Entrando a la funcion de rotar etiquetas ")
     
     try:
         # Esperar un momento para asegurar que el archivo esté disponible
@@ -1270,7 +1271,7 @@ def rotar_etiquetas_graficos(ruta_archivo, nombre_hoja):
                     x_axis = chart.Axes(1)
                     x_axis.TickLabels.Orientation = 45
             except Exception as e:
-                print(f"Advertencia: Error al rotar etiquetas en gráfico - {str(e)}")
+                messagebox.showinfo(f"Advertencia: Error al rotar etiquetas en gráfico - {str(e)}")
                 continue
         
         # Guardar y cerrar
@@ -1278,7 +1279,7 @@ def rotar_etiquetas_graficos(ruta_archivo, nombre_hoja):
         return True
         
     except Exception as e:
-        print(f"Error crítico al rotar etiquetas: {str(e)}")
+        messagebox.showinfo(f"Error crítico al rotar etiquetas: {str(e)}")
         return False
     finally:
         # Cerrar en orden inverso
