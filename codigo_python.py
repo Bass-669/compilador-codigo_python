@@ -1233,59 +1233,108 @@ def preparar_hoja_mes(mes, dia, anio):
 #         pythoncom.CoUninitialize()
 
 
-def rotar_etiquetas_graficos(ruta_archivo, nombre_hoja):
-    """Función mejorada para rotar etiquetas con manejo robusto de errores"""
-    pythoncom.CoInitialize()
-    excel = None
-    wb = None
-    messagebox.showinfo(f"Entrando a la funcion de rotar etiquetas ")
+# def rotar_etiquetas_graficos(ruta_archivo, nombre_hoja):
+#     """Función mejorada para rotar etiquetas con manejo robusto de errores"""
+#     pythoncom.CoInitialize()
+#     excel = None
+#     wb = None
+#     messagebox.showinfo(f"Entrando a la funcion de rotar etiquetas ")
     
-    try:
-        # Esperar un momento para asegurar que el archivo esté disponible
-        time.sleep(1)
+#     try:
+#         # Esperar un momento para asegurar que el archivo esté disponible
+#         time.sleep(1)
         
+#         excel = win32.Dispatch("Excel.Application")
+#         excel.Visible = False
+#         excel.DisplayAlerts = False
+#         excel.ScreenUpdating = False
+        
+#         # Usar ruta absoluta y verificar que el archivo existe
+#         ruta_abs = os.path.abspath(ruta_archivo)
+#         if not os.path.exists(ruta_abs):
+#             raise FileNotFoundError(f"No se encontró el archivo: {ruta_abs}")
+        
+#         wb = excel.Workbooks.Open(ruta_abs)
+        
+#         # Verificar que la hoja existe
+#         if nombre_hoja not in [sh.Name for sh in wb.Sheets]:
+#             raise ValueError(f"No se encontró la hoja '{nombre_hoja}'")
+        
+#         sheet = wb.Sheets(nombre_hoja)
+        
+#         # Procesar gráficos con más manejo de errores
+#         for chart_obj in sheet.ChartObjects():
+#             try:
+#                 chart = chart_obj.Chart
+#                 # Verificar que el gráfico tiene ejes
+#                 if chart.HasAxis(1):  # Eje x
+#                     x_axis = chart.Axes(1)
+#                     x_axis.TickLabels.Orientation = 45
+#             except Exception as e:
+#                 messagebox.showinfo(f"Advertencia: Error al rotar etiquetas en gráfico - {str(e)}")
+#                 continue
+        
+#         # Guardar y cerrar
+#         wb.Save()
+#         return True
+        
+#     except Exception as e:
+#         messagebox.showinfo(f"Error crítico al rotar etiquetas: {str(e)}")
+#         return False
+#     finally:
+#         # Cerrar en orden inverso
+#         try:
+#             if wb:
+#                 wb.Close(True)
+#         except:
+#             pass
+#         try:
+#             if excel:
+#                 excel.Quit()
+#         except:
+#             pass
+#         pythoncom.CoUninitialize()
+
+
+def rotar_etiquetas_graficos(ruta_archivo, nombre_hoja):
+    """Rota etiquetas de eje X en los gráficos de la hoja indicada."""
+    pythoncom.CoInitialize()
+    excel = wb = None
+    try:
+        print(f"[INFO] Rotando etiquetas de gráficos en hoja '{nombre_hoja}'...")
         excel = win32.Dispatch("Excel.Application")
         excel.Visible = False
         excel.DisplayAlerts = False
         excel.ScreenUpdating = False
-        
-        # Usar ruta absoluta y verificar que el archivo existe
-        ruta_abs = os.path.abspath(ruta_archivo)
-        if not os.path.exists(ruta_abs):
-            raise FileNotFoundError(f"No se encontró el archivo: {ruta_abs}")
-        
-        wb = excel.Workbooks.Open(ruta_abs)
-        
-        # Verificar que la hoja existe
-        if nombre_hoja not in [sh.Name for sh in wb.Sheets]:
-            raise ValueError(f"No se encontró la hoja '{nombre_hoja}'")
-        
+
+        wb = excel.Workbooks.Open(os.path.abspath(ruta_archivo))
+        if nombre_hoja not in [s.Name for s in wb.Sheets]:
+            print(f"[ADVERTENCIA] Hoja '{nombre_hoja}' no encontrada.")
+            return
+
         sheet = wb.Sheets(nombre_hoja)
-        
-        # Procesar gráficos con más manejo de errores
-        for chart_obj in sheet.ChartObjects():
+        graficos = sheet.ChartObjects()
+        print(f"[INFO] Se encontraron {graficos.Count} gráficos.")
+
+        rotados = 0
+        for chart_obj in graficos:
             try:
                 chart = chart_obj.Chart
-                # Verificar que el gráfico tiene ejes
-                if chart.HasAxis(1):  # Eje x
+                if chart.HasAxis(1):  # 1 = xlCategory
                     x_axis = chart.Axes(1)
                     x_axis.TickLabels.Orientation = 45
+                    rotados += 1
             except Exception as e:
-                messagebox.showinfo(f"Advertencia: Error al rotar etiquetas en gráfico - {str(e)}")
-                continue
-        
-        # Guardar y cerrar
+                print(f"[ERROR] No se pudo rotar gráfico: {e}")
+
         wb.Save()
-        return True
-        
+        print(f"[OK] Se rotaron {rotados} gráficos.")
     except Exception as e:
-        messagebox.showinfo(f"Error crítico al rotar etiquetas: {str(e)}")
-        return False
+        print(f"[CRÍTICO] Error al rotar etiquetas: {e}")
     finally:
-        # Cerrar en orden inverso
         try:
             if wb:
-                wb.Close(True)
+                wb.Close(SaveChanges=True)
         except:
             pass
         try:
@@ -1294,6 +1343,7 @@ def rotar_etiquetas_graficos(ruta_archivo, nombre_hoja):
         except:
             pass
         pythoncom.CoUninitialize()
+
 
 
 ventana = tk.Tk()
