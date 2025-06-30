@@ -748,7 +748,7 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                 celda_autosuma = hoja.cell(row=f_fin, column=30)
                 celda_autosuma.value = f"=SUM(AD{f_ini}:AD{f_fin-1})"
                 celda_autosuma.fill = FILL_AMARILLO
-                
+                wb.save(RUTA_ENTRADA)
                 # Procesar archivo temporal con manejo de errores
                 try:
                     temp_path, valor_ae = crear_archivo_temporal_con_ae(f"AD{f_fin}")
