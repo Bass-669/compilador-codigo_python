@@ -1297,7 +1297,7 @@ def preparar_hoja_mes(mes, dia, anio):
 
 
 def rotar_etiquetas_graficos(ruta_archivo, nombre_hoja):
-    """Rota etiquetas de eje X en los gráficos de la hoja indicada.
+    """Rota etiquetas de eje X en los gráficos de la hoja indicada usando solo messagebox.
     
     Args:
         ruta_archivo (str): Ruta completa al archivo Excel
@@ -1330,6 +1330,7 @@ def rotar_etiquetas_graficos(ruta_archivo, nombre_hoja):
         total_graficos = graficos.Count
         rotados = 0
         errores = 0
+        detalles_errores = []
 
         # Procesar cada gráfico
         for i, chart_obj in enumerate(graficos, 1):
@@ -1341,7 +1342,7 @@ def rotar_etiquetas_graficos(ruta_archivo, nombre_hoja):
                     rotados += 1
             except Exception as e:
                 errores += 1
-                print(f"Error en gráfico {i}: {str(e)}")  # Log para depuración
+                detalles_errores.append(f"Gráfico {i}: {str(e)}")
 
         # Guardar cambios
         wb.Save()
@@ -1352,15 +1353,18 @@ def rotar_etiquetas_graficos(ruta_archivo, nombre_hoja):
                 f"Se rotaron las etiquetas en {rotados} de {total_graficos} gráficos.")
             resultado = True
         else:
-            messagebox.showwarning("Advertencia", 
-                f"Se rotaron {rotados} gráficos, pero hubo {errores} errores.\n"
-                "Revise la consola para más detalles.")
+            mensaje_error = f"Se rotaron {rotados} gráficos, pero hubo {errores} errores.\n"
+            if len(detalles_errores) > 0:
+                mensaje_error += "\nDetalles de errores:\n- " + "\n- ".join(detalles_errores[:3])  # Mostrar solo primeros 3 errores
+                if len(detalles_errores) > 3:
+                    mensaje_error += f"\n\n(y {len(detalles_errores)-3} errores más...)"
+            
+            messagebox.showwarning("Advertencia", mensaje_error)
             resultado = False
             
     except Exception as e:
         messagebox.showerror("Error crítico", 
             f"No se pudo completar la operación:\n{str(e)}")
-        print(f"Error detallado: {traceback.format_exc()}")  # Log completo
         resultado = False
         
     finally:
@@ -1368,14 +1372,14 @@ def rotar_etiquetas_graficos(ruta_archivo, nombre_hoja):
         try:
             if wb:
                 wb.Close(SaveChanges=False)  # Ya guardamos antes si fue exitoso
-        except Exception as e:
-            print(f"Error al cerrar libro: {str(e)}")
+        except:
+            pass
             
         try:
             if excel:
                 excel.Quit()
-        except Exception as e:
-            print(f"Error al cerrar Excel: {str(e)}")
+        except:
+            pass
             
         pythoncom.CoUninitialize()
         
