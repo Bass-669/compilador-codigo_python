@@ -1056,7 +1056,6 @@ def preparar_hoja_mes(mes, dia, anio):
                     return False
                 hoja_copiada = wb.Sheets(nueva_temporal[0])
                 hoja_copiada.Name = nombre_hoja
-                rotar_etiquetas_graficos(RUTA_ENTRADA, nombre_hoja) # dep
                 wb.Save()
                 hoja_nueva_creada = True
 
@@ -1072,6 +1071,7 @@ def preparar_hoja_mes(mes, dia, anio):
                 except: pass
                 pythoncom.CoUninitialize()
                 time.sleep(1)
+                rotar_etiquetas_graficos(RUTA_ENTRADA, nombre_hoja)
 
         # 2. Limpiar datos y escribir fecha
         wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
