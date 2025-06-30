@@ -669,6 +669,119 @@ def ejecutar(txt, torno, mes, dia, anio):
 #             wb.close()
 
 
+# def procesar_datos(entrada, torno, mes, dia, anio):
+#     bloques_detectados = []
+#     sumas_ad_por_bloque = []
+    
+#     if not os.path.exists(RUTA_ENTRADA):
+#         messagebox.showerror("Error", f"No se encontró:\n{RUTA_ENTRADA}")
+#         return None, None
+
+#     try:
+#         wb = openpyxl.load_workbook(RUTA_ENTRADA)
+#         hoja = wb["IR diario "]
+#         ultima_fila = None
+        
+#         # Buscar última fila con patrón "* * ..."
+#         for fila in hoja.iter_rows():
+#             if [str(c.value).strip() if c.value else "" for c in fila[:3]] == ["*", "*", "..."]:
+#                 ultima_fila = fila[0].row
+                
+#         if not ultima_fila:
+#             raise ValueError("No se encontró '* * ...'")
+            
+#         fila = ultima_fila + 1
+        
+#         for b in extraer_bloques(entrada):
+#             try:
+#                 f_ini = fila
+#                 subs = sub_bloques(b)
+#                 filas_validas = []
+                
+#                 # Procesar cada subbloque
+#                 for sub in subs:
+#                     txt = sub[0] if not re.match(r'^\d', sub[0]) else ""
+#                     datos = sub[1:] if txt else sub
+                    
+#                     # Construir datos de columnas (manteniendo tu lógica original)
+#                     p = txt.split()
+#                     col_txt = (
+#                         [p[0], p[1], p[2], p[3], "", p[4]] if "*" in txt and len(p) >= 5 and p[0] == "*" else
+#                         ["*", "*", "...", "", "", ""] if "*" in txt else
+#                         [p[0], p[1], p[2], p[3], "", p[4]] if len(p) >= 5 else
+#                         ["", p[0], p[1], p[2], "", p[3]] if len(p) == 4 else
+#                         [""] * 6
+#                     )
+                    
+#                     col_nums = [val for l in datos for val in l.strip().split()]
+#                     fila_vals = col_txt + col_nums
+                    
+#                     # Escribir valores en las celdas
+#                     for col, val in enumerate(fila_vals[:24], 1):
+#                         try:
+#                             n = float(val.replace(",", ".")) if 3 <= col <= 24 and val else val
+#                             escribir(hoja, fila, col, n, isinstance(n, float))
+#                         except:
+#                             escribir(hoja, fila, col, val)
+                    
+#                     # Escribir metadatos (torno, fecha)
+#                     for col, val in zip(range(25, 29), [torno, mes, dia, anio]):
+#                         hoja.cell(row=fila, column=col, value=val).alignment = ALIGN_R
+                    
+#                     fila += 1
+                
+#                 f_fin = fila - 1
+#                 tipo_bloque = "PODADO" if "PODADO" in txt.upper() else "REGULAR"
+#                 bloques_detectados.append((tipo_bloque, f_fin))
+                
+#                 # Fórmulas proporcionales (usando D{f_fin} como referencia)
+#                 if len(subs) > 1:
+#                     for f in range(f_ini, f_fin + 1):
+#                         hoja.cell(row=f, column=30, value=f"=IFERROR(AC{f}*D{f}/D{f_fin}, 0)")
+
+
+#                 for col in range(25, 29):
+#                     hoja.cell(row=fila_autosuma, column=col, value="")
+
+
+#                 # Autosuma (excluyendo su propia celda)
+#                 celda_autosuma = hoja.cell(row=f_fin, column=30)
+#                 celda_autosuma.value = f"=SUM(AD{f_ini}:AD{f_fin-1})"
+#                 celda_autosuma.fill = FILL_AMARILLO
+#                 wb.save(RUTA_ENTRADA)
+#                 # Procesar archivo temporal con manejo de errores
+#                 try:
+#                     temp_path, valor_ae = crear_archivo_temporal_con_ae(f"AD{f_fin}")
+#                     if valor_ae == "#VALUE!":
+#                         raise ValueError("Valor no numérico en archivo temporal")
+#                     sumas_ad_por_bloque.append(float(valor_ae) if valor_ae not in (None, "#N/A", "#VALUE!") else 0.0)
+#                 except Exception as e:
+#                     print(f"Error procesando archivo temporal: {e}")
+#                     sumas_ad_por_bloque.append(0.0)
+                
+#                 # Guardar cambios
+#                 wb.save(RUTA_ENTRADA)
+#                 shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
+                
+#             except Exception as e:
+#                 print(f"Error en bloque: {e}")
+#                 continue  # Continuar con siguiente bloque
+        
+#         # Copia de seguridad final
+#         backup_path = os.path.join(CARPETA, "Reporte IR Tornos copia_de_seguridad.xlsx")
+#         shutil.copy(RUTA_ENTRADA, backup_path)
+        
+#         return bloques_detectados, sumas_ad_por_bloque
+        
+#     except Exception as e:
+#         messagebox.showerror("Error", f"Error general: {e}")
+#         return None, None
+        
+#     finally:
+#         if 'wb' in locals():
+#             wb.close()
+
+
 def procesar_datos(entrada, torno, mes, dia, anio):
     bloques_detectados = []
     sumas_ad_por_bloque = []
@@ -703,7 +816,7 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                     txt = sub[0] if not re.match(r'^\d', sub[0]) else ""
                     datos = sub[1:] if txt else sub
                     
-                    # Construir datos de columnas (manteniendo tu lógica original)
+                    # Construir datos de columnas
                     p = txt.split()
                     col_txt = (
                         [p[0], p[1], p[2], p[3], "", p[4]] if "*" in txt and len(p) >= 5 and p[0] == "*" else
@@ -716,7 +829,7 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                     col_nums = [val for l in datos for val in l.strip().split()]
                     fila_vals = col_txt + col_nums
                     
-                    # Escribir valores en las celdas
+                    # Escribir valores en las celdas (columnas 1-24)
                     for col, val in enumerate(fila_vals[:24], 1):
                         try:
                             n = float(val.replace(",", ".")) if 3 <= col <= 24 and val else val
@@ -724,7 +837,7 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                         except:
                             escribir(hoja, fila, col, val)
                     
-                    # Escribir metadatos (torno, fecha)
+                    # Escribir metadatos (columnas 25-28)
                     for col, val in zip(range(25, 29), [torno, mes, dia, anio]):
                         hoja.cell(row=fila, column=col, value=val).alignment = ALIGN_R
                     
@@ -734,38 +847,37 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                 tipo_bloque = "PODADO" if "PODADO" in txt.upper() else "REGULAR"
                 bloques_detectados.append((tipo_bloque, f_fin))
                 
-                # Fórmulas proporcionales (usando D{f_fin} como referencia)
+                # Insertar fórmulas proporcionales (columna AD)
                 if len(subs) > 1:
-                    for f in range(f_ini, f_fin + 1):
+                    for f in range(f_ini, f_fin):
                         hoja.cell(row=f, column=30, value=f"=IFERROR(AC{f}*D{f}/D{f_fin}, 0)")
-
-
+                
+                # Configurar celda de autosuma (última fila del bloque)
                 for col in range(25, 29):
-                    hoja.cell(row=fila_autosuma, column=col, value="")
-
-
-                # Autosuma (excluyendo su propia celda)
+                    hoja.cell(row=f_fin, column=col, value="")
+                
                 celda_autosuma = hoja.cell(row=f_fin, column=30)
                 celda_autosuma.value = f"=SUM(AD{f_ini}:AD{f_fin-1})"
                 celda_autosuma.fill = FILL_AMARILLO
-                # wb.save(RUTA_ENTRADA)
-                # Procesar archivo temporal con manejo de errores
+                
+                # Guardar cambios ANTES de procesar archivo temporal
+                wb.save(RUTA_ENTRADA)
+                
+                # Procesar archivo temporal para obtener valor AE
                 try:
                     temp_path, valor_ae = crear_archivo_temporal_con_ae(f"AD{f_fin}")
-                    if valor_ae == "#VALUE!":
-                        raise ValueError("Valor no numérico en archivo temporal")
-                    sumas_ad_por_bloque.append(float(valor_ae) if valor_ae not in (None, "#N/A", "#VALUE!") else 0.0)
+                    sumas_ad_por_bloque.append(float(valor_ae) if es_valor_valido(valor_ae) else 0.0)
                 except Exception as e:
                     print(f"Error procesando archivo temporal: {e}")
                     sumas_ad_por_bloque.append(0.0)
                 
-                # Guardar cambios
+                # Guardar cambios finales del bloque
                 wb.save(RUTA_ENTRADA)
                 shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
                 
             except Exception as e:
                 print(f"Error en bloque: {e}")
-                continue  # Continuar con siguiente bloque
+                continue
         
         # Copia de seguridad final
         backup_path = os.path.join(CARPETA, "Reporte IR Tornos copia_de_seguridad.xlsx")
