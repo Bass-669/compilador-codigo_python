@@ -1056,6 +1056,7 @@ def preparar_hoja_mes(mes, dia, anio):
                     return False
                 hoja_copiada = wb.Sheets(nueva_temporal[0])
                 hoja_copiada.Name = nombre_hoja
+                rotar_etiquetas_graficos(RUTA_ENTRADA, nombre_hoja) # dep
                 wb.Save()
                 hoja_nueva_creada = True
 
