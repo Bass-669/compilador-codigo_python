@@ -79,7 +79,12 @@ def cerrar_carga():
 
 def ejecutar(txt, torno, mes, dia, anio):
     try:
-        barra['value'] = 30 # Actualizar barra al inicio del procesamiento
+        barra['value'] = 10
+        ventana_carga.update_idletasks()
+        # 1. Preparar hoja del mes primero
+        if not preparar_hoja_mes(mes, anio):
+            return
+        barra['value'] = 30
         ventana_carga.update_idletasks()
         bloques, porcentajes = procesar_datos(txt, torno, mes, dia, anio)
         barra['value'] = 70 # Actualizar barra después de procesar datos
@@ -379,83 +384,194 @@ def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque
         celda.value = valor_ae / 100 if valor_ae > 1 else valor_ae  # Porcentaje en decimal
         celda.number_format = '0.00%'
 
+# def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
+#     pythoncom.CoInitialize()
+#     excel = wb = None
+#     nueva = f"IR {mes} {anio}"
+#     hoja_anterior = None
+#     hoja_nueva_existia = False
+#     try:
+#         excel = win32.gencache.EnsureDispatch('Excel.Application')
+#         excel.Visible = False
+#         excel.DisplayAlerts = False
+#         wb = excel.Workbooks.Open(RUTA_ENTRADA, UpdateLinks=0)
+#         nombres_hojas = [h.Name for h in wb.Sheets]
+#         hoja_nueva_existia = nueva in nombres_hojas
+#         if not hoja_nueva_existia:
+#             hojas_ir = [h for h in nombres_hojas if h.startswith("IR ") and len(h.split()) == 3]
+#             def total_meses(nombre):
+#                 try:
+#                     _, mes_str, anio_str = nombre.split()
+#                     return int(anio_str) * 12 + MESES_NUM[mes_str]
+#                 except:
+#                     return -1
+#             hojas_ir_ordenadas = sorted(hojas_ir, key=total_meses)
+#             total_nueva = int(anio) * 12 + MESES_NUM[mes]
+#             for h in hojas_ir_ordenadas:
+#                 if total_meses(h) < total_nueva:
+#                     hoja_anterior = h
+#                 else:
+#                     break
+#             if not hoja_anterior:
+#                 messagebox.showwarning("Orden inválido", f"No se encontró hoja anterior para insertar '{nueva}'")
+#                 return
+#             idx_anterior = [h.Name for h in wb.Sheets].index(hoja_anterior)
+#             insert_idx = min(idx_anterior + 2, wb.Sheets.Count)
+#             wb.Sheets(hoja_anterior).Copy(After=wb.Sheets(insert_idx - 1))
+#             wb.ActiveSheet.Name = nueva
+#             wb.Save()
+#     except Exception as e:
+#         messagebox.showerror("Error", f"No se pudo crear hoja:\n{e}")
+#         return
+#     finally:
+#         try:
+#             if wb:
+#                 wb.Close(SaveChanges=True)
+#         except:
+#             pass
+#         try:
+#             if excel:
+#                 excel.Quit()
+#         except:
+#             pass
+#         pythoncom.CoUninitialize()
+#     try:
+#         wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
+#         hoja_nueva = wb2[nueva]
+#         col_dia = dia + 1  # columna B es 2, día 1 → columna 2
+#         if not hoja_nueva_existia:
+#             filas_fechas = [2, 3, 4, 7, 8, 9, 12, 13, 14, 17, 18, 19, 22, 27, 31, 37]
+#             for fila in filas_fechas:
+#                 for col in range(2, 33):
+#                     hoja_nueva.cell(row=fila, column=col, value="")
+#         nueva_fecha = f"{dia:02d}/{MESES_NUM[mes]:02d}/{anio}"
+#         for fila in [2, 7, 12, 17, 22, 27, 31, 37]:
+#             hoja_nueva.cell(row=fila, column=col_dia, value=nueva_fecha)
+#         valores_para_escribir = [val for i, (tipo, val) in enumerate(bloques_detectados) if i % 2 == 1]
+#         tipos_para_escribir = [tipo for i, (tipo, val) in enumerate(bloques_detectados) if i % 2 == 1]
+#         for (tipo_bloque, valor), valor_ae in zip(zip(tipos_para_escribir, valores_para_escribir), sumas_ad_por_bloque):
+#             escribir_valor_bloque(hoja_nueva, col_dia, torno, valor, tipo_bloque)
+#         escribir_valores_resumen_bloques(hoja_nueva, col_dia, torno, sumas_ad_por_bloque, tipos_para_escribir)
+#         wb2.save(RUTA_ENTRADA)
+#         wb2.close()
+#         if not hoja_nueva_existia: # Rotar etiquetas solo si es hoja nueva
+#             rotar_etiquetas_graficos(RUTA_ENTRADA, nueva)
+#         shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
+#         mensaje = "✅ Valores actualizados correctamente." if hoja_nueva_existia else f"✅ Hoja '{nueva}' creada correctamente."
+#         messagebox.showinfo("Éxito", mensaje)
+#     except Exception as e:
+#         messagebox.showwarning("Advertencia", f"No se pudo ajustar hoja:\n{e}")
+
+
 def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
-    pythoncom.CoInitialize()
-    excel = wb = None
-    nueva = f"IR {mes} {anio}"
-    hoja_anterior = None
-    hoja_nueva_existia = False
+    """Escribe los datos en la hoja del mes (asume que ya existe)"""
+    nombre_hoja = f"IR {mes} {anio}"
+    
     try:
+        wb = openpyxl.load_workbook(RUTA_ENTRADA)
+        hoja_mes = wb[nombre_hoja]
+        
+        col_dia = dia + 1  # columna B es 2, día 1 → columna 2
+        
+        # Limpiar celdas si es necesario (solo para días nuevos)
+        if hoja_mes.cell(row=2, column=col_dia).value is None:
+            filas_fechas = [2, 3, 4, 7, 8, 9, 12, 13, 14, 17, 18, 19, 22, 27, 31, 37]
+            for fila in filas_fechas:
+                hoja_mes.cell(row=fila, column=col_dia, value="")
+        
+        # Escribir fecha
+        nueva_fecha = f"{dia:02d}/{MESES_NUM[mes]:02d}/{anio}"
+        for fila in [2, 7, 12, 17, 22, 27, 31, 37]:
+            hoja_mes.cell(row=fila, column=col_dia, value=nueva_fecha)
+        
+        # Escribir valores de bloques
+        valores_para_escribir = [val for i, (tipo, val) in enumerate(bloques_detectados) if i % 2 == 1]
+        tipos_para_escribir = [tipo for i, (tipo, val) in enumerate(bloques_detectados) if i % 2 == 1]
+        
+        for (tipo_bloque, valor), valor_ae in zip(zip(tipos_para_escribir, valores_para_escribir), sumas_ad_por_bloque):
+            escribir_valor_bloque(hoja_mes, col_dia, torno, valor, tipo_bloque)
+            escribir_valores_resumen_bloques(hoja_mes, col_dia, torno, [valor_ae], [tipo_bloque])
+        
+        wb.save(RUTA_ENTRADA)
+        wb.close()
+        
+        # Copia de seguridad
+        shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
+        
+        messagebox.showinfo("Éxito", "✅ Valores actualizados correctamente.")
+    except Exception as e:
+        messagebox.showerror("Error", f"No se pudo escribir en hoja:\n{e}")
+
+
+
+def preparar_hoja_mes(mes, anio):
+    """Verifica si existe la hoja del mes y la crea si no existe"""
+    nombre_hoja = f"IR {mes} {anio}"
+    
+    try:
+        # Verificar si la hoja ya existe
+        wb = openpyxl.load_workbook(RUTA_ENTRADA)
+        if nombre_hoja in wb.sheetnames:
+            wb.close()
+            return True
+        
+        # Si no existe, crearla
+        pythoncom.CoInitialize()
         excel = win32.gencache.EnsureDispatch('Excel.Application')
         excel.Visible = False
         excel.DisplayAlerts = False
-        wb = excel.Workbooks.Open(RUTA_ENTRADA, UpdateLinks=0)
-        nombres_hojas = [h.Name for h in wb.Sheets]
-        hoja_nueva_existia = nueva in nombres_hojas
-        if not hoja_nueva_existia:
-            hojas_ir = [h for h in nombres_hojas if h.startswith("IR ") and len(h.split()) == 3]
-            def total_meses(nombre):
-                try:
-                    _, mes_str, anio_str = nombre.split()
-                    return int(anio_str) * 12 + MESES_NUM[mes_str]
-                except:
-                    return -1
-            hojas_ir_ordenadas = sorted(hojas_ir, key=total_meses)
-            total_nueva = int(anio) * 12 + MESES_NUM[mes]
-            for h in hojas_ir_ordenadas:
-                if total_meses(h) < total_nueva:
-                    hoja_anterior = h
-                else:
-                    break
-            if not hoja_anterior:
-                messagebox.showwarning("Orden inválido", f"No se encontró hoja anterior para insertar '{nueva}'")
-                return
-            idx_anterior = [h.Name for h in wb.Sheets].index(hoja_anterior)
-            insert_idx = min(idx_anterior + 2, wb.Sheets.Count)
-            wb.Sheets(hoja_anterior).Copy(After=wb.Sheets(insert_idx - 1))
-            wb.ActiveSheet.Name = nueva
-            wb.Save()
+        
+        wb_com = excel.Workbooks.Open(RUTA_ENTRADA)
+        
+        # Buscar hoja anterior para copiar
+        hojas_ir = [h.Name for h in wb_com.Sheets if h.Name.startswith("IR ") and len(h.Name.split()) == 3]
+        def total_meses(nombre):
+            try:
+                _, mes_str, anio_str = nombre.split()
+                return int(anio_str) * 12 + MESES_NUM[mes_str]
+            except:
+                return -1
+        
+        hojas_ir_ordenadas = sorted(hojas_ir, key=total_meses)
+        total_nueva = int(anio) * 12 + MESES_NUM[mes]
+        hoja_anterior = None
+        
+        for h in hojas_ir_ordenadas:
+            if total_meses(h) < total_nueva:
+                hoja_anterior = h
+            else:
+                break
+        
+        if not hoja_anterior:
+            messagebox.showwarning("Orden inválido", f"No se encontró hoja anterior para insertar '{nombre_hoja}'")
+            return False
+        
+        # Copiar hoja anterior
+        idx_anterior = [h.Name for h in wb_com.Sheets].index(hoja_anterior)
+        insert_idx = min(idx_anterior + 2, wb_com.Sheets.Count)
+        wb_com.Sheets(hoja_anterior).Copy(After=wb_com.Sheets(insert_idx - 1))
+        wb_com.ActiveSheet.Name = nombre_hoja
+        
+        # Rotar etiquetas de gráficos
+        rotar_etiquetas_graficos(RUTA_ENTRADA, nombre_hoja)
+        
+        wb_com.Save()
+        wb_com.Close()
+        excel.Quit()
+        pythoncom.CoUninitialize()
+        return True
+        
     except Exception as e:
         messagebox.showerror("Error", f"No se pudo crear hoja:\n{e}")
-        return
+        return False
     finally:
-        try:
-            if wb:
-                wb.Close(SaveChanges=True)
-        except:
-            pass
-        try:
-            if excel:
-                excel.Quit()
-        except:
-            pass
+        if 'wb_com' in locals():
+            wb_com.Close(False)
+        if 'excel' in locals():
+            excel.Quit()
         pythoncom.CoUninitialize()
-    try:
-        wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
-        hoja_nueva = wb2[nueva]
-        col_dia = dia + 1  # columna B es 2, día 1 → columna 2
-        if not hoja_nueva_existia:
-            filas_fechas = [2, 3, 4, 7, 8, 9, 12, 13, 14, 17, 18, 19, 22, 27, 31, 37]
-            for fila in filas_fechas:
-                for col in range(2, 33):
-                    hoja_nueva.cell(row=fila, column=col, value="")
-        nueva_fecha = f"{dia:02d}/{MESES_NUM[mes]:02d}/{anio}"
-        for fila in [2, 7, 12, 17, 22, 27, 31, 37]:
-            hoja_nueva.cell(row=fila, column=col_dia, value=nueva_fecha)
-        valores_para_escribir = [val for i, (tipo, val) in enumerate(bloques_detectados) if i % 2 == 1]
-        tipos_para_escribir = [tipo for i, (tipo, val) in enumerate(bloques_detectados) if i % 2 == 1]
-        for (tipo_bloque, valor), valor_ae in zip(zip(tipos_para_escribir, valores_para_escribir), sumas_ad_por_bloque):
-            escribir_valor_bloque(hoja_nueva, col_dia, torno, valor, tipo_bloque)
-        escribir_valores_resumen_bloques(hoja_nueva, col_dia, torno, sumas_ad_por_bloque, tipos_para_escribir)
-        wb2.save(RUTA_ENTRADA)
-        wb2.close()
-        if not hoja_nueva_existia: # Rotar etiquetas solo si es hoja nueva
-            rotar_etiquetas_graficos(RUTA_ENTRADA, nueva)
-        shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
-        mensaje = "✅ Valores actualizados correctamente." if hoja_nueva_existia else f"✅ Hoja '{nueva}' creada correctamente."
-        messagebox.showinfo("Éxito", mensaje)
-    except Exception as e:
-        messagebox.showwarning("Advertencia", f"No se pudo ajustar hoja:\n{e}")
+
+
 
 def rotar_etiquetas_graficos(ruta_archivo, nombre_hoja):
     pythoncom.CoInitialize()
