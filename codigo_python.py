@@ -1297,32 +1297,32 @@ def preparar_hoja_mes(mes, dia, anio):
 
 
 def rotar_etiquetas_graficos(ruta_archivo, nombre_hoja):
-    """Rota etiquetas de eje X en los gráficos de la hoja indicada usando solo messagebox.
-    
-    Args:
-        ruta_archivo (str): Ruta completa al archivo Excel
-        nombre_hoja (str): Nombre de la hoja que contiene los gráficos
-        
-    Returns:
-        bool: True si la operación fue exitosa, False si hubo errores
-    """
+    """Versión mejorada con manejo específico de errores de gráficos"""
     pythoncom.CoInitialize()
     excel = wb = None
     resultado = False
     
     try:
-        # Iniciar Excel en modo silencioso
+        # Configuración inicial de Excel
         excel = win32.Dispatch("Excel.Application")
         excel.Visible = False
         excel.DisplayAlerts = False
         excel.ScreenUpdating = False
 
-        # Abrir el libro de trabajo
-        wb = excel.Workbooks.Open(os.path.abspath(ruta_archivo))
+        # Abrir el libro de trabajo con manejo de errores mejorado
+        try:
+            wb = excel.Workbooks.Open(os.path.abspath(ruta_archivo))
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo abrir el archivo:\n{str(e)}")
+            return False
         
         # Verificar si la hoja existe
-        if nombre_hoja not in [s.Name for s in wb.Sheets]:
-            messagebox.showerror("Error", f"No se encontró la hoja '{nombre_hoja}'")
+        try:
+            if nombre_hoja not in [s.Name for s in wb.Sheets]:
+                messagebox.showerror("Error", f"No se encontró la hoja '{nombre_hoja}'")
+                return False
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al buscar hoja:\n{str(e)}")
             return False
 
         sheet = wb.Sheets(nombre_hoja)
@@ -1332,55 +1332,78 @@ def rotar_etiquetas_graficos(ruta_archivo, nombre_hoja):
         errores = 0
         detalles_errores = []
 
-        # Procesar cada gráfico
+        # Procesar cada gráfico con manejo mejorado de errores
         for i, chart_obj in enumerate(graficos, 1):
             try:
                 chart = chart_obj.Chart
-                if chart.HasAxis(1):  # 1 = xlCategory (eje X)
-                    x_axis = chart.Axes(1)
-                    x_axis.TickLabels.Orientation = 45
-                    rotados += 1
+                try:
+                    # Verificar si el gráfico tiene ejes y son accesibles
+                    if chart.ChartType != -4100:  # -4100 = xlChartTypeArea
+                        if chart.HasAxis(1):  # 1 = xlCategory (eje X)
+                            x_axis = chart.Axes(1)
+                            if x_axis.HasTickLabels:
+                                x_axis.TickLabels.Orientation = 45
+                                rotados += 1
+                            else:
+                                raise Exception("El gráfico no tiene etiquetas en el eje X")
+                        else:
+                            raise Exception("El gráfico no tiene eje X")
+                    else:
+                        raise Exception("Tipo de gráfico no soportado")
+                except Exception as e:
+                    raise Exception(f"Error al procesar gráfico: {str(e)}")
             except Exception as e:
                 errores += 1
-                detalles_errores.append(f"Gráfico {i}: {str(e)}")
+                # Mensaje de error más legible para el usuario
+                detalles_errores.append(f"Gráfico {i}: No se pudo rotar las etiquetas")
 
-        # Guardar cambios
-        wb.Save()
+        # Guardar cambios solo si se procesaron gráficos
+        if total_graficos > 0:
+            try:
+                wb.Save()
+            except Exception as e:
+                messagebox.showwarning("Advertencia", f"Se rotaron gráficos pero no se pudo guardar:\n{str(e)}")
         
         # Mostrar resumen al usuario
-        if errores == 0:
-            messagebox.showinfo("Éxito", 
-                f"Se rotaron las etiquetas en {rotados} de {total_graficos} gráficos.")
+        if total_graficos == 0:
+            messagebox.showinfo("Información", "No se encontraron gráficos para rotar")
+            resultado = True
+        elif errores == 0:
+            messagebox.showinfo("Éxito", f"Se rotaron las etiquetas en {rotados} gráficos")
             resultado = True
         else:
-            mensaje_error = f"Se rotaron {rotados} gráficos, pero hubo {errores} errores.\n"
-            if len(detalles_errores) > 0:
-                mensaje_error += "\nDetalles de errores:\n- " + "\n- ".join(detalles_errores[:3])  # Mostrar solo primeros 3 errores
-                if len(detalles_errores) > 3:
-                    mensaje_error += f"\n\n(y {len(detalles_errores)-3} errores más...)"
+            mensaje_error = f"Resultado parcial: {rotados} de {total_graficos} gráficos procesados\n"
+            if errores > 0:
+                mensaje_error += f"{errores} gráficos no pudieron ser modificados\n"
+                mensaje_error += "Posibles causas:\n"
+                mensaje_error += "- Gráficos de tipo no soportado\n"
+                mensaje_error += "- Gráficos sin etiquetas en el eje X\n"
+                mensaje_error += "- Problemas de permisos"
             
             messagebox.showwarning("Advertencia", mensaje_error)
-            resultado = False
+            resultado = (errores < total_graficos)  # Considerar éxito si al menos uno funcionó
             
     except Exception as e:
         messagebox.showerror("Error crítico", 
-            f"No se pudo completar la operación:\n{str(e)}")
+            f"Error inesperado:\n{str(e)}\n\n"
+            "Recomendaciones:\n"
+            "1. Verifique que el archivo no esté abierto en Excel\n"
+            "2. Confirme que los gráficos son del tipo soportado\n"
+            "3. Intente nuevamente")
         resultado = False
         
     finally:
         # Limpieza segura de recursos
         try:
             if wb:
-                wb.Close(SaveChanges=False)  # Ya guardamos antes si fue exitoso
+                wb.Close(SaveChanges=False)
         except:
             pass
-            
         try:
             if excel:
                 excel.Quit()
         except:
             pass
-            
         pythoncom.CoUninitialize()
         
     return resultado
