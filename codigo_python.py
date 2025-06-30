@@ -1301,7 +1301,7 @@ def rotar_etiquetas_graficos(ruta_archivo, nombre_hoja):
     pythoncom.CoInitialize()
     excel = wb = None
     try:
-        print(f"[INFO] Rotando etiquetas de gráficos en hoja '{nombre_hoja}'...")
+        messagebox.showinfo(f"[INFO] Rotando etiquetas de gráficos en hoja '{nombre_hoja}'...")
         excel = win32.Dispatch("Excel.Application")
         excel.Visible = False
         excel.DisplayAlerts = False
@@ -1309,12 +1309,12 @@ def rotar_etiquetas_graficos(ruta_archivo, nombre_hoja):
 
         wb = excel.Workbooks.Open(os.path.abspath(ruta_archivo))
         if nombre_hoja not in [s.Name for s in wb.Sheets]:
-            print(f"[ADVERTENCIA] Hoja '{nombre_hoja}' no encontrada.")
+            messagebox.showinfo(f"[ADVERTENCIA] Hoja '{nombre_hoja}' no encontrada.")
             return
 
         sheet = wb.Sheets(nombre_hoja)
         graficos = sheet.ChartObjects()
-        print(f"[INFO] Se encontraron {graficos.Count} gráficos.")
+        messagebox.showinfo(f"[INFO] Se encontraron {graficos.Count} gráficos.")
 
         rotados = 0
         for chart_obj in graficos:
@@ -1325,12 +1325,12 @@ def rotar_etiquetas_graficos(ruta_archivo, nombre_hoja):
                     x_axis.TickLabels.Orientation = 45
                     rotados += 1
             except Exception as e:
-                print(f"[ERROR] No se pudo rotar gráfico: {e}")
+                messagebox.showinfo(f"[ERROR] No se pudo rotar gráfico: {e}")
 
         wb.Save()
-        print(f"[OK] Se rotaron {rotados} gráficos.")
+        messagebox.showinfo(f"[OK] Se rotaron {rotados} gráficos.")
     except Exception as e:
-        print(f"[CRÍTICO] Error al rotar etiquetas: {e}")
+        messagebox.showinfo(f"[CRÍTICO] Error al rotar etiquetas: {e}")
     finally:
         try:
             if wb:
