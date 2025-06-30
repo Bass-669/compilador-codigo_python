@@ -804,21 +804,115 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
 
 
 
+# def preparar_hoja_mes(mes, dia, anio):
+#     """Verifica si existe la hoja del mes. Si no existe, la crea desde una hoja anterior.
+#        Además, limpia los datos del día en la hoja del mes."""
+#     nombre_hoja = f"IR {mes} {anio}"
+#     col_dia = dia + 1  # columna B es 2, día 1 → columna 2
+#     hoja_nueva_creada = False
+
+#     try:
+#         wb_check = openpyxl.load_workbook(RUTA_ENTRADA)
+#         if nombre_hoja in wb_check.sheetnames:
+#             wb_check.close()
+#         else:
+#             wb_check.close()
+
+#             # Crear hoja con win32com
+#             pythoncom.CoInitialize()
+#             excel = wb = None
+#             try:
+#                 excel = win32.gencache.EnsureDispatch('Excel.Application')
+#                 excel.Visible = False
+#                 excel.DisplayAlerts = False
+#                 wb = excel.Workbooks.Open(RUTA_ENTRADA, UpdateLinks=0)
+#                 hojas = [h.Name for h in wb.Sheets]
+
+#                 hojas_ir = [h for h in hojas if h.startswith("IR ") and len(h.split()) == 3]
+
+#                 def total_meses(nombre):
+#                     try:
+#                         _, mes_str, anio_str = nombre.split()
+#                         return int(anio_str) * 12 + MESES_NUM[mes_str]
+#                     except:
+#                         return -1
+
+#                 hojas_ir_ordenadas = sorted(hojas_ir, key=total_meses)
+#                 total_nueva = int(anio) * 12 + MESES_NUM[mes]
+#                 hoja_anterior = None
+#                 for h in hojas_ir_ordenadas:
+#                     if total_meses(h) < total_nueva:
+#                         hoja_anterior = h
+#                     else:
+#                         break
+
+#                 if not hoja_anterior:
+#                     messagebox.showwarning("Orden inválido", f"No se encontró hoja anterior para insertar '{nombre_hoja}'")
+#                     return False
+
+#                 idx_anterior = [h.Name for h in wb.Sheets].index(hoja_anterior)
+#                 insert_idx = min(idx_anterior + 2, wb.Sheets.Count + 1)
+
+#                 # Copiar y renombrar hoja
+#                 wb.Sheets(hoja_anterior).Copy(After=wb.Sheets(insert_idx - 1))
+#                 nueva_hoja = wb.Sheets(wb.Sheets.Count)
+#                 nueva_hoja.Name = nombre_hoja
+#                 wb.Save()
+#                 hoja_nueva_creada = True
+#             except Exception as e:
+#                 messagebox.showerror("Error", f"No se pudo crear hoja nueva:\n{e}")
+#                 return False
+#             finally:
+#                 try:
+#                     if wb:
+#                         wb.Close(SaveChanges=True)
+#                 except:
+#                     pass
+#                 try:
+#                     if excel:
+#                         excel.Quit()
+#                 except:
+#                     pass
+#                 pythoncom.CoUninitialize()
+
+#         # Limpiar los datos del día en la hoja (ya sea nueva o existente)
+#         wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
+#         hoja = wb2[nombre_hoja]
+
+#         # Si la hoja es nueva o la columna del día está vacía
+#         if hoja_nueva_creada or hoja.cell(row=2, column=col_dia).value is None:
+#             filas_fechas = [2, 3, 4, 7, 8, 9, 12, 13, 14, 17, 18, 19, 22, 27, 31, 37]
+#             for fila in filas_fechas:
+#                 for col in range(2, 33):
+#                     hoja.cell(row=fila, column=col, value="")
+
+#             nueva_fecha = f"{dia:02d}/{MESES_NUM[mes]:02d}/{anio}"
+#             for fila in [2, 7, 12, 17, 22, 27, 31, 37]:
+#                 hoja.cell(row=fila, column=col_dia, value=nueva_fecha)
+
+#             wb2.save(RUTA_ENTRADA)
+#         wb2.close()
+#         return True
+
+#     except Exception as e:
+#         messagebox.showerror("Error", f"Error al preparar hoja:\n{str(e)}")
+#         return False
+
+
 def preparar_hoja_mes(mes, dia, anio):
-    """Verifica si existe la hoja del mes. Si no existe, la crea desde una hoja anterior.
-       Además, limpia los datos del día en la hoja del mes."""
+    """Crea la hoja del mes si no existe y limpia los datos del día especificado."""
     nombre_hoja = f"IR {mes} {anio}"
     col_dia = dia + 1  # columna B es 2, día 1 → columna 2
     hoja_nueva_creada = False
 
+    # Paso 1: Verificar si ya existe la hoja con openpyxl
     try:
         wb_check = openpyxl.load_workbook(RUTA_ENTRADA)
         if nombre_hoja in wb_check.sheetnames:
             wb_check.close()
         else:
             wb_check.close()
-
-            # Crear hoja con win32com
+            # Crear hoja nueva con win32com si no existe
             pythoncom.CoInitialize()
             excel = wb = None
             try:
@@ -828,8 +922,8 @@ def preparar_hoja_mes(mes, dia, anio):
                 wb = excel.Workbooks.Open(RUTA_ENTRADA, UpdateLinks=0)
                 hojas = [h.Name for h in wb.Sheets]
 
+                # Encontrar hoja anterior
                 hojas_ir = [h for h in hojas if h.startswith("IR ") and len(h.split()) == 3]
-
                 def total_meses(nombre):
                     try:
                         _, mes_str, anio_str = nombre.split()
@@ -837,10 +931,10 @@ def preparar_hoja_mes(mes, dia, anio):
                     except:
                         return -1
 
-                hojas_ir_ordenadas = sorted(hojas_ir, key=total_meses)
+                hojas_ordenadas = sorted(hojas_ir, key=total_meses)
                 total_nueva = int(anio) * 12 + MESES_NUM[mes]
                 hoja_anterior = None
-                for h in hojas_ir_ordenadas:
+                for h in hojas_ordenadas:
                     if total_meses(h) < total_nueva:
                         hoja_anterior = h
                     else:
@@ -850,10 +944,10 @@ def preparar_hoja_mes(mes, dia, anio):
                     messagebox.showwarning("Orden inválido", f"No se encontró hoja anterior para insertar '{nombre_hoja}'")
                     return False
 
-                idx_anterior = [h.Name for h in wb.Sheets].index(hoja_anterior)
+                idx_anterior = hojas.index(hoja_anterior)
                 insert_idx = min(idx_anterior + 2, wb.Sheets.Count + 1)
 
-                # Copiar y renombrar hoja
+                # Copiar hoja y renombrar de forma segura
                 wb.Sheets(hoja_anterior).Copy(After=wb.Sheets(insert_idx - 1))
                 nueva_hoja = wb.Sheets(wb.Sheets.Count)
                 nueva_hoja.Name = nombre_hoja
@@ -874,18 +968,23 @@ def preparar_hoja_mes(mes, dia, anio):
                 except:
                     pass
                 pythoncom.CoUninitialize()
+                time.sleep(1)  # Pausa para que Excel libere bien el archivo
 
-        # Limpiar los datos del día en la hoja (ya sea nueva o existente)
+        # Paso 2: Limpiar columna del día y escribir fecha
         wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
         hoja = wb2[nombre_hoja]
 
-        # Si la hoja es nueva o la columna del día está vacía
+        # Limpiar celdas del día si la hoja es nueva o el día está vacío
         if hoja_nueva_creada or hoja.cell(row=2, column=col_dia).value is None:
             filas_fechas = [2, 3, 4, 7, 8, 9, 12, 13, 14, 17, 18, 19, 22, 27, 31, 37]
+
             for fila in filas_fechas:
                 for col in range(2, 33):
-                    hoja.cell(row=fila, column=col, value="")
+                    celda = hoja.cell(row=fila, column=col)
+                    if not isinstance(celda, openpyxl.cell.cell.MergedCell):
+                        celda.value = ""
 
+            # Escribir fecha en filas principales
             nueva_fecha = f"{dia:02d}/{MESES_NUM[mes]:02d}/{anio}"
             for fila in [2, 7, 12, 17, 22, 27, 31, 37]:
                 hoja.cell(row=fila, column=col_dia, value=nueva_fecha)
@@ -895,7 +994,7 @@ def preparar_hoja_mes(mes, dia, anio):
         return True
 
     except Exception as e:
-        messagebox.showerror("Error", f"Error al preparar hoja:\n{str(e)}")
+        messagebox.showerror("Error", f"Error al preparar hoja:\n{e}")
         return False
 
 
