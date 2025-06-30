@@ -77,25 +77,70 @@ def mostrar_carga():
 def cerrar_carga():
     if ventana_carga: ventana_carga.destroy()
 
+# def ejecutar(txt, torno, mes, dia, anio):
+#     try:
+#         barra['value'] = 10
+#         ventana_carga.update_idletasks()
+#         # 1. Preparar hoja del mes primero
+#         if not preparar_hoja_mes(mes, anio):
+#             return
+#         barra['value'] = 30
+#         ventana_carga.update_idletasks()
+#         bloques, porcentajes = procesar_datos(txt, torno, mes, dia, anio)
+#         barra['value'] = 70 # Actualizar barra después de procesar datos
+#         ventana_carga.update_idletasks()
+#         if bloques is not None and porcentajes is not None:
+#             fecha(mes, dia, anio, torno, bloques, porcentajes)
+#         else:
+#             messagebox.showwarning("Advertencia", "No se pudo procesar los datos.")
+#         barra['value'] = 100 # Completar barra al final
+#     except Exception as e:
+#         messagebox.showerror("Error", f"Ocurrió un error en ejecutar():\n{e}")
+#     finally:
+#         cerrar_carga()
+#         ventana.destroy()
+
+
 def ejecutar(txt, torno, mes, dia, anio):
     try:
         barra['value'] = 10
         ventana_carga.update_idletasks()
-        # 1. Preparar hoja del mes primero
-        if not preparar_hoja_mes(mes, anio):
-            return
+        
+        # 1. Preparar hoja del mes primero (con reintentos)
+        intentos = 0
+        max_intentos = 3
+        while intentos < max_intentos:
+            try:
+                if preparar_hoja_mes(mes, anio):
+                    break
+                else:
+                    intentos += 1
+                    time.sleep(1)  # Esperar 1 segundo entre intentos
+            except Exception as e:
+                intentos += 1
+                print(f"Intento {intentos} fallado: {str(e)}")
+                time.sleep(1)
+        
+        if intentos >= max_intentos:
+            raise Exception("No se pudo preparar la hoja del mes después de varios intentos")
+        
         barra['value'] = 30
         ventana_carga.update_idletasks()
+        
+        # 2. Procesar datos
         bloques, porcentajes = procesar_datos(txt, torno, mes, dia, anio)
-        barra['value'] = 70 # Actualizar barra después de procesar datos
+        
+        barra['value'] = 70
         ventana_carga.update_idletasks()
+        
         if bloques is not None and porcentajes is not None:
+            # 3. Escribir en la hoja del mes
             fecha(mes, dia, anio, torno, bloques, porcentajes)
-        else:
-            messagebox.showwarning("Advertencia", "No se pudo procesar los datos.")
-        barra['value'] = 100 # Completar barra al final
+        
+        barra['value'] = 100
+        
     except Exception as e:
-        messagebox.showerror("Error", f"Ocurrió un error en ejecutar():\n{e}")
+        messagebox.showerror("Error", f"Ocurrió un error en ejecutar():\n{str(e)}")
     finally:
         cerrar_carga()
         ventana.destroy()
@@ -504,101 +549,258 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
 
 
 
+# def preparar_hoja_mes(mes, anio):
+#     """Verifica si existe la hoja del mes y la crea si no existe"""
+#     nombre_hoja = f"IR {mes} {anio}"
+    
+#     try:
+#         # Verificar si la hoja ya existe
+#         wb = openpyxl.load_workbook(RUTA_ENTRADA)
+#         if nombre_hoja in wb.sheetnames:
+#             wb.close()
+#             return True
+        
+#         # Si no existe, crearla
+#         pythoncom.CoInitialize()
+#         excel = win32.gencache.EnsureDispatch('Excel.Application')
+#         excel.Visible = False
+#         excel.DisplayAlerts = False
+        
+#         wb_com = excel.Workbooks.Open(RUTA_ENTRADA)
+        
+#         # Buscar hoja anterior para copiar
+#         hojas_ir = [h.Name for h in wb_com.Sheets if h.Name.startswith("IR ") and len(h.Name.split()) == 3]
+#         def total_meses(nombre):
+#             try:
+#                 _, mes_str, anio_str = nombre.split()
+#                 return int(anio_str) * 12 + MESES_NUM[mes_str]
+#             except:
+#                 return -1
+        
+#         hojas_ir_ordenadas = sorted(hojas_ir, key=total_meses)
+#         total_nueva = int(anio) * 12 + MESES_NUM[mes]
+#         hoja_anterior = None
+        
+#         for h in hojas_ir_ordenadas:
+#             if total_meses(h) < total_nueva:
+#                 hoja_anterior = h
+#             else:
+#                 break
+        
+#         if not hoja_anterior:
+#             messagebox.showwarning("Orden inválido", f"No se encontró hoja anterior para insertar '{nombre_hoja}'")
+#             return False
+        
+#         # Copiar hoja anterior
+#         idx_anterior = [h.Name for h in wb_com.Sheets].index(hoja_anterior)
+#         insert_idx = min(idx_anterior + 2, wb_com.Sheets.Count)
+#         wb_com.Sheets(hoja_anterior).Copy(After=wb_com.Sheets(insert_idx - 1))
+#         wb_com.ActiveSheet.Name = nombre_hoja
+        
+#         # Rotar etiquetas de gráficos
+#         rotar_etiquetas_graficos(RUTA_ENTRADA, nombre_hoja)
+        
+#         wb_com.Save()
+#         wb_com.Close()
+#         excel.Quit()
+#         pythoncom.CoUninitialize()
+#         return True
+        
+#     except Exception as e:
+#         messagebox.showerror("Error", f"No se pudo crear hoja:\n{e}")
+#         return False
+#     finally:
+#         if 'wb_com' in locals():
+#             wb_com.Close(False)
+#         if 'excel' in locals():
+#             excel.Quit()
+#         pythoncom.CoUninitialize()
+
+
 def preparar_hoja_mes(mes, anio):
     """Verifica si existe la hoja del mes y la crea si no existe"""
     nombre_hoja = f"IR {mes} {anio}"
     
     try:
-        # Verificar si la hoja ya existe
+        # Verificar si la hoja ya existe con openpyxl (más rápido)
         wb = openpyxl.load_workbook(RUTA_ENTRADA)
         if nombre_hoja in wb.sheetnames:
             wb.close()
             return True
+        wb.close()
         
-        # Si no existe, crearla
+        # Si no existe, crearla con win32com
         pythoncom.CoInitialize()
-        excel = win32.gencache.EnsureDispatch('Excel.Application')
-        excel.Visible = False
-        excel.DisplayAlerts = False
+        excel = None
+        wb_com = None
         
-        wb_com = excel.Workbooks.Open(RUTA_ENTRADA)
-        
-        # Buscar hoja anterior para copiar
-        hojas_ir = [h.Name for h in wb_com.Sheets if h.Name.startswith("IR ") and len(h.Name.split()) == 3]
-        def total_meses(nombre):
-            try:
-                _, mes_str, anio_str = nombre.split()
-                return int(anio_str) * 12 + MESES_NUM[mes_str]
-            except:
-                return -1
-        
-        hojas_ir_ordenadas = sorted(hojas_ir, key=total_meses)
-        total_nueva = int(anio) * 12 + MESES_NUM[mes]
-        hoja_anterior = None
-        
-        for h in hojas_ir_ordenadas:
-            if total_meses(h) < total_nueva:
-                hoja_anterior = h
-            else:
-                break
-        
-        if not hoja_anterior:
-            messagebox.showwarning("Orden inválido", f"No se encontró hoja anterior para insertar '{nombre_hoja}'")
+        try:
+            excel = win32.gencache.EnsureDispatch('Excel.Application')
+            excel.Visible = False
+            excel.DisplayAlerts = False
+            excel.ScreenUpdating = False
+            
+            # Abrir el libro con contexto de Excel
+            wb_com = excel.Workbooks.Open(os.path.abspath(RUTA_ENTRADA))
+            
+            # Buscar hoja anterior para copiar
+            hojas_ir = [h.Name for h in wb_com.Sheets if h.Name.startswith("IR ") and len(h.Name.split()) == 3]
+            
+            def total_meses(nombre):
+                try:
+                    _, mes_str, anio_str = nombre.split()
+                    return int(anio_str) * 12 + MESES_NUM[mes_str]
+                except:
+                    return -1
+            
+            if not hojas_ir:
+                messagebox.showwarning("Error", "No se encontraron hojas IR para copiar")
+                return False
+                
+            hojas_ir_ordenadas = sorted(hojas_ir, key=total_meses)
+            total_nueva = int(anio) * 12 + MESES_NUM[mes]
+            hoja_anterior = None
+            
+            for h in hojas_ir_ordenadas:
+                if total_meses(h) < total_nueva:
+                    hoja_anterior = h
+                else:
+                    break
+            
+            if not hoja_anterior:
+                hoja_anterior = hojas_ir_ordenadas[-1]  # Usar la última disponible
+            
+            # Copiar hoja anterior
+            idx_anterior = [h.Name for h in wb_com.Sheets].index(hoja_anterior)
+            insert_idx = min(idx_anterior + 2, wb_com.Sheets.Count)
+            
+            # Asegurarse de que la hoja fuente existe
+            if hoja_anterior not in [h.Name for h in wb_com.Sheets]:
+                messagebox.showwarning("Error", f"No se encontró la hoja fuente '{hoja_anterior}'")
+                return False
+            
+            wb_com.Sheets(hoja_anterior).Copy(After=wb_com.Sheets(insert_idx - 1))
+            wb_com.ActiveSheet.Name = nombre_hoja
+            
+            # Guardar cambios
+            wb_com.Save()
+            
+            # Rotar etiquetas (en proceso separado para mayor estabilidad)
+            time.sleep(1)  # Pequeña pausa para asegurar que se guardó
+            rotar_etiquetas_graficos(RUTA_ENTRADA, nombre_hoja)
+            
+            return True
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo crear hoja:\n{str(e)}")
             return False
-        
-        # Copiar hoja anterior
-        idx_anterior = [h.Name for h in wb_com.Sheets].index(hoja_anterior)
-        insert_idx = min(idx_anterior + 2, wb_com.Sheets.Count)
-        wb_com.Sheets(hoja_anterior).Copy(After=wb_com.Sheets(insert_idx - 1))
-        wb_com.ActiveSheet.Name = nombre_hoja
-        
-        # Rotar etiquetas de gráficos
-        rotar_etiquetas_graficos(RUTA_ENTRADA, nombre_hoja)
-        
-        wb_com.Save()
-        wb_com.Close()
-        excel.Quit()
-        pythoncom.CoUninitialize()
-        return True
-        
+        finally:
+            # Cerrar todo en orden inverso
+            try:
+                if wb_com:
+                    wb_com.Close(True)
+            except:
+                pass
+            try:
+                if excel:
+                    excel.Quit()
+            except:
+                pass
+            pythoncom.CoUninitialize()
+            
     except Exception as e:
-        messagebox.showerror("Error", f"No se pudo crear hoja:\n{e}")
+        messagebox.showerror("Error", f"Error general al preparar hoja:\n{str(e)}")
         return False
-    finally:
-        if 'wb_com' in locals():
-            wb_com.Close(False)
-        if 'excel' in locals():
-            excel.Quit()
-        pythoncom.CoUninitialize()
 
+
+# def rotar_etiquetas_graficos(ruta_archivo, nombre_hoja):
+#     pythoncom.CoInitialize()
+#     excel = None
+#     try:
+#         excel = win32.Dispatch("Excel.Application") # Iniciar Excel en segundo plano
+#         excel.Visible = False
+#         excel.DisplayAlerts = False
+#         excel.ScreenUpdating = False  # Optimizar rendimiento
+#         wb = excel.Workbooks.Open(ruta_archivo)
+#         sheet = wb.Sheets(nombre_hoja)
+#         for chart_obj in sheet.ChartObjects(): # Procesar todos los gráficos en la hoja
+#             try:
+#                 chart = chart_obj.Chart
+#                 x_axis = chart.Axes(1)
+#                 x_axis.TickLabels.Orientation = 45 # Rotar etiquetas a 45 grados
+#             except Exception as e:
+#                 print(f"Advertencia: Error en gráfico - {str(e)}")
+#                 continue
+#         wb.Save()
+#         wb.Close(True)
+#     except Exception as e:
+#         print(f"Error crítico al rotar etiquetas: {str(e)}")
+#     finally:
+#         try:
+#             if 'wb' in locals():
+#                 wb.Close(False)
+#         except:
+#             pass
+#         try:
+#             if excel:
+#                 excel.Quit()
+#         except:
+#             pass
+#         pythoncom.CoUninitialize()
 
 
 def rotar_etiquetas_graficos(ruta_archivo, nombre_hoja):
+    """Función mejorada para rotar etiquetas con manejo robusto de errores"""
     pythoncom.CoInitialize()
     excel = None
+    wb = None
+    
     try:
-        excel = win32.Dispatch("Excel.Application") # Iniciar Excel en segundo plano
+        # Esperar un momento para asegurar que el archivo esté disponible
+        time.sleep(1)
+        
+        excel = win32.Dispatch("Excel.Application")
         excel.Visible = False
         excel.DisplayAlerts = False
-        excel.ScreenUpdating = False  # Optimizar rendimiento
-        wb = excel.Workbooks.Open(ruta_archivo)
+        excel.ScreenUpdating = False
+        
+        # Usar ruta absoluta y verificar que el archivo existe
+        ruta_abs = os.path.abspath(ruta_archivo)
+        if not os.path.exists(ruta_abs):
+            raise FileNotFoundError(f"No se encontró el archivo: {ruta_abs}")
+        
+        wb = excel.Workbooks.Open(ruta_abs)
+        
+        # Verificar que la hoja existe
+        if nombre_hoja not in [sh.Name for sh in wb.Sheets]:
+            raise ValueError(f"No se encontró la hoja '{nombre_hoja}'")
+        
         sheet = wb.Sheets(nombre_hoja)
-        for chart_obj in sheet.ChartObjects(): # Procesar todos los gráficos en la hoja
+        
+        # Procesar gráficos con más manejo de errores
+        for chart_obj in sheet.ChartObjects():
             try:
                 chart = chart_obj.Chart
-                x_axis = chart.Axes(1)
-                x_axis.TickLabels.Orientation = 45 # Rotar etiquetas a 45 grados
+                # Verificar que el gráfico tiene ejes
+                if chart.HasAxis(1):  # Eje x
+                    x_axis = chart.Axes(1)
+                    x_axis.TickLabels.Orientation = 45
             except Exception as e:
-                print(f"Advertencia: Error en gráfico - {str(e)}")
+                print(f"Advertencia: Error al rotar etiquetas en gráfico - {str(e)}")
                 continue
+        
+        # Guardar y cerrar
         wb.Save()
-        wb.Close(True)
+        return True
+        
     except Exception as e:
         print(f"Error crítico al rotar etiquetas: {str(e)}")
+        return False
     finally:
+        # Cerrar en orden inverso
         try:
-            if 'wb' in locals():
-                wb.Close(False)
+            if wb:
+                wb.Close(True)
         except:
             pass
         try:
@@ -607,6 +809,7 @@ def rotar_etiquetas_graficos(ruta_archivo, nombre_hoja):
         except:
             pass
         pythoncom.CoUninitialize()
+
 
 ventana = tk.Tk()
 ventana.title("Ingresar datos")
