@@ -1,5 +1,5 @@
 import openpyxl, re, shutil, time, os, sys, tkinter as tk
-from openpyxl.styles import Border, Side, Alignment, PatternFill
+from openpyxl.styles import Font, Border, Side, Alignment, PatternFill
 from datetime import datetime
 from tkinter import messagebox, ttk
 from tkcalendar import DateEntry
