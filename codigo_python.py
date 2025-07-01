@@ -375,71 +375,128 @@ def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque
         celda.value = valor_ae / 100 if valor_ae > 1 else valor_ae  # Porcentaje en decimal
         celda.number_format = '0.00%'
 
+# def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
+#     """Versión mejorada con manejo robusto de valores calculados"""
+#     nombre_hoja = f"IR {mes} {anio}"
+#     col_dia = dia + 1  # columna B es 2, día 1 → columna 2
+#     try:
+#         # 1. Abrir el archivo con openpyxl en modo de solo lectura primero
+#         with openpyxl.load_workbook(RUTA_ENTRADA, data_only=True) as wb_temp:
+#             if nombre_hoja not in wb_temp.sheetnames:
+#                 messagebox.showerror("Error", f"No se encontró la hoja '{nombre_hoja}'")
+#                 return
+
+#             # Verificar valores temporalmente
+#             hoja_temp = wb_temp[nombre_hoja]
+
+#         # 2. Abrir el archivo principal para escritura
+#         wb = openpyxl.load_workbook(RUTA_ENTRADA)
+#         hoja_mes = wb[nombre_hoja]
+
+#         # 3. Preparar datos para escritura
+#         valores_para_escribir = [val for i, (tipo, val) in enumerate(bloques_detectados) if i % 2 == 1]
+#         tipos_para_escribir = [tipo for i, (tipo, val) in enumerate(bloques_detectados) if i % 2 == 1]
+
+#         # 4. Escribir valores con verificación
+#         for (tipo_bloque, valor), valor_ae in zip(zip(tipos_para_escribir, valores_para_escribir), sumas_ad_por_bloque):
+#             # Escribir valor del bloque
+#             escribir_valor_bloque(hoja_mes, col_dia, torno, valor, tipo_bloque)
+
+#             # Verificar y ajustar valor AE antes de escribir
+#             try:
+#                 valor_ae_float = float(valor_ae) if not isinstance(valor_ae, (int, float)) else valor_ae
+#                 # Escribir valor AE verificando que no sea 0.00 incorrecto
+#                 if valor_ae_float != 0.0 or str(hoja_temp.cell(
+#                     row=13 if (tipo_bloque == "PODADO" and torno == 1) else 
+#                     14 if (tipo_bloque == "PODADO" and torno != 1) else
+#                     18 if (tipo_bloque == "REGULAR" and torno == 1) else
+#                     19, 
+#                     column=col_dia).value) == "0.00":
+#                     escribir_valores_resumen_bloques(hoja_mes, col_dia, torno, [valor_ae_float], [tipo_bloque])
+#             except (ValueError, TypeError):
+#                 messagebox.showwarning("Advertencia", f"Valor AE inválido para {tipo_bloque}: {valor_ae}")
+
+#         # 5. Guardar cambios
+#         wb.save(RUTA_ENTRADA)
+#         wb.close()
+#         # 6. Forzar actualización con Excel COM para asegurar cálculos
+#         try:
+#             pythoncom.CoInitialize()
+#             excel = win32.Dispatch("Excel.Application")
+#             excel.Visible = False
+#             excel.DisplayAlerts = False
+#             wb_com = excel.Workbooks.Open(RUTA_ENTRADA)
+#             excel.CalculateFull()
+#             wb_com.Save()
+#             wb_com.Close()
+#             excel.Quit()
+#             pythoncom.CoUninitialize()
+#         except Exception as e:
+#             print(f"Advertencia al forzar cálculo: {str(e)}")
+#             pythoncom.CoUninitialize()
+#         # 7. Copia de seguridad
+#         shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
+#         messagebox.showinfo("Éxito", "✅ Valores actualizados correctamente.")
+#     except Exception as e:
+#         messagebox.showerror("Error", f"No se pudo escribir en hoja:\n{str(e)}\n\n"
+#                               "Verifique que el archivo no esté abierto en Excel.")
+
+
 def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
-    """Versión mejorada con manejo robusto de valores calculados"""
+    """Escribe los datos en la hoja del mes (versión corregida sin context manager)"""
     nombre_hoja = f"IR {mes} {anio}"
     col_dia = dia + 1  # columna B es 2, día 1 → columna 2
+    
+    wb = None
     try:
-        # 1. Abrir el archivo con openpyxl en modo de solo lectura primero
-        with openpyxl.load_workbook(RUTA_ENTRADA, data_only=True) as wb_temp:
-            if nombre_hoja not in wb_temp.sheetnames:
-                messagebox.showerror("Error", f"No se encontró la hoja '{nombre_hoja}'")
-                return
-
-            # Verificar valores temporalmente
-            hoja_temp = wb_temp[nombre_hoja]
-
-        # 2. Abrir el archivo principal para escritura
+        # 1. Abrir el archivo principal
         wb = openpyxl.load_workbook(RUTA_ENTRADA)
-        hoja_mes = wb[nombre_hoja]
+        
+        # Verificar si la hoja existe
+        if nombre_hoja not in wb.sheetnames:
+            messagebox.showerror("Error", f"No se encontró la hoja '{nombre_hoja}'")
+            return False
 
-        # 3. Preparar datos para escritura
+        hoja_mes = wb[nombre_hoja]
+        
+        # 2. Escribir valores de bloques
         valores_para_escribir = [val for i, (tipo, val) in enumerate(bloques_detectados) if i % 2 == 1]
         tipos_para_escribir = [tipo for i, (tipo, val) in enumerate(bloques_detectados) if i % 2 == 1]
-
-        # 4. Escribir valores con verificación
+        
         for (tipo_bloque, valor), valor_ae in zip(zip(tipos_para_escribir, valores_para_escribir), sumas_ad_por_bloque):
-            # Escribir valor del bloque
             escribir_valor_bloque(hoja_mes, col_dia, torno, valor, tipo_bloque)
-
-            # Verificar y ajustar valor AE antes de escribir
-            try:
-                valor_ae_float = float(valor_ae) if not isinstance(valor_ae, (int, float)) else valor_ae
-                # Escribir valor AE verificando que no sea 0.00 incorrecto
-                if valor_ae_float != 0.0 or str(hoja_temp.cell(
-                    row=13 if (tipo_bloque == "PODADO" and torno == 1) else 
-                    14 if (tipo_bloque == "PODADO" and torno != 1) else
-                    18 if (tipo_bloque == "REGULAR" and torno == 1) else
-                    19, 
-                    column=col_dia).value) == "0.00":
-                    escribir_valores_resumen_bloques(hoja_mes, col_dia, torno, [valor_ae_float], [tipo_bloque])
-            except (ValueError, TypeError):
-                messagebox.showwarning("Advertencia", f"Valor AE inválido para {tipo_bloque}: {valor_ae}")
-
-        # 5. Guardar cambios
+            escribir_valores_resumen_bloques(hoja_mes, col_dia, torno, [valor_ae], [tipo_bloque])
+        
+        # 3. Guardar cambios
         wb.save(RUTA_ENTRADA)
-        wb.close()
-        # 6. Forzar actualización con Excel COM para asegurar cálculos
+        
+        # 4. Copia de seguridad
         try:
-            pythoncom.CoInitialize()
-            excel = win32.Dispatch("Excel.Application")
-            excel.Visible = False
-            excel.DisplayAlerts = False
-            wb_com = excel.Workbooks.Open(RUTA_ENTRADA)
-            excel.CalculateFull()
-            wb_com.Save()
-            wb_com.Close()
-            excel.Quit()
-            pythoncom.CoUninitialize()
+            shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
         except Exception as e:
-            print(f"Advertencia al forzar cálculo: {str(e)}")
-            pythoncom.CoUninitialize()
-        # 7. Copia de seguridad
-        shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
+            messagebox.showwarning("Advertencia", f"No se pudo crear copia de seguridad:\n{str(e)}")
+        
         messagebox.showinfo("Éxito", "✅ Valores actualizados correctamente.")
+        return True
+        
     except Exception as e:
-        messagebox.showerror("Error", f"No se pudo escribir en hoja:\n{str(e)}\n\n"
-                              "Verifique que el archivo no esté abierto en Excel.")
+        messagebox.showerror("Error", 
+            f"No se pudo escribir en hoja:\n{str(e)}\n\n"
+            "Verifique que:\n"
+            "1. El archivo no esté abierto en Excel\n"
+            "2. Tenga permisos de escritura\n"
+            "3. La hoja exista en el archivo"
+        )
+        return False
+        
+    finally:
+        # 5. Cerrar el workbook si está abierto
+        if wb is not None:
+            try:
+                wb.close()
+            except:
+                pass
+
 
 def preparar_hoja_mes(mes, dia, anio):
     """Crea la hoja del mes si no existe, limpia el día y rota etiquetas como en la función fecha() antigua."""
