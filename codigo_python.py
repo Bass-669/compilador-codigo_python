@@ -580,7 +580,7 @@ def preparar_hoja_mes(mes, dia, anio):
             
             # Texto "FALTANTE" para AH13, AH14, AH18, AH19
             for fila in [13, 14, 18, 19]:
-                hoja.cell(row=fila, column=34, value="FALTANTE")
+                hoja.cell(row=fila, column=34, value=" ")
             
             # Fórmulas para AH39 y AH40 con formato porcentual
             hoja.cell(row=39, column=34, value="=AH33/AH28").number_format = '0.00%'
@@ -608,6 +608,10 @@ def preparar_hoja_mes(mes, dia, anio):
                 except Exception as e:
                     print(f"Error procesando columna {letra}: {str(e)}")
                     continue
+
+            celda = hoja.cell(row=32, column=34, value="R%")
+            celda.font = Font(bold=True, name=celda.font.name, size=celda.font.size)  # Preserva fuente y tamaño original
+            celda.alignment = Alignment(horizontal='center', vertical='center')
             
             hoja.cell(row=49, column=27, value=" ")
             hoja.cell(row=50, column=27, value=" ")
