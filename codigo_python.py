@@ -687,20 +687,20 @@ def rotar_etiquetas_graficos(ruta_archivo, nombre_hoja):
                 mensaje += "\n\nProblemas encontrados:\n" + "\n".join(problemas[:3])
             messagebox.showinfo("Resultado", mensaje)
             resultado = True
-        else:
-            mensaje = (
-                "No se pudo rotar ningún gráfico.\n\n"
-                "Causas probables:\n"
-                "1. Versión de Excel no compatible\n"
-                "2. Gráficos de tipo especial (3D, combinados, etc.)\n"
-                "3. El archivo está protegido o dañado\n\n"
-                "Solución recomendada:\n"
-                "1. Guardar los gráficos como imágenes\n"
-                "2. Crear nuevos gráficos estándar\n"
-                "3. Actualizar Microsoft Excel"
-            )
-            messagebox.showerror("Error", mensaje)
-            resultado = False
+        # else:
+        #     mensaje = (
+        #         "No se pudo rotar ningún gráfico.\n\n"
+        #         "Causas probables:\n"
+        #         "1. Versión de Excel no compatible\n"
+        #         "2. Gráficos de tipo especial (3D, combinados, etc.)\n"
+        #         "3. El archivo está protegido o dañado\n\n"
+        #         "Solución recomendada:\n"
+        #         "1. Guardar los gráficos como imágenes\n"
+        #         "2. Crear nuevos gráficos estándar\n"
+        #         "3. Actualizar Microsoft Excel"
+        #     )
+        #     messagebox.showerror("Error", mensaje)
+        #     resultado = False
         # 6. Guardar cambios si hubo éxito
         if rotados > 0:
             try:
