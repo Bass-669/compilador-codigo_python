@@ -246,73 +246,160 @@ def es_valor_valido(valor):
     except:
         return False
 
+# original
+# def crear_archivo_temporal_con_ae(celda_origen):
+#     pythoncom.CoInitialize()
+#     excel = win32.Dispatch("Excel.Application")
+#     excel.Visible = False
+#     excel.DisplayAlerts = False
+#     try:
+#         # Validar formato de celda_origen
+#         if not re.match(r'^AD\d+$', celda_origen):
+#             raise ValueError(f"Formato de celda inválido: {celda_origen}")
+        
+#         wb = excel.Workbooks.Open(RUTA_ENTRADA)
+#         hoja = wb.Sheets("IR diario ")
+#         # Extraer número de fila de manera segura
+#         try:
+#             fila = int(re.search(r'\d+', celda_origen).group())
+#         except:
+#             raise ValueError(f"No se pudo extraer número de fila de {celda_origen}")
+#         # Verificar que la fila existe
+#         if fila > hoja.UsedRange.Rows.Count or fila < 1:
+#             raise ValueError(f"Fila {fila} está fuera de rango")
+        
+#         # 1. Copiar valor original
+#         valor_original = hoja.Range(celda_origen).Value
+#         # 2. Forzar cálculo y convertir a valor absoluto
+#         hoja.Range(celda_origen).Copy()
+#         celda_destino = f"AE{fila}"
+#         hoja.Range(celda_destino).PasteSpecial(Paste=-4163)  # xlPasteValues
+#         # 3. Guardar como temporal
+#         temp_dir = os.path.join(BASE_DIR, CARPETA)
+#         os.makedirs(temp_dir, exist_ok=True)
+#         temp_path = os.path.join(temp_dir, "temp_report.xlsx")
+#         # 4. Guardar y cerrar
+#         wb.SaveAs(temp_path)
+#         wb.Close(False)
+#         excel.Quit()
+#         # 5. Leer con openpyxl (modo solo valores)
+#         wb_temp = openpyxl.load_workbook(temp_path, data_only=True)
+#         hoja_temp = wb_temp["IR diario "]
+#         # 6. Obtener valor con múltiples validaciones
+#         valor_celda = hoja_temp.cell(row=fila, column=31).value
+#         valor_ae = valor_celda
+#         # 7. Limpieza y conversión segura
+#         try:
+#             if valor_ae in (None, "#N/A", "#VALUE!", "#REF!", "#DIV/0!"):
+#                 return temp_path, 0.0
+            
+#             if isinstance(valor_ae, (int, float)):
+#                 valor_final = float(valor_ae)
+#             else:
+#                 valor_final = float(str(valor_ae).replace(",", "."))
+                
+#             return temp_path, valor_final
+            
+#         except (ValueError, TypeError):
+#             return temp_path, 0.0
+            
+#     except Exception as e:
+#         print(f"Error crítico en crear_archivo_temporal: {str(e)}")
+#         try:
+#             if 'wb' in locals():
+#                 wb.Close(False)
+#             excel.Quit()
+#         except:
+#             pass
+#         return None, 0.0
+#     finally:
+#         pythoncom.CoUninitialize()
+
+
 def crear_archivo_temporal_con_ae(celda_origen):
     pythoncom.CoInitialize()
-    excel = win32.Dispatch("Excel.Application")
-    excel.Visible = False
-    excel.DisplayAlerts = False
+    excel = None
+    wb = None
+    temp_txt_path = None
+    valor_ae = 0.0
+    
     try:
         # Validar formato de celda_origen
         if not re.match(r'^AD\d+$', celda_origen):
             raise ValueError(f"Formato de celda inválido: {celda_origen}")
         
+        # Configurar ruta del TXT (siempre nuevo)
+        temp_dir = os.path.join(BASE_DIR, CARPETA, "temp")
+        os.makedirs(temp_dir, exist_ok=True)
+        
+        # Eliminar TXTs antiguos primero
+        for old_file in glob.glob(os.path.join(temp_dir, "temp_values_*.txt")):
+            try:
+                os.remove(old_file)
+            except:
+                pass
+                
+        # Crear nuevo TXT con timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        temp_txt_path = os.path.join(temp_dir, f"temp_values_{timestamp}.txt")
+        
+        # Procesar con Excel
+        excel = win32.Dispatch("Excel.Application")
+        excel.Visible = False
+        excel.DisplayAlerts = False
+        
         wb = excel.Workbooks.Open(RUTA_ENTRADA)
         hoja = wb.Sheets("IR diario ")
-        # Extraer número de fila de manera segura
-        try:
-            fila = int(re.search(r'\d+', celda_origen).group())
-        except:
-            raise ValueError(f"No se pudo extraer número de fila de {celda_origen}")
-        # Verificar que la fila existe
+        
+        # Extraer número de fila
+        fila = int(re.search(r'\d+', celda_origen).group())
         if fila > hoja.UsedRange.Rows.Count or fila < 1:
             raise ValueError(f"Fila {fila} está fuera de rango")
         
-        # 1. Copiar valor original
+        # Obtener valor directamente
         valor_original = hoja.Range(celda_origen).Value
-        # 2. Forzar cálculo y convertir a valor absoluto
         hoja.Range(celda_origen).Copy()
         celda_destino = f"AE{fila}"
         hoja.Range(celda_destino).PasteSpecial(Paste=-4163)  # xlPasteValues
-        # 3. Guardar como temporal
-        temp_dir = os.path.join(BASE_DIR, CARPETA)
-        os.makedirs(temp_dir, exist_ok=True)
-        temp_path = os.path.join(temp_dir, "temp_report.xlsx")
-        # 4. Guardar y cerrar
-        wb.SaveAs(temp_path)
-        wb.Close(False)
-        excel.Quit()
-        # 5. Leer con openpyxl (modo solo valores)
-        wb_temp = openpyxl.load_workbook(temp_path, data_only=True)
-        hoja_temp = wb_temp["IR diario "]
-        # 6. Obtener valor con múltiples validaciones
-        valor_celda = hoja_temp.cell(row=fila, column=31).value
-        valor_ae = valor_celda
-        # 7. Limpieza y conversión segura
+        
+        # Forzar cálculo
+        excel.CalculateFull()
+        valor_ae = hoja.Range(celda_destino).Value
+        
+        # Procesar valor AE
         try:
             if valor_ae in (None, "#N/A", "#VALUE!", "#REF!", "#DIV/0!"):
-                return temp_path, 0.0
-            
-            if isinstance(valor_ae, (int, float)):
-                valor_final = float(valor_ae)
+                valor_ae = 0.0
+            elif isinstance(valor_ae, (int, float)):
+                valor_ae = float(valor_ae)
             else:
-                valor_final = float(str(valor_ae).replace(",", "."))
-                
-            return temp_path, valor_final
-            
+                valor_ae = float(str(valor_ae).replace(",", "."))
         except (ValueError, TypeError):
-            return temp_path, 0.0
-            
+            valor_ae = 0.0
+        
+        # Guardar SOLO el valor actual en el TXT (sin historial)
+        with open(temp_txt_path, 'w') as f:
+            f.write(f"{valor_ae}\n")  # Solo una línea con el valor actual
+        
     except Exception as e:
-        print(f"Error crítico en crear_archivo_temporal: {str(e)}")
+        print(f"Error en crear_archivo_temporal: {str(e)}")
+        valor_ae = 0.0
+    
+    finally:
+        # Limpieza garantizada
         try:
-            if 'wb' in locals():
+            if wb:
                 wb.Close(False)
-            excel.Quit()
+            if excel:
+                excel.Quit()
         except:
             pass
-        return None, 0.0
-    finally:
         pythoncom.CoUninitialize()
+    
+    # Devolvemos el valor directamente (el TXT es solo como respaldo)
+    return valor_ae
+
+
 
 def extraer_bloques(txt):
     lineas = [l.strip() for l in txt.strip().split("\n") if l.strip()]
