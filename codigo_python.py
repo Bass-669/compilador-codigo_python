@@ -318,26 +318,43 @@ def es_valor_valido(valor):
 
 def crear_archivo_temporal_con_ae(celda_origen):
     """
-    Devuelve una referencia a la celda en formato: ='IR diario '!AD123
+    Versión mejorada que usa messagebox para depuración y:
+    1. Devuelve referencia correcta a la celda AD
+    2. Maneja mejor los casos de error
+    3. Proporciona feedback al usuario
     """
     try:
-        # Validar formato de celda (ej: "AD123")
-        if not re.match(r'^AD\d+$', celda_origen):
-            messagebox.showerror("Error", f"Formato de celda inválido: {celda_origen}")
-            return None, 0.0
+        # Validación robusta del formato de entrada
+        if not isinstance(celda_origen, str) or not celda_origen.upper().startswith('AD'):
+            raise ValueError(f"Formato de celda inválido. Debe ser 'AD123', recibido: {celda_origen}")
         
-        # Extraer número de fila
-        fila = re.search(r'\d+', celda_origen).group()
+        # Extraer número de fila con validación
+        try:
+            fila = int(celda_origen[2:])  # Extrae todo después de 'AD'
+            if fila <= 0:
+                raise ValueError("El número de fila debe ser positivo")
+        except ValueError as e:
+            raise ValueError(f"Número de fila inválido en '{celda_origen}': {str(e)}")
         
-        # Crear referencia a la celda
-        referencia_celda = f"='IR diario '!{celda_origen}"
+        # Construir referencia completa
+        referencia = f"='IR diario '!{celda_origen.upper()}"
         
-        # Para compatibilidad, también devolvemos un valor por defecto
-        return referencia_celda, 0.0
+        # Mostrar mensaje de depuración
+        messagebox.showinfo("DEBUG - Referencia generada", 
+                          f"Se generó la referencia:\n\n{referencia}\n\n"
+                          f"Para la celda origen: {celda_origen}")
+        
+        return referencia, 0.0  # Mantenemos el 0.0 por compatibilidad
         
     except Exception as e:
-        messagebox.showerror("Error", f"Error al crear referencia:\n{str(e)}")
-        return None, 0.0
+        # Mostrar error al usuario
+        error_msg = f"Error en crear_archivo_temporal_con_ae:\n\n" \
+                   f"Celda origen: {celda_origen}\n" \
+                   f"Error: {str(e)}\n\n" \
+                   f"Se usará valor por defecto (0.00)."
+        
+        messagebox.showerror("Error", error_msg)
+        return None, 0.0  # Devuelve None para la referencia y 0.0 por defecto
 
 
 def extraer_bloques(txt):
@@ -404,30 +421,62 @@ def escribir_valor_bloque(hoja, col_dia, torno, valor, tipo_bloque):
 
 
 def escribir_valores_resumen_bloques(hoja, col_dia, torno, referencias_ae_por_bloque, tipos_bloque):
+    """
+    Versión mejorada que usa messagebox para feedback y:
+    1. Acepta referencias de celdas o valores directos
+    2. Maneja mejor los casos de error
+    3. Proporciona retroalimentación al usuario
+    """
+    resultados = []
+    
     for i, (tipo_bloque, referencia_ae) in enumerate(zip(tipos_bloque, referencias_ae_por_bloque)):
-        tipo_bloque = tipo_bloque.strip().upper()
-        
-        # Determinar fila según el tipo de bloque y torno
-        if tipo_bloque == "PODADO":
-            fila_valor = 13 if torno == 1 else 14
-        elif tipo_bloque == "REGULAR":
-            fila_valor = 18 if torno == 1 else 19
-        else:
-            continue  # ignorar bloques con tipo desconocido
-        
-        # Escribir la referencia en la celda
-        celda = hoja.cell(row=fila_valor, column=col_dia)
-        
-        if referencia_ae and isinstance(referencia_ae, str) and referencia_ae.startswith("='IR diario '!"):
-            # Escribir la referencia directa a la celda
-            celda.value = referencia_ae
-        else:
-            # Si no hay referencia válida, mantener lógica original (porcentaje)
-            valor_ae = referencia_ae if isinstance(referencia_ae, (int, float)) else 0.0
-            celda.value = valor_ae / 100 if valor_ae > 1 else valor_ae
-        
-        # Mantener el formato de porcentaje
-        celda.number_format = '0.00%'
+        try:
+            tipo_bloque = tipo_bloque.strip().upper()
+            
+            # Determinar fila según el tipo de bloque y torno
+            if tipo_bloque == "PODADO":
+                fila_valor = 13 if torno == 1 else 14
+            elif tipo_bloque == "REGULAR":
+                fila_valor = 18 if torno == 1 else 19
+            else:
+                messagebox.showwarning("Tipo de bloque desconocido", 
+                                      f"Se encontró un tipo de bloque no reconocido: '{tipo_bloque}'\n\n"
+                                      "Los valores válidos son: 'PODADO' o 'REGULAR'.\n"
+                                      "Este bloque será omitido.")
+                continue
+            
+            celda = hoja.cell(row=fila_valor, column=col_dia)
+            
+            # Manejar diferentes tipos de entrada
+            if isinstance(referencia_ae, str) and referencia_ae.startswith("='IR diario '!AD"):
+                # Caso ideal: tenemos una referencia válida
+                celda.value = referencia_ae
+                resultados.append(f"✓ Bloque {i+1} ({tipo_bloque}): Referencia escrita correctamente")
+            elif isinstance(referencia_ae, (int, float)):
+                # Caso de compatibilidad: valor numérico directo
+                valor = referencia_ae / 100 if referencia_ae > 1 else referencia_ae
+                celda.value = valor
+                resultados.append(f"⚠ Bloque {i+1} ({tipo_bloque}): Valor directo usado (no referencia)")
+            else:
+                # Caso de error: usar 0.00
+                celda.value = 0.0
+                resultados.append(f"✗ Bloque {i+1} ({tipo_bloque}): Valor AE inválido - Usado 0.00")
+            
+            # Aplicar formato de porcentaje en todos los casos
+            celda.number_format = '0.00%'
+            celda.alignment = ALIGN_R
+            celda.border = BORDER
+            
+        except Exception as e:
+            error_msg = f"Error procesando bloque {i+1} (Tipo: {tipo_bloque}):\n\n{str(e)}"
+            messagebox.showerror("Error en bloque", error_msg)
+            resultados.append(f"✗ Bloque {i+1} ({tipo_bloque}): Error - {str(e)}")
+            continue
+    
+    # Mostrar resumen al final
+    if resultados:
+        resumen = "Resumen de operación:\n\n" + "\n".join(resultados)
+        messagebox.showinfo("Resultado de la operación", resumen)
 
 
 def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
