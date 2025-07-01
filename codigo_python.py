@@ -318,140 +318,26 @@ def es_valor_valido(valor):
 
 def crear_archivo_temporal_con_ae(celda_origen):
     """
-    Función que obtiene un valor de Excel, lo guarda en un TXT y luego lo lee.
-    Incluye messagebox para depuración en cada paso crítico.
+    Devuelve una referencia a la celda en formato: ='IR diario '!AD123
     """
-    pythoncom.CoInitialize()
-    excel = None
-    wb = None
-    valor_ae = 0.0
-    temp_txt_path = os.path.join(BASE_DIR, CARPETA, "temp_valor_ae.txt")
-    
     try:
-        # Mostrar inicio del proceso
-        messagebox.showinfo("Depuración", f"Iniciando proceso para celda: {celda_origen}")
-        
-        # PASO 1: Configurar Excel
-        try:
-            excel = win32.Dispatch("Excel.Application")
-            excel.Visible = False
-            excel.DisplayAlerts = False
-            messagebox.showinfo("Depuración", "Excel configurado correctamente")
-        except Exception as e:
-            messagebox.showerror("Error Excel", f"No se pudo configurar Excel:\n{str(e)}")
-            raise
-
-        # PASO 2: Abrir archivo Excel
-        try:
-            wb = excel.Workbooks.Open(RUTA_ENTRADA)
-            hoja = wb.Sheets("IR diario ")
-            messagebox.showinfo("Depuración", f"Archivo abierto: {RUTA_ENTRADA}")
-        except Exception as e:
-            messagebox.showerror("Error Archivo", f"No se pudo abrir el archivo:\n{str(e)}")
-            raise
-
-        # Validar formato de celda
+        # Validar formato de celda (ej: "AD123")
         if not re.match(r'^AD\d+$', celda_origen):
-            error_msg = f"Formato de celda inválido: {celda_origen}"
-            messagebox.showerror("Error Formato", error_msg)
-            raise ValueError(error_msg)
-
-        # Extraer número de fila
-        try:
-            fila = int(re.search(r'\d+', celda_origen).group())
-            messagebox.showinfo("Depuración", f"Fila extraída: {fila}")
-        except Exception as e:
-            messagebox.showerror("Error Fila", f"No se pudo extraer número de fila:\n{str(e)}")
-            raise
-
-        # Verificar que la fila existe
-        if fila > hoja.UsedRange.Rows.Count or fila < 1:
-            error_msg = f"Fila {fila} está fuera de rango"
-            messagebox.showerror("Error Rango", error_msg)
-            raise ValueError(error_msg)
-
-        # PASO 3: Obtener valor de Excel
-        try:
-            celda_destino = f"AE{fila}"
-            valor_excel = hoja.Range(celda_destino).Value
-            messagebox.showinfo("Valor Obtenido", f"Valor en {celda_destino}: {valor_excel}")
-        except Exception as e:
-            messagebox.showerror("Error Lectura", f"No se pudo leer el valor:\n{str(e)}")
-            raise
-
-        # PASO 4: Escribir en TXT
-        try:
-            with open(temp_txt_path, 'w') as f:
-                f.write(str(valor_excel))
-            messagebox.showinfo("Escritura TXT", f"Valor guardado en:\n{temp_txt_path}")
-        except Exception as e:
-            messagebox.showerror("Error TXT", f"No se pudo escribir en TXT:\n{str(e)}")
-            raise
-
-        # PASO 5: Cerrar Excel
-        try:
-            wb.Close(False)
-            excel.Quit()
-            messagebox.showinfo("Depuración", "Excel cerrado correctamente")
-        except Exception as e:
-            messagebox.showerror("Error Cierre", f"No se pudo cerrar Excel:\n{str(e)}")
-            raise
-
-        # Pequeña pausa para asegurar cierre
-        time.sleep(0.5)
+            messagebox.showerror("Error", f"Formato de celda inválido: {celda_origen}")
+            return None, 0.0
         
-        # PASO 6: Leer del TXT
-        try:
-            with open(temp_txt_path, 'r') as f:
-                contenido = f.read().strip()
-            messagebox.showinfo("Lectura TXT", f"Contenido leído:\n{contenido}")
-        except Exception as e:
-            messagebox.showerror("Error Lectura TXT", f"No se pudo leer el TXT:\n{str(e)}")
-            raise
-            
-        # PASO 7: Procesar valor
-        try:
-            if contenido in ("None", "#N/A", "#VALUE!", "#REF!", "#DIV/0!"):
-                valor_ae = 0.0
-                messagebox.showwarning("Valor Inválido", "Se detectó un valor inválido, usando 0.0")
-            else:
-                valor_ae = float(contenido.replace(",", "."))
-                messagebox.showinfo("Valor Procesado", f"Valor convertido: {valor_ae}")
-        except (ValueError, TypeError) as e:
-            valor_ae = 0.0
-            messagebox.showerror("Error Conversión", f"Error al convertir valor:\n{str(e)}\nUsando 0.0")
-
-        messagebox.showinfo("Proceso Completado", "¡Proceso finalizado con éxito!")
-        return temp_txt_path, valor_ae
+        # Extraer número de fila
+        fila = re.search(r'\d+', celda_origen).group()
+        
+        # Crear referencia a la celda
+        referencia_celda = f"='IR diario '!{celda_origen}"
+        
+        # Para compatibilidad, también devolvemos un valor por defecto
+        return referencia_celda, 0.0
         
     except Exception as e:
-        error_msg = f"Error en crear_archivo_temporal_con_ae: {str(e)}"
-        messagebox.showerror("Error General", error_msg)
-        
-        # Si hay error, intentar leer el TXT si existe
-        if os.path.exists(temp_txt_path):
-            try:
-                with open(temp_txt_path, 'r') as f:
-                    contenido = f.read().strip()
-                    valor_ae = float(contenido) if contenido.replace(".", "").isdigit() else 0.0
-                messagebox.showinfo("Recuperación", f"Valor recuperado del TXT: {valor_ae}")
-            except:
-                valor_ae = 0.0
-                messagebox.showwarning("Recuperación Fallida", "No se pudo recuperar valor del TXT")
-        
-        return temp_txt_path, valor_ae
-        
-    finally:
-        # Limpieza garantizada
-        try:
-            if wb:
-                wb.Close(False)
-            if excel:
-                excel.Quit()
-        except Exception as e:
-            messagebox.showerror("Error Limpieza", f"Error al limpiar recursos:\n{str(e)}")
-        finally:
-            pythoncom.CoUninitialize()
+        messagebox.showerror("Error", f"Error al crear referencia:\n{str(e)}")
+        return None, 0.0
 
 
 def extraer_bloques(txt):
@@ -503,17 +389,44 @@ def escribir_valor_bloque(hoja, col_dia, torno, valor, tipo_bloque):
     celda.value = valor_final
     celda.number_format = '0' # cambio de 0.00 a 0
 
-def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque, tipos_bloque):
-    for i, (tipo_bloque, valor_ae) in enumerate(zip(tipos_bloque, valores_ae_por_bloque)):
+# def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque, tipos_bloque):
+#     for i, (tipo_bloque, valor_ae) in enumerate(zip(tipos_bloque, valores_ae_por_bloque)):
+#         tipo_bloque = tipo_bloque.strip().upper()
+#         if tipo_bloque == "PODADO":
+#             fila_valor = 13 if torno == 1 else 14
+#         elif tipo_bloque == "REGULAR":
+#             fila_valor = 18 if torno == 1 else 19
+#         else:
+#             continue # ignorar bloques con tipo desconocido
+#         celda = hoja.cell(row=fila_valor, column=col_dia)
+#         celda.value = valor_ae / 100 if valor_ae > 1 else valor_ae  # Porcentaje en decimal
+#         celda.number_format = '0.00%'
+
+
+def escribir_valores_resumen_bloques(hoja, col_dia, torno, referencias_ae_por_bloque, tipos_bloque):
+    for i, (tipo_bloque, referencia_ae) in enumerate(zip(tipos_bloque, referencias_ae_por_bloque)):
         tipo_bloque = tipo_bloque.strip().upper()
+        
+        # Determinar fila según el tipo de bloque y torno
         if tipo_bloque == "PODADO":
             fila_valor = 13 if torno == 1 else 14
         elif tipo_bloque == "REGULAR":
             fila_valor = 18 if torno == 1 else 19
         else:
-            continue # ignorar bloques con tipo desconocido
+            continue  # ignorar bloques con tipo desconocido
+        
+        # Escribir la referencia en la celda
         celda = hoja.cell(row=fila_valor, column=col_dia)
-        celda.value = valor_ae / 100 if valor_ae > 1 else valor_ae  # Porcentaje en decimal
+        
+        if referencia_ae and isinstance(referencia_ae, str) and referencia_ae.startswith("='IR diario '!"):
+            # Escribir la referencia directa a la celda
+            celda.value = referencia_ae
+        else:
+            # Si no hay referencia válida, mantener lógica original (porcentaje)
+            valor_ae = referencia_ae if isinstance(referencia_ae, (int, float)) else 0.0
+            celda.value = valor_ae / 100 if valor_ae > 1 else valor_ae
+        
+        # Mantener el formato de porcentaje
         celda.number_format = '0.00%'
 
 
