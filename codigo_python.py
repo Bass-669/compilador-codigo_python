@@ -410,7 +410,7 @@ def escribir_valor_bloque(hoja, col_dia, torno, valor, tipo_bloque):
 
 def escribir_valores_resumen_bloques(hoja, col_dia, torno, referencias_ae_por_bloque, tipos_bloque):
     """
-    Versión corregida que asegura el uso de referencias
+    Versión corregida con manejo adecuado de strings
     """
     for i, (tipo_bloque, referencia_ae) in enumerate(zip(tipos_bloque, referencias_ae_por_bloque)):
         try:
@@ -428,9 +428,10 @@ def escribir_valores_resumen_bloques(hoja, col_dia, torno, referencias_ae_por_bl
             
             # Verificar y corregir referencia si es necesario
             if isinstance(referencia_ae, str):
-                # Asegurar que la referencia tenga el formato correcto
-                if not referencia_ae.startswith("='IR diario '!"):
-                    referencia_ae = f"='IR diario '!{referencia_ae.replace("'", "").replace("=", "")}"
+                # Primero limpiamos la referencia
+                ref_limpia = referencia_ae.replace("'", "").replace("=", "")
+                # Luego construimos la referencia correcta
+                referencia_ae = f"='IR diario '!{ref_limpia}"
                 
                 # Verificar que sea una referencia válida
                 if re.match(r"^='IR diario '!AD\d+$", referencia_ae):
