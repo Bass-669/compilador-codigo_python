@@ -588,7 +588,9 @@ def preparar_hoja_mes(mes, dia, anio):
         # wb2.close()
         # return True
 
-                # agregar la limpiesa da la pagina
+            # agregar la limpiesa da la pagina
+            # Limpiar datos del día, escribir fecha y fórmulas
+            try:
                 wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
                 hoja = wb2[nombre_hoja]
                 
@@ -677,10 +679,6 @@ def preparar_hoja_mes(mes, dia, anio):
                         wb2.close()
                 except:
                     pass
-
-    except Exception as e:
-        messagebox.showerror("Error", f"Error al preparar hoja:\n{e}")
-        return False
 
 
 def rotar_etiquetas_graficos(ruta_archivo, nombre_hoja):
