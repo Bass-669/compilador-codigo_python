@@ -790,7 +790,24 @@ def preparar_hoja_mes(mes, dia, anio):
                 try:
                     letra = openpyxl.utils.get_column_letter(col_num)
                     celda = hoja.cell(row=40, column=col_num, value=f"=IFERROR({letra}34/{letra}28, 0)")
-                    celda.number_format = '0.00'
+                    celda.number_format = '0.00%'
+                    celda.alignment = Alignment(horizontal='right')
+                    celda.border = Border(
+                        left=Side(style='thin'),
+                        right=Side(style='thin'),
+                        top=Side(style='thin'),
+                        bottom=Side(style='thin')
+                    )
+                except Exception as e:
+                    print(f"Error escribiendo fórmula en columna {col_num}: {str(e)}")
+                    continue
+
+            # Escribir fórmulas en fila 34 (B a AF) para calcular promedio
+            for col_num in range(2, 33):
+                try:
+                    letra = openpyxl.utils.get_column_letter(col_num)
+                    celda = hoja.cell(row=34, column=col_num, value=f"=IFERROR(AVERAGE({letra}32:{letra}33), 0)")
+                    celda.number_format = '0.00%'
                     celda.alignment = Alignment(horizontal='right')
                     celda.border = Border(
                         left=Side(style='thin'),
