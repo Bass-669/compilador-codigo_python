@@ -570,6 +570,49 @@ def preparar_hoja_mes(mes, dia, anio):
                     print(f"Error escribiendo fórmula en columna {col_num}: {str(e)}")
                     continue
 
+            # ===== NUEVAS FÓRMULAS PARA COLUMNA AH =====
+            # Escribir año en AH2 (columna 34)
+            hoja.cell(row=2, column=34, value=int(anio))
+            
+            # Fórmulas de suma para AH3, AH4, AH8, AH9
+            for fila in [3, 4, 8, 9]:
+                hoja.cell(row=fila, column=34, value=f"=SUM(B{fila}:AG{fila})")
+            
+            # Texto "FALTANTE" para AH13, AH14, AH18, AH19
+            for fila in [13, 14, 18, 19]:
+                hoja.cell(row=fila, column=34, value="FALTANTE")
+            
+            # Fórmulas para AH39 y AH40 con formato porcentual
+            hoja.cell(row=39, column=34, value="=AH33/AH28").number_format = '0.00%'
+            hoja.cell(row=40, column=34, value="=AH34/AH28").number_format = '0.00%'
+
+            for col_num in range(2,24):
+                celda = hoja.cell(row=23, column=col_num, value=f"=IFERROR(({letra}3*{letra}13+{letra}8*{letra}18)/({letra}3+{letra}8), 0)")
+                celda = hoja.cell(row=24, column=col_num, value=f"=IFERROR(({letra}4*{letra}14+{letra}9*{letra}19)/({letra}4+{letra}9), 0)")
+                celda = hoja.cell(row=28, column=col_num, 
+                 value=f"=IFERROR(({letra}23*({letra}3+{letra}8)+{letra}24*({letra}4+{letra}9))/({letra}3+{letra}4+{letra}8+{letra}9), 0)")
+                celda = hoja.cell(row=38, column=col_num, value=f"=IFERROR({letra}32/{letra}23, 0)")
+                celda = hoja.cell(row=39, column=col_num, value=f"=IFERROR({letra}33/{letra}24, 0)")
+            
+            hoja.cell(row=49, column=27, value=" ")
+            hoja.cell(row=50, column=27, value=" ")
+            hoja.cell(row=51, column=27, value=" ")
+            
+            hoja.cell(row=49, column=28, value=" ")
+            hoja.cell(row=50, column=28, value=" ")
+            hoja.cell(row=51, column=28, value=" ")
+            
+            hoja.cell(row=49, column=29, value=" ")
+            hoja.cell(row=50, column=29, value=" ")
+            hoja.cell(row=51, column=29, value=" ")
+            
+            hoja.cell(row=49, column=30, value=" ")
+            hoja.cell(row=50, column=30, value=" ")
+            hoja.cell(row=51, column=30, value=" ")
+            
+            # ===== FIN DE NUEVAS FÓRMULAS =====
+
+            
             # Guardar cambios
             try:
                 wb2.save(RUTA_ENTRADA)
