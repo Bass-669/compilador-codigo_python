@@ -317,74 +317,130 @@ def es_valor_valido(valor):
 
 
 def crear_archivo_temporal_con_ae(celda_origen):
+    """
+    Función que obtiene un valor de Excel, lo guarda en un TXT y luego lo lee.
+    Incluye messagebox para depuración en cada paso crítico.
+    """
     pythoncom.CoInitialize()
     excel = None
     wb = None
-    temp_txt_path = None
     valor_ae = 0.0
+    temp_txt_path = os.path.join(BASE_DIR, CARPETA, "temp_valor_ae.txt")
     
     try:
-        # Validar formato de celda_origen
-        if not re.match(r'^AD\d+$', celda_origen):
-            raise ValueError(f"Formato de celda inválido: {celda_origen}")
+        # Mostrar inicio del proceso
+        messagebox.showinfo("Depuración", f"Iniciando proceso para celda: {celda_origen}")
         
-        # Configurar ruta del TXT (siempre nuevo)
-        temp_dir = os.path.join(BASE_DIR, CARPETA, "temp")
-        os.makedirs(temp_dir, exist_ok=True)
-        
-        # Eliminar TXTs antiguos primero
-        for old_file in glob.glob(os.path.join(temp_dir, "temp_values_*.txt")):
-            try:
-                os.remove(old_file)
-            except:
-                pass
-                
-        # Crear nuevo TXT con timestamp
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-        temp_txt_path = os.path.join(temp_dir, f"temp_values_{timestamp}.txt")
-        
-        # Procesar con Excel
-        excel = win32.Dispatch("Excel.Application")
-        excel.Visible = False
-        excel.DisplayAlerts = False
-        
-        wb = excel.Workbooks.Open(RUTA_ENTRADA)
-        hoja = wb.Sheets("IR diario ")
-        
-        # Extraer número de fila
-        fila = int(re.search(r'\d+', celda_origen).group())
-        if fila > hoja.UsedRange.Rows.Count or fila < 1:
-            raise ValueError(f"Fila {fila} está fuera de rango")
-        
-        # Obtener valor directamente
-        valor_original = hoja.Range(celda_origen).Value
-        hoja.Range(celda_origen).Copy()
-        celda_destino = f"AE{fila}"
-        hoja.Range(celda_destino).PasteSpecial(Paste=-4163)  # xlPasteValues
-        
-        # Forzar cálculo
-        excel.CalculateFull()
-        valor_ae = hoja.Range(celda_destino).Value
-        
-        # Procesar valor AE
+        # PASO 1: Configurar Excel
         try:
-            if valor_ae in (None, "#N/A", "#VALUE!", "#REF!", "#DIV/0!"):
-                valor_ae = 0.0
-            elif isinstance(valor_ae, (int, float)):
-                valor_ae = float(valor_ae)
-            else:
-                valor_ae = float(str(valor_ae).replace(",", "."))
-        except (ValueError, TypeError):
-            valor_ae = 0.0
+            excel = win32.Dispatch("Excel.Application")
+            excel.Visible = False
+            excel.DisplayAlerts = False
+            messagebox.showinfo("Depuración", "Excel configurado correctamente")
+        except Exception as e:
+            messagebox.showerror("Error Excel", f"No se pudo configurar Excel:\n{str(e)}")
+            raise
+
+        # PASO 2: Abrir archivo Excel
+        try:
+            wb = excel.Workbooks.Open(RUTA_ENTRADA)
+            hoja = wb.Sheets("IR diario ")
+            messagebox.showinfo("Depuración", f"Archivo abierto: {RUTA_ENTRADA}")
+        except Exception as e:
+            messagebox.showerror("Error Archivo", f"No se pudo abrir el archivo:\n{str(e)}")
+            raise
+
+        # Validar formato de celda
+        if not re.match(r'^AD\d+$', celda_origen):
+            error_msg = f"Formato de celda inválido: {celda_origen}"
+            messagebox.showerror("Error Formato", error_msg)
+            raise ValueError(error_msg)
+
+        # Extraer número de fila
+        try:
+            fila = int(re.search(r'\d+', celda_origen).group())
+            messagebox.showinfo("Depuración", f"Fila extraída: {fila}")
+        except Exception as e:
+            messagebox.showerror("Error Fila", f"No se pudo extraer número de fila:\n{str(e)}")
+            raise
+
+        # Verificar que la fila existe
+        if fila > hoja.UsedRange.Rows.Count or fila < 1:
+            error_msg = f"Fila {fila} está fuera de rango"
+            messagebox.showerror("Error Rango", error_msg)
+            raise ValueError(error_msg)
+
+        # PASO 3: Obtener valor de Excel
+        try:
+            celda_destino = f"AE{fila}"
+            valor_excel = hoja.Range(celda_destino).Value
+            messagebox.showinfo("Valor Obtenido", f"Valor en {celda_destino}: {valor_excel}")
+        except Exception as e:
+            messagebox.showerror("Error Lectura", f"No se pudo leer el valor:\n{str(e)}")
+            raise
+
+        # PASO 4: Escribir en TXT
+        try:
+            with open(temp_txt_path, 'w') as f:
+                f.write(str(valor_excel))
+            messagebox.showinfo("Escritura TXT", f"Valor guardado en:\n{temp_txt_path}")
+        except Exception as e:
+            messagebox.showerror("Error TXT", f"No se pudo escribir en TXT:\n{str(e)}")
+            raise
+
+        # PASO 5: Cerrar Excel
+        try:
+            wb.Close(False)
+            excel.Quit()
+            messagebox.showinfo("Depuración", "Excel cerrado correctamente")
+        except Exception as e:
+            messagebox.showerror("Error Cierre", f"No se pudo cerrar Excel:\n{str(e)}")
+            raise
+
+        # Pequeña pausa para asegurar cierre
+        time.sleep(0.5)
         
-        # Guardar SOLO el valor actual en el TXT (sin historial)
-        with open(temp_txt_path, 'w') as f:
-            f.write(f"{valor_ae}\n")  # Solo una línea con el valor actual
+        # PASO 6: Leer del TXT
+        try:
+            with open(temp_txt_path, 'r') as f:
+                contenido = f.read().strip()
+            messagebox.showinfo("Lectura TXT", f"Contenido leído:\n{contenido}")
+        except Exception as e:
+            messagebox.showerror("Error Lectura TXT", f"No se pudo leer el TXT:\n{str(e)}")
+            raise
+            
+        # PASO 7: Procesar valor
+        try:
+            if contenido in ("None", "#N/A", "#VALUE!", "#REF!", "#DIV/0!"):
+                valor_ae = 0.0
+                messagebox.showwarning("Valor Inválido", "Se detectó un valor inválido, usando 0.0")
+            else:
+                valor_ae = float(contenido.replace(",", "."))
+                messagebox.showinfo("Valor Procesado", f"Valor convertido: {valor_ae}")
+        except (ValueError, TypeError) as e:
+            valor_ae = 0.0
+            messagebox.showerror("Error Conversión", f"Error al convertir valor:\n{str(e)}\nUsando 0.0")
+
+        messagebox.showinfo("Proceso Completado", "¡Proceso finalizado con éxito!")
+        return temp_txt_path, valor_ae
         
     except Exception as e:
-        print(f"Error en crear_archivo_temporal: {str(e)}")
-        valor_ae = 0.0
-    
+        error_msg = f"Error en crear_archivo_temporal_con_ae: {str(e)}"
+        messagebox.showerror("Error General", error_msg)
+        
+        # Si hay error, intentar leer el TXT si existe
+        if os.path.exists(temp_txt_path):
+            try:
+                with open(temp_txt_path, 'r') as f:
+                    contenido = f.read().strip()
+                    valor_ae = float(contenido) if contenido.replace(".", "").isdigit() else 0.0
+                messagebox.showinfo("Recuperación", f"Valor recuperado del TXT: {valor_ae}")
+            except:
+                valor_ae = 0.0
+                messagebox.showwarning("Recuperación Fallida", "No se pudo recuperar valor del TXT")
+        
+        return temp_txt_path, valor_ae
+        
     finally:
         # Limpieza garantizada
         try:
@@ -392,13 +448,10 @@ def crear_archivo_temporal_con_ae(celda_origen):
                 wb.Close(False)
             if excel:
                 excel.Quit()
-        except:
-            pass
-        pythoncom.CoUninitialize()
-    
-    # Devolvemos el valor directamente (el TXT es solo como respaldo)
-    return valor_ae
-
+        except Exception as e:
+            messagebox.showerror("Error Limpieza", f"Error al limpiar recursos:\n{str(e)}")
+        finally:
+            pythoncom.CoUninitialize()
 
 
 def extraer_bloques(txt):
