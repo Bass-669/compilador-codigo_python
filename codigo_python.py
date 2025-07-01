@@ -498,17 +498,204 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
                 pass
 
 
+# def preparar_hoja_mes(mes, dia, anio):
+#     """Crea la hoja del mes si no existe, limpia el día y rota etiquetas como en la función fecha() antigua."""
+#     nombre_hoja = f"IR {mes} {anio}"
+#     col_dia = dia + 1
+#     hoja_nueva_creada = False
+#     try:
+#         wb_check = openpyxl.load_workbook(RUTA_ENTRADA)
+#         if nombre_hoja in wb_check.sheetnames:
+#             wb_check.close()
+#         else:
+#             wb_check.close()
+#             pythoncom.CoInitialize()
+#             excel = wb = None
+#             try:
+#                 excel = win32.gencache.EnsureDispatch('Excel.Application')
+#                 excel.Visible = False
+#                 excel.DisplayAlerts = False
+#                 wb = excel.Workbooks.Open(RUTA_ENTRADA, UpdateLinks=0)
+
+#                 hojas = [h.Name for h in wb.Sheets]
+#                 hojas_ir = [h for h in hojas if h.startswith("IR ") and len(h.split()) == 3]
+
+#                 def total_meses(nombre):
+#                     try:
+#                         _, mes_str, anio_str = nombre.split()
+#                         return int(anio_str) * 12 + MESES_NUM[mes_str]
+#                     except:
+#                         return -1
+
+#                 hojas_ordenadas = sorted(hojas_ir, key=total_meses)
+#                 total_nueva = int(anio) * 12 + MESES_NUM[mes]
+#                 hoja_anterior = None
+#                 for h in hojas_ordenadas:
+#                     if total_meses(h) < total_nueva:
+#                         hoja_anterior = h
+#                     else:
+#                         break
+
+#                 if not hoja_anterior:
+#                     messagebox.showwarning("Orden inválido", f"No se encontró hoja anterior para insertar '{nombre_hoja}'")
+#                     return False
+
+#                 idx_anterior = hojas.index(hoja_anterior)
+#                 insert_idx = min(idx_anterior + 2, wb.Sheets.Count + 1)
+#                 nombres_antes = [s.Name for s in wb.Sheets]
+#                 wb.Sheets(hoja_anterior).Copy(After=wb.Sheets(insert_idx - 1))
+#                 nombres_despues = [s.Name for s in wb.Sheets]
+#                 nueva_temporal = list(set(nombres_despues) - set(nombres_antes))
+#                 if not nueva_temporal:
+#                     messagebox.showerror("Error", "No se pudo identificar hoja copiada")
+#                     return False
+#                 hoja_copiada = wb.Sheets(nueva_temporal[0])
+#                 hoja_copiada.Name = nombre_hoja
+#                 wb.Save()
+#                 hoja_nueva_creada = True
+
+#             except Exception as e:
+#                 messagebox.showerror("Error", f"No se pudo crear hoja nueva:\n{e}")
+#                 return False
+#             finally:
+#                 try:
+#                     if wb: wb.Close(SaveChanges=True)
+#                 except: pass
+#                 try:
+#                     if excel: excel.Quit()
+#                 except: pass
+#                 pythoncom.CoUninitialize()
+
+#             # 💡 Aquí es donde se rotaban etiquetas en tu función original
+#             rotar_etiquetas_graficos(RUTA_ENTRADA, nombre_hoja)
+
+#         # # Limpiar datos del día y escribir fecha
+#         # wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
+#         # hoja = wb2[nombre_hoja]
+#         # if hoja_nueva_creada or hoja.cell(row=2, column=col_dia).value is None:
+#         #     filas_fechas = [2, 3, 4, 7, 8, 9, 12, 13, 14, 17, 18, 19, 22, 27, 31, 32, 33, 34, 37, 40]
+#         #     for fila in filas_fechas:
+#         #         for col in range(2, 40):
+#         #             celda = hoja.cell(row=fila, column=col)
+#         #             if not isinstance(celda, openpyxl.cell.cell.MergedCell):
+#         #                 celda.value = ""
+
+#         #     nueva_fecha = f"{dia:02d}/{MESES_NUM[mes]:02d}/{anio}"
+#         #     for fila in [2, 7, 12, 17, 22, 27, 31, 37]:
+#         #         hoja.cell(row=fila, column=col_dia, value=nueva_fecha)
+
+#         #     wb2.save(RUTA_ENTRADA)
+#         # wb2.close()
+#         # return True
+
+#         # agregar la limpiesa da la pagina
+#         # Limpiar datos del día, escribir fecha y fórmulas
+#         try:
+#             wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
+#             hoja = wb2[nombre_hoja]
+            
+#             if hoja_nueva_creada or hoja.cell(row=2, column=col_dia).value is None:
+#                 # 1. Limpiar datos del día
+#                 filas_a_limpiar = [2, 3, 4, 7, 8, 9, 12, 13, 14, 17, 18, 19, 22, 27, 31, 32, 33, 34, 37, 40]
+#                 columnas_a_limpiar = range(2, 40)  # Desde B hasta AN
+                
+#                 for fila in filas_a_limpiar:
+#                     for col in columnas_a_limpiar:
+#                         try:
+#                             celda = hoja.cell(row=fila, column=col)
+#                             if not isinstance(celda, openpyxl.cell.cell.MergedCell):
+#                                 celda.value = ""
+#                         except Exception as e:
+#                             print(f"Error limpiando celda {fila},{col}: {str(e)}")
+#                             continue
+
+#                 # 2. Escribir nueva fecha
+#                 formato_fecha = f"{dia:02d}/{MESES_NUM[mes]:02d}/{anio}"
+#                 filas_fecha = [2, 7, 12, 17, 22, 27, 31, 37]
+                
+#                 for fila in filas_fecha:
+#                     try:
+#                         hoja.cell(row=fila, column=col_dia, value=formato_fecha)
+#                     except Exception as e:
+#                         print(f"Error escribiendo fecha en fila {fila}: {str(e)}")
+#                         continue
+
+#                 # 3. Escribir fórmulas en fila 40 (B a AF)
+#                 for col_num in range(2, 33):
+#                     try:
+#                         letra = openpyxl.utils.get_column_letter(col_num)
+#                         celda = hoja.cell(row=40, column=col_num)
+                        
+#                         # Escribir fórmula
+#                         celda.value = f"=IFERROR({letra}34/{letra}28, 0)"  # Usando IFERROR en inglés
+#                         celda.number_format = '0.00'
+#                         celda.alignment = Alignment(horizontal='right')
+#                         celda.border = Border(
+#                             left=Side(style='thin'),
+#                             right=Side(style='thin'),
+#                             top=Side(style='thin'),
+#                             bottom=Side(style='thin')
+#                         )
+#                     except Exception as e:
+#                         print(f"Error escribiendo fórmula en columna {col_num}: {str(e)}")
+#                         continue
+
+#                 # Guardar cambios
+#                 try:
+#                     wb2.save(RUTA_ENTRADA)
+                    
+#                     # Forzar actualización de fórmulas con Excel COM
+#                     try:
+#                         pythoncom.CoInitialize()
+#                         excel = win32.Dispatch("Excel.Application")
+#                         excel.Visible = False
+#                         excel.DisplayAlerts = False
+#                         excel_wb = excel.Workbooks.Open(RUTA_ENTRADA)
+#                         excel.CalculateFull()  # Fuerza recálculo completo
+#                         excel_wb.Save()
+#                         excel_wb.Close()
+#                         excel.Quit()
+#                         pythoncom.CoUninitialize()
+#                     except Exception as com_error:
+#                         print(f"Error al actualizar fórmulas: {str(com_error)}")
+#                         pythoncom.CoUninitialize()
+                        
+#                 except Exception as save_error:
+#                     raise Exception(f"No se pudo guardar el archivo: {str(save_error)}")
+            
+#             return True
+            
+#         except Exception as main_error:
+#             messagebox.showerror(
+#                 "Error crítico",
+#                 f"No se pudo completar la operación:\n{str(main_error)}\n\n"
+#                 "Verifique que el archivo no esté abierto en Excel."
+#             )
+#             return False
+            
+#         finally:
+#             try:
+#                 if 'wb2' in locals():
+#                     wb2.close()
+#             except:
+#                 pass
+
+
 def preparar_hoja_mes(mes, dia, anio):
-    """Crea la hoja del mes si no existe, limpia el día y rota etiquetas como en la función fecha() antigua."""
+    """Crea la hoja del mes si no existe, limpia el día y configura fórmulas"""
     nombre_hoja = f"IR {mes} {anio}"
-    col_dia = dia + 1
+    col_dia = dia + 1  # columna B es 2, día 1 → columna 2
     hoja_nueva_creada = False
+    
     try:
+        # 1. Verificar si la hoja ya existe
         wb_check = openpyxl.load_workbook(RUTA_ENTRADA)
         if nombre_hoja in wb_check.sheetnames:
             wb_check.close()
         else:
             wb_check.close()
+            
+            # 2. Crear nueva hoja usando Excel COM
             pythoncom.CoInitialize()
             excel = wb = None
             try:
@@ -517,6 +704,7 @@ def preparar_hoja_mes(mes, dia, anio):
                 excel.DisplayAlerts = False
                 wb = excel.Workbooks.Open(RUTA_ENTRADA, UpdateLinks=0)
 
+                # Encontrar hoja anterior adecuada para copiar
                 hojas = [h.Name for h in wb.Sheets]
                 hojas_ir = [h for h in hojas if h.startswith("IR ") and len(h.split()) == 3]
 
@@ -530,6 +718,7 @@ def preparar_hoja_mes(mes, dia, anio):
                 hojas_ordenadas = sorted(hojas_ir, key=total_meses)
                 total_nueva = int(anio) * 12 + MESES_NUM[mes]
                 hoja_anterior = None
+                
                 for h in hojas_ordenadas:
                     if total_meses(h) < total_nueva:
                         hoja_anterior = h
@@ -540,17 +729,14 @@ def preparar_hoja_mes(mes, dia, anio):
                     messagebox.showwarning("Orden inválido", f"No se encontró hoja anterior para insertar '{nombre_hoja}'")
                     return False
 
+                # Copiar hoja anterior
                 idx_anterior = hojas.index(hoja_anterior)
-                insert_idx = min(idx_anterior + 2, wb.Sheets.Count + 1)
-                nombres_antes = [s.Name for s in wb.Sheets]
+                insert_idx = min(idx_anterior + 2, wb.Sheets.Count)
                 wb.Sheets(hoja_anterior).Copy(After=wb.Sheets(insert_idx - 1))
-                nombres_despues = [s.Name for s in wb.Sheets]
-                nueva_temporal = list(set(nombres_despues) - set(nombres_antes))
-                if not nueva_temporal:
-                    messagebox.showerror("Error", "No se pudo identificar hoja copiada")
-                    return False
-                hoja_copiada = wb.Sheets(nueva_temporal[0])
-                hoja_copiada.Name = nombre_hoja
+                
+                # Renombrar la nueva hoja
+                nueva_hoja = wb.ActiveSheet
+                nueva_hoja.Name = nombre_hoja
                 wb.Save()
                 hoja_nueva_creada = True
 
@@ -559,126 +745,103 @@ def preparar_hoja_mes(mes, dia, anio):
                 return False
             finally:
                 try:
-                    if wb: wb.Close(SaveChanges=True)
-                except: pass
+                    if wb:
+                        wb.Close(SaveChanges=True)
+                except:
+                    pass
                 try:
-                    if excel: excel.Quit()
-                except: pass
+                    if excel:
+                        excel.Quit()
+                except:
+                    pass
                 pythoncom.CoUninitialize()
 
-            # 💡 Aquí es donde se rotaban etiquetas en tu función original
+            # Rotar etiquetas de gráficos en la nueva hoja
             rotar_etiquetas_graficos(RUTA_ENTRADA, nombre_hoja)
 
-        # # Limpiar datos del día y escribir fecha
-        # wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
-        # hoja = wb2[nombre_hoja]
-        # if hoja_nueva_creada or hoja.cell(row=2, column=col_dia).value is None:
-        #     filas_fechas = [2, 3, 4, 7, 8, 9, 12, 13, 14, 17, 18, 19, 22, 27, 31, 32, 33, 34, 37, 40]
-        #     for fila in filas_fechas:
-        #         for col in range(2, 40):
-        #             celda = hoja.cell(row=fila, column=col)
-        #             if not isinstance(celda, openpyxl.cell.cell.MergedCell):
-        #                 celda.value = ""
-
-        #     nueva_fecha = f"{dia:02d}/{MESES_NUM[mes]:02d}/{anio}"
-        #     for fila in [2, 7, 12, 17, 22, 27, 31, 37]:
-        #         hoja.cell(row=fila, column=col_dia, value=nueva_fecha)
-
-        #     wb2.save(RUTA_ENTRADA)
-        # wb2.close()
-        # return True
-
-        # agregar la limpiesa da la pagina
-        # Limpiar datos del día, escribir fecha y fórmulas
-        try:
-            wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
-            hoja = wb2[nombre_hoja]
-            
-            if hoja_nueva_creada or hoja.cell(row=2, column=col_dia).value is None:
-                # 1. Limpiar datos del día
-                filas_a_limpiar = [2, 3, 4, 7, 8, 9, 12, 13, 14, 17, 18, 19, 22, 27, 31, 32, 33, 34, 37, 40]
-                columnas_a_limpiar = range(2, 40)  # Desde B hasta AN
-                
-                for fila in filas_a_limpiar:
-                    for col in columnas_a_limpiar:
-                        try:
-                            celda = hoja.cell(row=fila, column=col)
-                            if not isinstance(celda, openpyxl.cell.cell.MergedCell):
-                                celda.value = ""
-                        except Exception as e:
-                            print(f"Error limpiando celda {fila},{col}: {str(e)}")
-                            continue
-
-                # 2. Escribir nueva fecha
-                formato_fecha = f"{dia:02d}/{MESES_NUM[mes]:02d}/{anio}"
-                filas_fecha = [2, 7, 12, 17, 22, 27, 31, 37]
-                
-                for fila in filas_fecha:
+        # 3. Limpiar datos del día y configurar fórmulas
+        wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
+        hoja = wb2[nombre_hoja]
+        
+        if hoja_nueva_creada or hoja.cell(row=2, column=col_dia).value is None:
+            # Limpiar datos del día
+            filas_a_limpiar = [2, 3, 4, 7, 8, 9, 12, 13, 14, 17, 18, 19, 22, 27, 31, 32, 33, 34, 37, 40]
+            for fila in filas_a_limpiar:
+                for col in range(2, 40):
                     try:
-                        hoja.cell(row=fila, column=col_dia, value=formato_fecha)
+                        celda = hoja.cell(row=fila, column=col)
+                        if not isinstance(celda, openpyxl.cell.cell.MergedCell):
+                            celda.value = ""
                     except Exception as e:
-                        print(f"Error escribiendo fecha en fila {fila}: {str(e)}")
+                        print(f"Error limpiando celda {fila},{col}: {str(e)}")
                         continue
 
-                # 3. Escribir fórmulas en fila 40 (B a AF)
-                for col_num in range(2, 33):
-                    try:
-                        letra = openpyxl.utils.get_column_letter(col_num)
-                        celda = hoja.cell(row=40, column=col_num)
-                        
-                        # Escribir fórmula
-                        celda.value = f"=IFERROR({letra}34/{letra}28, 0)"  # Usando IFERROR en inglés
-                        celda.number_format = '0.00'
-                        celda.alignment = Alignment(horizontal='right')
-                        celda.border = Border(
-                            left=Side(style='thin'),
-                            right=Side(style='thin'),
-                            top=Side(style='thin'),
-                            bottom=Side(style='thin')
-                        )
-                    except Exception as e:
-                        print(f"Error escribiendo fórmula en columna {col_num}: {str(e)}")
-                        continue
-
-                # Guardar cambios
+            # Escribir nueva fecha
+            nueva_fecha = f"{dia:02d}/{MESES_NUM[mes]:02d}/{anio}"
+            for fila in [2, 7, 12, 17, 22, 27, 31, 37]:
                 try:
-                    wb2.save(RUTA_ENTRADA)
-                    
-                    # Forzar actualización de fórmulas con Excel COM
-                    try:
-                        pythoncom.CoInitialize()
-                        excel = win32.Dispatch("Excel.Application")
-                        excel.Visible = False
-                        excel.DisplayAlerts = False
-                        excel_wb = excel.Workbooks.Open(RUTA_ENTRADA)
-                        excel.CalculateFull()  # Fuerza recálculo completo
-                        excel_wb.Save()
-                        excel_wb.Close()
-                        excel.Quit()
-                        pythoncom.CoUninitialize()
-                    except Exception as com_error:
-                        print(f"Error al actualizar fórmulas: {str(com_error)}")
-                        pythoncom.CoUninitialize()
-                        
-                except Exception as save_error:
-                    raise Exception(f"No se pudo guardar el archivo: {str(save_error)}")
-            
-            return True
-            
-        except Exception as main_error:
-            messagebox.showerror(
-                "Error crítico",
-                f"No se pudo completar la operación:\n{str(main_error)}\n\n"
-                "Verifique que el archivo no esté abierto en Excel."
-            )
-            return False
-            
-        finally:
+                    hoja.cell(row=fila, column=col_dia, value=nueva_fecha)
+                except Exception as e:
+                    print(f"Error escribiendo fecha en fila {fila}: {str(e)}")
+                    continue
+
+            # Escribir fórmulas en fila 40 (B a AF)
+            for col_num in range(2, 33):
+                try:
+                    letra = openpyxl.utils.get_column_letter(col_num)
+                    celda = hoja.cell(row=40, column=col_num, value=f"=IFERROR({letra}34/{letra}28, 0)")
+                    celda.number_format = '0.00'
+                    celda.alignment = Alignment(horizontal='right')
+                    celda.border = Border(
+                        left=Side(style='thin'),
+                        right=Side(style='thin'),
+                        top=Side(style='thin'),
+                        bottom=Side(style='thin')
+                    )
+                except Exception as e:
+                    print(f"Error escribiendo fórmula en columna {col_num}: {str(e)}")
+                    continue
+
+            # Guardar cambios
             try:
-                if 'wb2' in locals():
-                    wb2.close()
-            except:
-                pass
+                wb2.save(RUTA_ENTRADA)
+                
+                # Forzar actualización de fórmulas con Excel COM
+                try:
+                    pythoncom.CoInitialize()
+                    excel = win32.Dispatch("Excel.Application")
+                    excel.Visible = False
+                    excel.DisplayAlerts = False
+                    excel_wb = excel.Workbooks.Open(RUTA_ENTRADA)
+                    excel.CalculateFull()
+                    excel_wb.Save()
+                    excel_wb.Close()
+                    excel.Quit()
+                    pythoncom.CoUninitialize()
+                except Exception as com_error:
+                    print(f"Error al actualizar fórmulas: {str(com_error)}")
+                    pythoncom.CoUninitialize()
+                    
+            except Exception as save_error:
+                raise Exception(f"No se pudo guardar el archivo: {str(save_error)}")
+        
+        return True
+        
+    except Exception as main_error:
+        messagebox.showerror(
+            "Error crítico",
+            f"No se pudo completar la operación:\n{str(main_error)}\n\n"
+            "Verifique que el archivo no esté abierto en Excel."
+        )
+        return False
+        
+    finally:
+        try:
+            if 'wb2' in locals():
+                wb2.close()
+        except:
+            pass
+
 
 def rotar_etiquetas_graficos(ruta_archivo, nombre_hoja):
     """Versión final que maneja todos los casos de gráficos y versiones de Excel"""
