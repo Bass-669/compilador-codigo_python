@@ -586,13 +586,28 @@ def preparar_hoja_mes(mes, dia, anio):
             hoja.cell(row=39, column=34, value="=AH33/AH28").number_format = '0.00%'
             hoja.cell(row=40, column=34, value="=AH34/AH28").number_format = '0.00%'
 
-            for col_num in range(2,24):
-                celda = hoja.cell(row=23, column=col_num, value=f"=IFERROR(({letra}3*{letra}13+{letra}8*{letra}18)/({letra}3+{letra}8), 0)")
-                celda = hoja.cell(row=24, column=col_num, value=f"=IFERROR(({letra}4*{letra}14+{letra}9*{letra}19)/({letra}4+{letra}9), 0)")
-                celda = hoja.cell(row=28, column=col_num, 
-                 value=f"=IFERROR(({letra}23*({letra}3+{letra}8)+{letra}24*({letra}4+{letra}9))/({letra}3+{letra}4+{letra}8+{letra}9), 0)")
-                celda = hoja.cell(row=38, column=col_num, value=f"=IFERROR({letra}32/{letra}23, 0)")
-                celda = hoja.cell(row=39, column=col_num, value=f"=IFERROR({letra}33/{letra}24, 0)")
+            for col_num in range(2, 24):
+                try:
+                    letra = openpyxl.utils.get_column_letter(col_num)  # Definir letra primero
+                    # Fila 23
+                    hoja.cell(row=23, column=col_num, 
+                             value=f"=IFERROR(({letra}3*{letra}13+{letra}8*{letra}18)/({letra}3+{letra}8), 0)")
+                    # Fila 24
+                    hoja.cell(row=24, column=col_num, 
+                             value=f"=IFERROR(({letra}4*{letra}14+{letra}9*{letra}19)/({letra}4+{letra}9), 0)")
+                    # Fila 28
+                    hoja.cell(row=28, column=col_num, 
+                             value=f"=IFERROR(({letra}23*({letra}3+{letra}8)+{letra}24*({letra}4+{letra}9))/({letra}3+{letra}4+{letra}8+{letra}9), 0)")
+                    # Fila 38
+                    hoja.cell(row=38, column=col_num, 
+                             value=f"=IFERROR({letra}32/{letra}23, 0)")
+                    # Fila 39
+                    hoja.cell(row=39, column=col_num, 
+                             value=f"=IFERROR({letra}33/{letra}24, 0)")
+                        
+                except Exception as e:
+                    print(f"Error procesando columna {letra}: {str(e)}")
+                    continue
             
             hoja.cell(row=49, column=27, value=" ")
             hoja.cell(row=50, column=27, value=" ")
