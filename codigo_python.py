@@ -586,7 +586,7 @@ def preparar_hoja_mes(mes, dia, anio):
             hoja.cell(row=39, column=34, value="=AH33/AH28").number_format = '0.00%'
             hoja.cell(row=40, column=34, value="=AH34/AH28").number_format = '0.00%'
 
-            for col_num in range(2, 24):
+            for col_num in range(2, 32):
                 try:
                     letra = openpyxl.utils.get_column_letter(col_num)  # Definir letra primero
                     # Fila 23
