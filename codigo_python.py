@@ -494,13 +494,72 @@ def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque
             continue
 
 
+# def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
+#     """Escribe los datos en la hoja del mes (versión corregida sin context manager)"""
+#     nombre_hoja = f"IR {mes} {anio}"
+#     col_dia = dia + 1  # columna B es 2, día 1 → columna 2
+    
+#     wb = None
+#     try:
+#         # 1. Abrir el archivo principal
+#         wb = openpyxl.load_workbook(RUTA_ENTRADA)
+        
+#         # Verificar si la hoja existe
+#         if nombre_hoja not in wb.sheetnames:
+#             messagebox.showerror("Error", f"No se encontró la hoja '{nombre_hoja}'")
+#             return False
+
+#         hoja_mes = wb[nombre_hoja]
+        
+#         # 2. Escribir valores de bloques
+#         valores_para_escribir = [val for i, (tipo, val) in enumerate(bloques_detectados) if i % 2 == 1]
+#         tipos_para_escribir = [tipo for i, (tipo, val) in enumerate(bloques_detectados) if i % 2 == 1]
+        
+#         for (tipo_bloque, valor), valor_ae in zip(zip(tipos_para_escribir, valores_para_escribir), sumas_ad_por_bloque):
+#             escribir_valor_bloque(hoja_mes, col_dia, torno, valor, tipo_bloque)
+#             escribir_valores_resumen_bloques(hoja_mes, col_dia, torno, [valor_ae], [tipo_bloque])
+        
+#         # 3. Guardar cambios
+#         wb.save(RUTA_ENTRADA)
+        
+#         # 4. Copia de seguridad
+#         try:
+#             shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
+#         except Exception as e:
+#             messagebox.showwarning("Advertencia", f"No se pudo crear copia de seguridad:\n{str(e)}")
+        
+#         messagebox.showinfo("Éxito", "✅ Valores actualizados correctamente.")
+#         return True
+        
+#     except Exception as e:
+#         messagebox.showerror("Error", 
+#             f"No se pudo escribir en hoja:\n{str(e)}\n\n"
+#             "Verifique que:\n"
+#             "1. El archivo no esté abierto en Excel\n"
+#             "2. Tenga permisos de escritura\n"
+#             "3. La hoja exista en el archivo"
+#         )
+#         return False
+        
+#     finally:
+#         # 5. Cerrar el workbook si está abierto
+#         if wb is not None:
+#             try:
+#                 wb.close()
+#             except:
+#                 pass
+
+
+
 def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
-    """Escribe los datos en la hoja del mes (versión corregida sin context manager)"""
+    """Escribe los datos en la hoja del mes incluyendo las fechas"""
     nombre_hoja = f"IR {mes} {anio}"
     col_dia = dia + 1  # columna B es 2, día 1 → columna 2
     
     wb = None
     try:
+        messagebox.showinfo("Proceso", f"Iniciando escritura en hoja {nombre_hoja} para el día {dia}")
+        
         # 1. Abrir el archivo principal
         wb = openpyxl.load_workbook(RUTA_ENTRADA)
         
@@ -511,20 +570,39 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
 
         hoja_mes = wb[nombre_hoja]
         
-        # 2. Escribir valores de bloques
+        # 2. Escribir la fecha en las celdas correspondientes
+        messagebox.showinfo("Proceso", f"Escribiendo fecha {dia}/{MESES_NUM[mes]:02d}/{anio} en columna {col_dia}")
+        nueva_fecha = f"{dia:02d}/{MESES_NUM[mes]:02d}/{anio}"
+        
+        # Celdas donde debe ir la fecha (filas basadas en tu estructura de Excel)
+        filas_fecha = [2, 7, 12, 17, 22, 27, 31, 37]
+        
+        for fila in filas_fecha:
+            try:
+                celda = hoja_mes.cell(row=fila, column=col_dia)
+                celda.value = nueva_fecha
+                messagebox.showinfo("Detalle", f"Fecha escrita en {fila},{col_dia}")
+            except Exception as e:
+                messagebox.showwarning("Advertencia", f"Error escribiendo fecha en {fila},{col_dia}: {str(e)}")
+        
+        # 3. Escribir valores de bloques
+        messagebox.showinfo("Proceso", "Escribiendo valores de bloques...")
         valores_para_escribir = [val for i, (tipo, val) in enumerate(bloques_detectados) if i % 2 == 1]
         tipos_para_escribir = [tipo for i, (tipo, val) in enumerate(bloques_detectados) if i % 2 == 1]
         
         for (tipo_bloque, valor), valor_ae in zip(zip(tipos_para_escribir, valores_para_escribir), sumas_ad_por_bloque):
             escribir_valor_bloque(hoja_mes, col_dia, torno, valor, tipo_bloque)
             escribir_valores_resumen_bloques(hoja_mes, col_dia, torno, [valor_ae], [tipo_bloque])
+            messagebox.showinfo("Detalle", f"Bloque {tipo_bloque} escrito en columna {col_dia}")
         
-        # 3. Guardar cambios
+        # 4. Guardar cambios
+        messagebox.showinfo("Proceso", "Guardando cambios...")
         wb.save(RUTA_ENTRADA)
         
-        # 4. Copia de seguridad
+        # 5. Copia de seguridad
         try:
             shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
+            messagebox.showinfo("Proceso", "Copia de seguridad creada")
         except Exception as e:
             messagebox.showwarning("Advertencia", f"No se pudo crear copia de seguridad:\n{str(e)}")
         
@@ -542,12 +620,16 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
         return False
         
     finally:
-        # 5. Cerrar el workbook si está abierto
+        # 6. Cerrar el workbook si está abierto
         if wb is not None:
             try:
                 wb.close()
+                messagebox.showinfo("Proceso", "Workbook cerrado correctamente")
             except:
+                messagebox.showwarning("Advertencia", "Error al cerrar el workbook")
                 pass
+
+
 
 # def preparar_hoja_mes(mes, dia, anio):
 #     """Crea la hoja del mes si no existe, limpia el día y configura fórmulas"""
