@@ -571,7 +571,7 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
         hoja_mes = wb[nombre_hoja]
         
         # 2. Escribir la fecha en las celdas correspondientes
-        messagebox.showinfo("Proceso", f"Escribiendo fecha {dia}/{MESES_NUM[mes]:02d}/{anio} en columna {col_dia}")
+        # messagebox.showinfo("Proceso", f"Escribiendo fecha {dia}/{MESES_NUM[mes]:02d}/{anio} en columna {col_dia}")
         nueva_fecha = f"{dia:02d}/{MESES_NUM[mes]:02d}/{anio}"
         
         # Celdas donde debe ir la fecha (filas basadas en tu estructura de Excel)
@@ -581,12 +581,12 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
             try:
                 celda = hoja_mes.cell(row=fila, column=col_dia)
                 celda.value = nueva_fecha
-                messagebox.showinfo("Detalle", f"Fecha escrita en {fila},{col_dia}")
+                # messagebox.showinfo("Detalle", f"Fecha escrita en {fila},{col_dia}")
             except Exception as e:
                 messagebox.showwarning("Advertencia", f"Error escribiendo fecha en {fila},{col_dia}: {str(e)}")
         
         # 3. Escribir valores de bloques
-        messagebox.showinfo("Proceso", "Escribiendo valores de bloques...")
+        # messagebox.showinfo("Proceso", "Escribiendo valores de bloques...")
         valores_para_escribir = [val for i, (tipo, val) in enumerate(bloques_detectados) if i % 2 == 1]
         tipos_para_escribir = [tipo for i, (tipo, val) in enumerate(bloques_detectados) if i % 2 == 1]
         
@@ -596,13 +596,13 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
             messagebox.showinfo("Detalle", f"Bloque {tipo_bloque} escrito en columna {col_dia}")
         
         # 4. Guardar cambios
-        messagebox.showinfo("Proceso", "Guardando cambios...")
+        # messagebox.showinfo("Proceso", "Guardando cambios...")
         wb.save(RUTA_ENTRADA)
         
         # 5. Copia de seguridad
         try:
             shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
-            messagebox.showinfo("Proceso", "Copia de seguridad creada")
+            # messagebox.showinfo("Proceso", "Copia de seguridad creada")
         except Exception as e:
             messagebox.showwarning("Advertencia", f"No se pudo crear copia de seguridad:\n{str(e)}")
         
@@ -624,7 +624,7 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
         if wb is not None:
             try:
                 wb.close()
-                messagebox.showinfo("Proceso", "Workbook cerrado correctamente")
+                # messagebox.showinfo("Proceso", "Workbook cerrado correctamente")
             except:
                 messagebox.showwarning("Advertencia", "Error al cerrar el workbook")
                 pass
@@ -1192,6 +1192,28 @@ def preparar_hoja_mes(mes, dia, anio):
                 # Fórmulas básicas
                 hoja.cell(row=40, column=col, value=f"=IFERROR({letra}34/{letra}28, 0)").number_format = '0.00%'
                 hoja.cell(row=34, column=col, value=f"=IFERROR(AVERAGE({letra}32:{letra}33), 0)").number_format = '0.00%'
+
+                # limpiesa y colocacion de otros datos
+
+                celda = hoja.cell(row=32, column=34, value="R%")
+                celda.font = Font(bold=True, name=celda.font.name, size=celda.font.size)  # Preserva fuente y tamaño original
+                celda.alignment = Alignment(horizontal='center', vertical='center')
+
+                hoja.cell(row=49, column=27, value=" ")
+                hoja.cell(row=50, column=27, value=" ")
+                hoja.cell(row=51, column=27, value=" ")
+                
+                hoja.cell(row=49, column=28, value=" ")
+                hoja.cell(row=50, column=28, value=" ")
+                hoja.cell(row=51, column=28, value=" ")
+                
+                hoja.cell(row=49, column=29, value=" ")
+                hoja.cell(row=50, column=29, value=" ")
+                hoja.cell(row=51, column=29, value=" ")
+                
+                hoja.cell(row=49, column=30, value=" ")
+                hoja.cell(row=50, column=30, value=" ")
+                hoja.cell(row=51, column=30, value=" ")
                 
                 # Fórmulas especiales
                 hoja.cell(row=23, column=col, 
