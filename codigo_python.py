@@ -1089,7 +1089,7 @@ def preparar_hoja_mes(mes, dia, anio):
                 messagebox.showinfo("Información", f"El día {dia} ya tiene datos en la hoja {nombre_hoja}. Se agregarán los nuevos datos.")
             return True
         else:
-            messagebox.showinfo("Proceso", "Creando nueva hoja...")
+            # messagebox.showinfo("Proceso", "Creando nueva hoja...")
             wb_check.close()
             
             # 2. Crear nueva hoja usando Excel COM
@@ -1136,7 +1136,7 @@ def preparar_hoja_mes(mes, dia, anio):
                 nueva_hoja.Name = nombre_hoja
                 wb.Save()
                 hoja_nueva_creada = True
-                messagebox.showinfo("Proceso", "Nueva hoja creada exitosamente")
+                # messagebox.showinfo("Proceso", "Nueva hoja creada exitosamente")
 
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudo crear hoja nueva:\n{e}")
@@ -1155,17 +1155,17 @@ def preparar_hoja_mes(mes, dia, anio):
                 pythoncom.CoUninitialize()
 
             # Rotar etiquetas de gráficos en la nueva hoja
-            messagebox.showinfo("Proceso", "Rotando etiquetas de gráficos...")
+            # messagebox.showinfo("Proceso", "Rotando etiquetas de gráficos...")
             rotar_etiquetas_graficos(RUTA_ENTRADA, nombre_hoja)
 
         # 3. Configurar solo para nueva hoja (no limpiar nada para días nuevos)
         if hoja_nueva_creada:
-            messagebox.showinfo("Proceso", "Configurando nueva hoja...")
+            # messagebox.showinfo("Proceso", "Configurando nueva hoja...")
             wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
             hoja = wb2[nombre_hoja]
             
             # LIMPIEZA COMPLETA SOLO PARA NUEVA HOJA
-            messagebox.showinfo("Proceso", "Limpiando datos en nueva hoja...")
+            # messagebox.showinfo("Proceso", "Limpiando datos en nueva hoja...")
             filas_a_limpiar = [2,3,4,7,8,9,12,13,14,17,18,19,22,23,24,27,28,31,32,33,34,37,38,39,40]
             for fila in filas_a_limpiar:
                 for col in range(2, 35):  # Columnas B a AH (2-34)
@@ -1178,14 +1178,14 @@ def preparar_hoja_mes(mes, dia, anio):
                         continue
             
             # Escribir fechas en todas las columnas para nueva hoja
-            messagebox.showinfo("Proceso", "Configurando fechas...")
+            # messagebox.showinfo("Proceso", "Configurando fechas...")
             for col in range(2, 32):  # Columnas B a AF (2-31)
                 fecha_formato = f"01/{MESES_NUM[mes]:02d}/{anio}" if col == 2 else f"{col-1:02d}/{MESES_NUM[mes]:02d}/{anio}"
                 for fila_fecha in [2,7,12,17,22,27,31,37]:
                     hoja.cell(row=fila_fecha, column=col, value=fecha_formato)
             
             # Configuración inicial completa para nueva hoja
-            messagebox.showinfo("Proceso", "Agregando fórmulas...")
+            # messagebox.showinfo("Proceso", "Agregando fórmulas...")
             for col in range(2, 33):  # Columnas B a AF (2-32)
                 letra = openpyxl.utils.get_column_letter(col)
                 
@@ -1196,6 +1196,10 @@ def preparar_hoja_mes(mes, dia, anio):
                 # limpiesa y colocacion de otros datos
 
                 celda = hoja.cell(row=32, column=34, value="R%")
+                celda.font = Font(bold=True, name=celda.font.name, size=celda.font.size)  # Preserva fuente y tamaño original
+                celda.alignment = Alignment(horizontal='center', vertical='center')
+
+                celda = hoja.cell(row=38, column=34, value="IR%")
                 celda.font = Font(bold=True, name=celda.font.name, size=celda.font.size)  # Preserva fuente y tamaño original
                 celda.alignment = Alignment(horizontal='center', vertical='center')
 
@@ -1214,7 +1218,11 @@ def preparar_hoja_mes(mes, dia, anio):
                 hoja.cell(row=49, column=30, value=" ")
                 hoja.cell(row=50, column=30, value=" ")
                 hoja.cell(row=51, column=30, value=" ")
-                
+
+                hoja.cell(row=23, column=34, value="=(AH3*AH13+AH8*AH18)/(AH3+AH8)")
+                hoja.cell(row=24, column=34, value="=(AH4*AH14+AH9*AH19)/(AH4+AH9)")
+                hoja.cell(row=24, column=34, value="=(AH23*(AH3+AH8)+AH24*(AH4+AH9))/(AH3+AH4+AH8+AH9))
+
                 # Fórmulas especiales
                 hoja.cell(row=23, column=col, 
                          value=f"=IFERROR(({letra}3*{letra}13+{letra}8*{letra}18)/({letra}3+{letra}8), 0)")
@@ -1228,7 +1236,7 @@ def preparar_hoja_mes(mes, dia, anio):
                          value=f"=IFERROR({letra}33/{letra}24, 0)")
             
             # Configuración columna AH
-            messagebox.showinfo("Proceso", "Configurando columnas especiales...")
+            # messagebox.showinfo("Proceso", "Configurando columnas especiales...")
             hoja.cell(row=2, column=34, value=int(anio))
             for fila in [3,4,8,9]:
                 hoja.cell(row=fila, column=34, value=f"=SUM(B{fila}:AG{fila})")
@@ -1239,12 +1247,12 @@ def preparar_hoja_mes(mes, dia, anio):
             
             # Guardar cambios
             try:
-                messagebox.showinfo("Proceso", "Guardando cambios...")
+                # messagebox.showinfo("Proceso", "Guardando cambios...")
                 wb2.save(RUTA_ENTRADA)
                 
                 # Forzar actualización de fórmulas
                 try:
-                    messagebox.showinfo("Proceso", "Actualizando fórmulas...")
+                    # messagebox.showinfo("Proceso", "Actualizando fórmulas...")
                     pythoncom.CoInitialize()
                     excel = win32.Dispatch("Excel.Application")
                     excel.Visible = False
