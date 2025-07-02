@@ -1086,6 +1086,7 @@ def preparar_hoja_mes(mes, dia, anio):
             wb_existente.close()
             
             if dia_con_datos:
+                print("Información", f"El día {dia} ya tiene datos en la hoja {nombre_hoja}. Se agregarán los nuevos datos.")
                 # messagebox.showinfo("Información", f"El día {dia} ya tiene datos en la hoja {nombre_hoja}. Se agregarán los nuevos datos.")
             return True
         else:
