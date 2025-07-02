@@ -850,6 +850,8 @@ def preparar_hoja_mes(mes, dia, anio):
                 
                 # Fórmulas básicas
                 hoja.cell(row=40, column=col, value=f"=IFERROR({letra}34/{letra}28, 0)").number_format = '0.00%'
+                hoja.cell(row=40, column=col).font = Font(color='000000')
+                
                 hoja.cell(row=34, column=col, value=f"=IFERROR(AVERAGE({letra}32:{letra}33), 0)").number_format = '0.00%'
 
                 # Limpieza y colocación de otros datos
@@ -878,10 +880,14 @@ def preparar_hoja_mes(mes, dia, anio):
                          value=f"=IFERROR(({letra}4*{letra}14+{letra}9*{letra}19)/({letra}4+{letra}9), 0)")
                 hoja.cell(row=28, column=col, 
                          value=f"=IFERROR(({letra}23*({letra}3+{letra}8)+{letra}24*({letra}4+{letra}9))/({letra}3+{letra}4+{letra}8+{letra}9), 0)")
+
+                
                 hoja.cell(row=38, column=col, 
                          value=f"=IFERROR({letra}32/{letra}23, 0)")
+                hoja.cell(row=38, column=col).font = Font(color='000000')
                 hoja.cell(row=39, column=col, 
                          value=f"=IFERROR({letra}33/{letra}24, 0)")
+                hoja.cell(row=39, column=col).font = Font(color='000000')
             
             # Configuración columna AH (columna 34)
             hoja.cell(row=2, column=34, value=int(anio))
