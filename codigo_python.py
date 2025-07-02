@@ -558,7 +558,7 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
     
     wb = None
     try:
-        messagebox.showinfo("Proceso", f"Iniciando escritura en hoja {nombre_hoja} para el día {dia}")
+        # messagebox.showinfo("Proceso", f"Iniciando escritura en hoja {nombre_hoja} para el día {dia}")
         
         # 1. Abrir el archivo principal
         wb = openpyxl.load_workbook(RUTA_ENTRADA)
@@ -593,7 +593,7 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
         for (tipo_bloque, valor), valor_ae in zip(zip(tipos_para_escribir, valores_para_escribir), sumas_ad_por_bloque):
             escribir_valor_bloque(hoja_mes, col_dia, torno, valor, tipo_bloque)
             escribir_valores_resumen_bloques(hoja_mes, col_dia, torno, [valor_ae], [tipo_bloque])
-            messagebox.showinfo("Detalle", f"Bloque {tipo_bloque} escrito en columna {col_dia}")
+            # messagebox.showinfo("Detalle", f"Bloque {tipo_bloque} escrito en columna {col_dia}")
         
         # 4. Guardar cambios
         # messagebox.showinfo("Proceso", "Guardando cambios...")
@@ -1063,11 +1063,11 @@ def preparar_hoja_mes(mes, dia, anio):
     
     try:
         # 1. Verificar si la hoja ya existe
-        messagebox.showinfo("Proceso", f"Iniciando preparación de hoja {nombre_hoja}")
+        # messagebox.showinfo("Proceso", f"Iniciando preparación de hoja {nombre_hoja}")
         wb_check = openpyxl.load_workbook(RUTA_ENTRADA)
         
         if nombre_hoja in wb_check.sheetnames:
-            messagebox.showinfo("Proceso", "Hoja existente encontrada")
+            # messagebox.showinfo("Proceso", "Hoja existente encontrada")
             wb_check.close()
             
             # Verificar si el día ya tiene datos
