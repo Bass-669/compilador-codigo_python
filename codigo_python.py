@@ -809,7 +809,9 @@ def preparar_hoja_mes(mes, dia, anio):
             # Comprobar si las celdas clave para este día están vacías
             celdas_clave = [
                 hoja_existente.cell(row=3, column=col_dia).value,  # Torno 1 regular
-                hoja_existente.cell(row=8, column=col_dia).value   # Torno 2 regular
+                hoja_existente.cell(row=4, column=col_dia).value,  # Torno 1 podado
+                hoja_existente.cell(row=8, column=col_dia).value,  # Torno 2 regular
+                hoja_existente.cell(row=9, column=col_dia).value   # Torno 2 podado
             ]
             
             dia_vacio = all(cell is None for cell in celdas_clave)
