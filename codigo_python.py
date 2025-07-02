@@ -1086,7 +1086,7 @@ def preparar_hoja_mes(mes, dia, anio):
             wb_existente.close()
             
             if dia_con_datos:
-                messagebox.showinfo("Información", f"El día {dia} ya tiene datos en la hoja {nombre_hoja}. Se agregarán los nuevos datos.")
+                # messagebox.showinfo("Información", f"El día {dia} ya tiene datos en la hoja {nombre_hoja}. Se agregarán los nuevos datos.")
             return True
         else:
             # messagebox.showinfo("Proceso", "Creando nueva hoja...")
@@ -1221,7 +1221,7 @@ def preparar_hoja_mes(mes, dia, anio):
 
                 hoja.cell(row=23, column=34, value="=(AH3*AH13+AH8*AH18)/(AH3+AH8)")
                 hoja.cell(row=24, column=34, value="=(AH4*AH14+AH9*AH19)/(AH4+AH9)")
-                hoja.cell(row=24, column=34, value="=(AH23*(AH3+AH8)+AH24*(AH4+AH9))/(AH3+AH4+AH8+AH9)")
+                hoja.cell(row=28, column=34, value="=(AH23*(AH3+AH8)+AH24*(AH4+AH9))/(AH3+AH4+AH8+AH9)")
 
                 # Fórmulas especiales
                 hoja.cell(row=23, column=col, 
