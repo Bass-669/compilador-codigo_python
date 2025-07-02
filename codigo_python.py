@@ -317,33 +317,77 @@ def es_valor_valido(valor):
 
 
 def crear_archivo_temporal_con_ae(celda_origen):
-    """
-    Versión corregida que genera la referencia correctamente
-    """
+    """Calcula el valor absoluto de la celda AD usando Excel COM"""
+    pythoncom.CoInitialize()
+    excel = wb = None
     try:
-        # Validación robusta del formato de entrada
-        celda_origen = str(celda_origen).strip().upper()
-        if not celda_origen.startswith('AD'):
-            raise ValueError(f"Formato de celda inválido. Debe ser 'AD123', recibido: {celda_origen}")
+        # Validar formato de celda_origen
+        if not re.match(r'^AD\d+$', celda_origen):
+            raise ValueError(f"Formato de celda inválido: {celda_origen}")
         
-        # Extraer número de fila con validación
+        # Extraer número de fila
+        fila = int(re.search(r'\d+', celda_origen).group())
+        
+        # Iniciar Excel
+        excel = win32.Dispatch("Excel.Application")
+        excel.Visible = False
+        excel.DisplayAlerts = False
+        
+        # Abrir archivo
+        wb = excel.Workbooks.Open(RUTA_ENTRADA)
+        hoja = wb.Sheets("IR diario ")
+        
+        # Verificar que la fila existe
+        if fila > hoja.UsedRange.Rows.Count or fila < 1:
+            raise ValueError(f"Fila {fila} está fuera de rango")
+        
+        # Calcular valor en AE{fila}
+        celda_ae = f"AE{fila}"
+        hoja.Range(celda_ae).Formula = f"=ABS({celda_origen})"
+        excel.Calculate()  # Forzar cálculo
+        
+        # Obtener valor
+        valor_ae = hoja.Range(celda_ae).Value
+        
+        # Crear archivo temporal
+        temp_dir = os.path.join(BASE_DIR, CARPETA)
+        os.makedirs(temp_dir, exist_ok=True)
+        temp_path = os.path.join(temp_dir, "temp_report.xlsx")
+        
+        # Guardar y cerrar
+        wb.SaveAs(temp_path)
+        wb.Close(False)
+        
+        # Convertir valor a float seguro
         try:
-            fila = int(celda_origen[2:])  # Extrae todo después de 'AD'
-            if fila <= 0:
-                raise ValueError("El número de fila debe ser positivo")
-        except ValueError as e:
-            raise ValueError(f"Número de fila inválido en '{celda_origen}': {str(e)}")
-        
-        # Construir referencia completa CORRECTAMENTE (¡agregar el !)
-        referencia = f"='IR diario '!{celda_origen}"
-        
-        return referencia, 0.0  # Mantenemos el 0.0 por compatibilidad
-        
+            if valor_ae in (None, "#N/A", "#VALUE!", "#REF!", "#DIV/0!"):
+                return temp_path, 0.0
+            
+            if isinstance(valor_ae, (int, float)):
+                valor_final = float(valor_ae)
+            else:
+                valor_final = float(str(valor_ae).replace(",", "."))
+                
+            return temp_path, valor_final
+            
+        except (ValueError, TypeError):
+            return temp_path, 0.0
+            
     except Exception as e:
-        messagebox.showerror("Error", 
-                           f"No se pudo generar referencia para {celda_origen}:\n{str(e)}")
+        print(f"Error en crear_archivo_temporal_con_ae: {str(e)}")
         return None, 0.0
-
+    finally:
+        try:
+            if 'wb' in locals():
+                wb.Close(False)
+        except:
+            pass
+        try:
+            if excel:
+                excel.Quit()
+        except:
+            pass
+        pythoncom.CoUninitialize()
 
 def extraer_bloques(txt):
     lineas = [l.strip() for l in txt.strip().split("\n") if l.strip()]
@@ -408,11 +452,9 @@ def escribir_valor_bloque(hoja, col_dia, torno, valor, tipo_bloque):
 #         celda.number_format = '0.00%'
 
 
-def escribir_valores_resumen_bloques(hoja, col_dia, torno, referencias_ae_por_bloque, tipos_bloque):
-    """
-    Versión corregida con manejo adecuado de strings
-    """
-    for i, (tipo_bloque, referencia_ae) in enumerate(zip(tipos_bloque, referencias_ae_por_bloque)):
+def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque, tipos_bloque):
+    """Escribe los valores de porcentaje en las celdas correspondientes"""
+    for i, (tipo_bloque, valor_ae) in enumerate(zip(tipos_bloque, valores_ae_por_bloque)):
         try:
             tipo_bloque = tipo_bloque.strip().upper()
             
@@ -422,37 +464,34 @@ def escribir_valores_resumen_bloques(hoja, col_dia, torno, referencias_ae_por_bl
             elif tipo_bloque == "REGULAR":
                 fila_valor = 18 if torno == 1 else 19
             else:
-                continue
+                continue  # ignorar bloques con tipo desconocido
             
-            celda = hoja.cell(row=fila_valor, column=col_dia)
-            
-            # Verificar y corregir referencia si es necesario
-            if isinstance(referencia_ae, str):
-                # Primero limpiamos la referencia
-                ref_limpia = referencia_ae.replace("'", "").replace("=", "")
-                # Luego construimos la referencia correcta
-                referencia_ae = f"='IR diario '!{ref_limpia}"
-                
-                # Verificar que sea una referencia válida
-                if re.match(r"^='IR diario '!AD\d+$", referencia_ae):
-                    celda.value = referencia_ae
+            # Validar y convertir el valor
+            try:
+                if valor_ae is None:
+                    valor_porcentaje = 0.0
+                elif isinstance(valor_ae, str) and valor_ae.startswith("='IR diario '!AD"):
+                    # Es una referencia, obtener el valor real
+                    ref_fila = int(valor_ae.split("!AD")[1])
+                    valor_celda = hoja.parent["IR diario "].cell(row=ref_fila, column=30).value
+                    valor_porcentaje = float(valor_celda) / 100 if valor_celda else 0.0
                 else:
-                    raise ValueError(f"Referencia inválida: {referencia_ae}")
-            else:
-                # Si no es string, usar valor directo
-                valor = referencia_ae / 100 if referencia_ae > 1 else referencia_ae
-                celda.value = valor
+                    # Es un valor directo
+                    valor_num = float(str(valor_ae).replace(",", ".")) if valor_ae else 0.0
+                    valor_porcentaje = valor_num / 100 if valor_num > 1 else valor_num
+            except:
+                valor_porcentaje = 0.0
             
-            # Aplicar formato
+            # Escribir el valor
+            celda = hoja.cell(row=fila_valor, column=col_dia)
+            celda.value = valor_porcentaje
             celda.number_format = '0.00%'
             celda.alignment = ALIGN_R
             celda.border = BORDER
             
         except Exception as e:
-            messagebox.showerror("Error", 
-                               f"Error en bloque {i+1} ({tipo_bloque}):\n{str(e)}")
+            print(f"Error escribiendo bloque {i} ({tipo_bloque}): {str(e)}")
             continue
-
 
 
 def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
@@ -510,8 +549,250 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
             except:
                 pass
 
+# def preparar_hoja_mes(mes, dia, anio):
+#     """Crea la hoja del mes si no existe, limpia el día y configura fórmulas"""
+#     nombre_hoja = f"IR {mes} {anio}"
+#     col_dia = dia + 1  # columna B es 2, día 1 → columna 2
+#     hoja_nueva_creada = False
+    
+#     try:
+#         # 1. Verificar si la hoja ya existe
+#         wb_check = openpyxl.load_workbook(RUTA_ENTRADA)
+#         if nombre_hoja in wb_check.sheetnames:
+#             wb_check.close()
+#         else:
+#             wb_check.close()
+            
+#             # 2. Crear nueva hoja usando Excel COM
+#             pythoncom.CoInitialize()
+#             excel = wb = None
+#             try:
+#                 excel = win32.gencache.EnsureDispatch('Excel.Application')
+#                 excel.Visible = False
+#                 excel.DisplayAlerts = False
+#                 wb = excel.Workbooks.Open(RUTA_ENTRADA, UpdateLinks=0)
+
+#                 # Encontrar hoja anterior adecuada para copiar
+#                 hojas = [h.Name for h in wb.Sheets]
+#                 hojas_ir = [h for h in hojas if h.startswith("IR ") and len(h.split()) == 3]
+
+#                 def total_meses(nombre):
+#                     try:
+#                         _, mes_str, anio_str = nombre.split()
+#                         return int(anio_str) * 12 + MESES_NUM[mes_str]
+#                     except:
+#                         return -1
+
+#                 hojas_ordenadas = sorted(hojas_ir, key=total_meses)
+#                 total_nueva = int(anio) * 12 + MESES_NUM[mes]
+#                 hoja_anterior = None
+                
+#                 for h in hojas_ordenadas:
+#                     if total_meses(h) < total_nueva:
+#                         hoja_anterior = h
+#                     else:
+#                         break
+
+#                 if not hoja_anterior:
+#                     messagebox.showwarning("Orden inválido", f"No se encontró hoja anterior para insertar '{nombre_hoja}'")
+#                     return False
+
+#                 # Copiar hoja anterior
+#                 idx_anterior = hojas.index(hoja_anterior)
+#                 insert_idx = min(idx_anterior + 2, wb.Sheets.Count)
+#                 wb.Sheets(hoja_anterior).Copy(After=wb.Sheets(insert_idx - 1))
+                
+#                 # Renombrar la nueva hoja
+#                 nueva_hoja = wb.ActiveSheet
+#                 nueva_hoja.Name = nombre_hoja
+#                 wb.Save()
+#                 hoja_nueva_creada = True
+
+#             except Exception as e:
+#                 messagebox.showerror("Error", f"No se pudo crear hoja nueva:\n{e}")
+#                 return False
+#             finally:
+#                 try:
+#                     if wb:
+#                         wb.Close(SaveChanges=True)
+#                 except:
+#                     pass
+#                 try:
+#                     if excel:
+#                         excel.Quit()
+#                 except:
+#                     pass
+#                 pythoncom.CoUninitialize()
+
+#             # Rotar etiquetas de gráficos en la nueva hoja
+#             rotar_etiquetas_graficos(RUTA_ENTRADA, nombre_hoja)
+
+#         # 3. Limpiar datos del día y configurar fórmulas
+#         wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
+#         hoja = wb2[nombre_hoja]
+        
+#         if hoja_nueva_creada or hoja.cell(row=2, column=col_dia).value is None:
+#             # Limpiar datos del día
+#             filas_a_limpiar = [2, 3, 4, 7, 8, 9, 12, 13, 14, 17, 18, 19, 22, 27, 31, 32, 33, 34, 37, 40]
+#             for fila in filas_a_limpiar:
+#                 for col in range(2, 40):
+#                     try:
+#                         celda = hoja.cell(row=fila, column=col)
+#                         if not isinstance(celda, openpyxl.cell.cell.MergedCell):
+#                             celda.value = ""
+#                     except Exception as e:
+#                         print(f"Error limpiando celda {fila},{col}: {str(e)}")
+#                         continue
+
+#             # Escribir nueva fecha
+#             nueva_fecha = f"{dia:02d}/{MESES_NUM[mes]:02d}/{anio}"
+#             for fila in [2, 7, 12, 17, 22, 27, 31, 37]:
+#                 try:
+#                     hoja.cell(row=fila, column=col_dia, value=nueva_fecha)
+#                 except Exception as e:
+#                     print(f"Error escribiendo fecha en fila {fila}: {str(e)}")
+#                     continue
+
+#             # Escribir fórmulas en fila 40 (B a AF)
+#             for col_num in range(2, 33):
+#                 try:
+#                     letra = openpyxl.utils.get_column_letter(col_num)
+#                     celda = hoja.cell(row=40, column=col_num, value=f"=IFERROR({letra}34/{letra}28, 0)")
+#                     celda.number_format = '0.00%'
+#                     celda.alignment = Alignment(horizontal='right')
+#                     celda.border = Border(
+#                         left=Side(style='thin'),
+#                         right=Side(style='thin'),
+#                         top=Side(style='thin'),
+#                         bottom=Side(style='thin')
+#                     )
+#                 except Exception as e:
+#                     print(f"Error escribiendo fórmula en columna {col_num}: {str(e)}")
+#                     continue
+
+#             # Escribir fórmulas en fila 34 (B a AF) para calcular promedio
+#             for col_num in range(2, 33):
+#                 try:
+#                     letra = openpyxl.utils.get_column_letter(col_num)
+#                     celda = hoja.cell(row=34, column=col_num, value=f"=IFERROR(AVERAGE({letra}32:{letra}33), 0)")
+#                     celda.number_format = '0.00%'
+#                     celda.alignment = Alignment(horizontal='right')
+#                     celda.border = Border(
+#                         left=Side(style='thin'),
+#                         right=Side(style='thin'),
+#                         top=Side(style='thin'),
+#                         bottom=Side(style='thin')
+#                     )
+#                 except Exception as e:
+#                     print(f"Error escribiendo fórmula en columna {col_num}: {str(e)}")
+#                     continue
+
+#             # ===== NUEVAS FÓRMULAS PARA COLUMNA AH =====
+#             # Escribir año en AH2 (columna 34)
+#             hoja.cell(row=2, column=34, value=int(anio))
+            
+#             # Fórmulas de suma para AH3, AH4, AH8, AH9
+#             for fila in [3, 4, 8, 9]:
+#                 hoja.cell(row=fila, column=34, value=f"=SUM(B{fila}:AG{fila})")
+            
+#             # Texto "FALTANTE" para AH13, AH14, AH18, AH19
+#             for fila in [13, 14, 18, 19]:
+#                 hoja.cell(row=fila, column=34, value=" ")
+            
+#             # Fórmulas para AH39 y AH40 con formato porcentual
+#             hoja.cell(row=39, column=34, value="=AH33/AH28").number_format = '0.00%'
+#             hoja.cell(row=40, column=34, value="=AH34/AH28").number_format = '0.00%'
+
+#             for col_num in range(2, 32):
+#                 try:
+#                     letra = openpyxl.utils.get_column_letter(col_num)  # Definir letra primero
+#                     # Fila 23
+#                     hoja.cell(row=23, column=col_num, 
+#                              value=f"=IFERROR(({letra}3*{letra}13+{letra}8*{letra}18)/({letra}3+{letra}8), 0)")
+#                     # Fila 24
+#                     hoja.cell(row=24, column=col_num, 
+#                              value=f"=IFERROR(({letra}4*{letra}14+{letra}9*{letra}19)/({letra}4+{letra}9), 0)")
+#                     # Fila 28
+#                     hoja.cell(row=28, column=col_num, 
+#                              value=f"=IFERROR(({letra}23*({letra}3+{letra}8)+{letra}24*({letra}4+{letra}9))/({letra}3+{letra}4+{letra}8+{letra}9), 0)")
+#                     # Fila 38
+#                     hoja.cell(row=38, column=col_num, 
+#                              value=f"=IFERROR({letra}32/{letra}23, 0)")
+#                     # Fila 39
+#                     hoja.cell(row=39, column=col_num, 
+#                              value=f"=IFERROR({letra}33/{letra}24, 0)")
+                        
+#                 except Exception as e:
+#                     print(f"Error procesando columna {letra}: {str(e)}")
+#                     continue
+
+#             celda = hoja.cell(row=32, column=34, value="R%")
+#             celda.font = Font(bold=True, name=celda.font.name, size=celda.font.size)  # Preserva fuente y tamaño original
+#             celda.alignment = Alignment(horizontal='center', vertical='center')
+            
+#             hoja.cell(row=49, column=27, value=" ")
+#             hoja.cell(row=50, column=27, value=" ")
+#             hoja.cell(row=51, column=27, value=" ")
+            
+#             hoja.cell(row=49, column=28, value=" ")
+#             hoja.cell(row=50, column=28, value=" ")
+#             hoja.cell(row=51, column=28, value=" ")
+            
+#             hoja.cell(row=49, column=29, value=" ")
+#             hoja.cell(row=50, column=29, value=" ")
+#             hoja.cell(row=51, column=29, value=" ")
+            
+#             hoja.cell(row=49, column=30, value=" ")
+#             hoja.cell(row=50, column=30, value=" ")
+#             hoja.cell(row=51, column=30, value=" ")
+            
+#             # ===== FIN DE NUEVAS FÓRMULAS =====
+
+            
+#             # Guardar cambios
+#             try:
+#                 wb2.save(RUTA_ENTRADA)
+                
+#                 # Forzar actualización de fórmulas con Excel COM
+#                 try:
+#                     pythoncom.CoInitialize()
+#                     excel = win32.Dispatch("Excel.Application")
+#                     excel.Visible = False
+#                     excel.DisplayAlerts = False
+#                     excel_wb = excel.Workbooks.Open(RUTA_ENTRADA)
+#                     excel.CalculateFull()
+#                     excel_wb.Save()
+#                     excel_wb.Close()
+#                     excel.Quit()
+#                     pythoncom.CoUninitialize()
+#                 except Exception as com_error:
+#                     print(f"Error al actualizar fórmulas: {str(com_error)}")
+#                     pythoncom.CoUninitialize()
+                    
+#             except Exception as save_error:
+#                 raise Exception(f"No se pudo guardar el archivo: {str(save_error)}")
+        
+#         return True
+        
+#     except Exception as main_error:
+#         messagebox.showerror(
+#             "Error crítico",
+#             f"No se pudo completar la operación:\n{str(main_error)}\n\n"
+#             "Verifique que el archivo no esté abierto en Excel."
+#         )
+#         return False
+        
+#     finally:
+#         try:
+#             if 'wb2' in locals():
+#                 wb2.close()
+#         except:
+#             pass
+
+
+
 def preparar_hoja_mes(mes, dia, anio):
-    """Crea la hoja del mes si no existe, limpia el día y configura fórmulas"""
+    """Crea la hoja del mes si no existe y configura fórmulas iniciales"""
     nombre_hoja = f"IR {mes} {anio}"
     col_dia = dia + 1  # columna B es 2, día 1 → columna 2
     hoja_nueva_creada = False
@@ -521,6 +802,22 @@ def preparar_hoja_mes(mes, dia, anio):
         wb_check = openpyxl.load_workbook(RUTA_ENTRADA)
         if nombre_hoja in wb_check.sheetnames:
             wb_check.close()
+            # Verificar si el día ya tiene datos
+            wb_existente = openpyxl.load_workbook(RUTA_ENTRADA)
+            hoja_existente = wb_existente[nombre_hoja]
+            
+            # Comprobar si las celdas clave para este día están vacías
+            celdas_clave = [
+                hoja_existente.cell(row=3, column=col_dia).value,  # Torno 1 regular
+                hoja_existente.cell(row=8, column=col_dia).value   # Torno 2 regular
+            ]
+            
+            dia_vacio = all(cell is None for cell in celdas_clave)
+            wb_existente.close()
+            
+            if not dia_vacio:
+                # El día ya tiene datos, no hacer nada
+                return True
         else:
             wb_check.close()
             
@@ -588,150 +885,57 @@ def preparar_hoja_mes(mes, dia, anio):
             # Rotar etiquetas de gráficos en la nueva hoja
             rotar_etiquetas_graficos(RUTA_ENTRADA, nombre_hoja)
 
-        # 3. Limpiar datos del día y configurar fórmulas
+        # 3. Configurar fórmulas solo para días vacíos o hojas nuevas
         wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
         hoja = wb2[nombre_hoja]
         
-        if hoja_nueva_creada or hoja.cell(row=2, column=col_dia).value is None:
-            # Limpiar datos del día
-            filas_a_limpiar = [2, 3, 4, 7, 8, 9, 12, 13, 14, 17, 18, 19, 22, 27, 31, 32, 33, 34, 37, 40]
+        if hoja_nueva_creada or dia_vacio:
+            # Limpiar solo las celdas del día específico
+            filas_a_limpiar = [3, 4, 8, 9, 13, 14, 18, 19, 23, 24, 28, 32, 33, 34, 38, 39, 40]
             for fila in filas_a_limpiar:
-                for col in range(2, 40):
-                    try:
-                        celda = hoja.cell(row=fila, column=col)
-                        if not isinstance(celda, openpyxl.cell.cell.MergedCell):
-                            celda.value = ""
-                    except Exception as e:
-                        print(f"Error limpiando celda {fila},{col}: {str(e)}")
-                        continue
+                try:
+                    hoja.cell(row=fila, column=col_dia, value="")
+                except:
+                    continue
 
-            # Escribir nueva fecha
+            # Escribir nueva fecha solo en celdas clave
             nueva_fecha = f"{dia:02d}/{MESES_NUM[mes]:02d}/{anio}"
             for fila in [2, 7, 12, 17, 22, 27, 31, 37]:
                 try:
                     hoja.cell(row=fila, column=col_dia, value=nueva_fecha)
-                except Exception as e:
-                    print(f"Error escribiendo fecha en fila {fila}: {str(e)}")
+                except:
                     continue
 
-            # Escribir fórmulas en fila 40 (B a AF)
-            for col_num in range(2, 33):
-                try:
-                    letra = openpyxl.utils.get_column_letter(col_num)
-                    celda = hoja.cell(row=40, column=col_num, value=f"=IFERROR({letra}34/{letra}28, 0)")
-                    celda.number_format = '0.00%'
-                    celda.alignment = Alignment(horizontal='right')
-                    celda.border = Border(
-                        left=Side(style='thin'),
-                        right=Side(style='thin'),
-                        top=Side(style='thin'),
-                        bottom=Side(style='thin')
-                    )
-                except Exception as e:
-                    print(f"Error escribiendo fórmula en columna {col_num}: {str(e)}")
-                    continue
-
-            # Escribir fórmulas en fila 34 (B a AF) para calcular promedio
-            for col_num in range(2, 33):
-                try:
-                    letra = openpyxl.utils.get_column_letter(col_num)
-                    celda = hoja.cell(row=34, column=col_num, value=f"=IFERROR(AVERAGE({letra}32:{letra}33), 0)")
-                    celda.number_format = '0.00%'
-                    celda.alignment = Alignment(horizontal='right')
-                    celda.border = Border(
-                        left=Side(style='thin'),
-                        right=Side(style='thin'),
-                        top=Side(style='thin'),
-                        bottom=Side(style='thin')
-                    )
-                except Exception as e:
-                    print(f"Error escribiendo fórmula en columna {col_num}: {str(e)}")
-                    continue
-
-            # ===== NUEVAS FÓRMULAS PARA COLUMNA AH =====
-            # Escribir año en AH2 (columna 34)
-            hoja.cell(row=2, column=34, value=int(anio))
+            # Configurar fórmulas para el día actual
+            letra = openpyxl.utils.get_column_letter(col_dia)
             
-            # Fórmulas de suma para AH3, AH4, AH8, AH9
-            for fila in [3, 4, 8, 9]:
-                hoja.cell(row=fila, column=34, value=f"=SUM(B{fila}:AG{fila})")
+            # Fórmulas para fila 40 (IR diario)
+            hoja.cell(row=40, column=col_dia, value=f"=IFERROR({letra}34/{letra}28, 0)")
+            hoja.cell(row=40, column=col_dia).number_format = '0.00%'
             
-            # Texto "FALTANTE" para AH13, AH14, AH18, AH19
-            for fila in [13, 14, 18, 19]:
-                hoja.cell(row=fila, column=34, value=" ")
+            # Fórmulas para fila 34 (Promedio)
+            hoja.cell(row=34, column=col_dia, value=f"=IFERROR(AVERAGE({letra}32:{letra}33), 0)")
+            hoja.cell(row=34, column=col_dia).number_format = '0.00%'
             
-            # Fórmulas para AH39 y AH40 con formato porcentual
-            hoja.cell(row=39, column=34, value="=AH33/AH28").number_format = '0.00%'
-            hoja.cell(row=40, column=34, value="=AH34/AH28").number_format = '0.00%'
-
-            for col_num in range(2, 32):
-                try:
-                    letra = openpyxl.utils.get_column_letter(col_num)  # Definir letra primero
-                    # Fila 23
-                    hoja.cell(row=23, column=col_num, 
-                             value=f"=IFERROR(({letra}3*{letra}13+{letra}8*{letra}18)/({letra}3+{letra}8), 0)")
-                    # Fila 24
-                    hoja.cell(row=24, column=col_num, 
-                             value=f"=IFERROR(({letra}4*{letra}14+{letra}9*{letra}19)/({letra}4+{letra}9), 0)")
-                    # Fila 28
-                    hoja.cell(row=28, column=col_num, 
-                             value=f"=IFERROR(({letra}23*({letra}3+{letra}8)+{letra}24*({letra}4+{letra}9))/({letra}3+{letra}4+{letra}8+{letra}9), 0)")
-                    # Fila 38
-                    hoja.cell(row=38, column=col_num, 
-                             value=f"=IFERROR({letra}32/{letra}23, 0)")
-                    # Fila 39
-                    hoja.cell(row=39, column=col_num, 
-                             value=f"=IFERROR({letra}33/{letra}24, 0)")
-                        
-                except Exception as e:
-                    print(f"Error procesando columna {letra}: {str(e)}")
-                    continue
-
-            celda = hoja.cell(row=32, column=34, value="R%")
-            celda.font = Font(bold=True, name=celda.font.name, size=celda.font.size)  # Preserva fuente y tamaño original
-            celda.alignment = Alignment(horizontal='center', vertical='center')
-            
-            hoja.cell(row=49, column=27, value=" ")
-            hoja.cell(row=50, column=27, value=" ")
-            hoja.cell(row=51, column=27, value=" ")
-            
-            hoja.cell(row=49, column=28, value=" ")
-            hoja.cell(row=50, column=28, value=" ")
-            hoja.cell(row=51, column=28, value=" ")
-            
-            hoja.cell(row=49, column=29, value=" ")
-            hoja.cell(row=50, column=29, value=" ")
-            hoja.cell(row=51, column=29, value=" ")
-            
-            hoja.cell(row=49, column=30, value=" ")
-            hoja.cell(row=50, column=30, value=" ")
-            hoja.cell(row=51, column=30, value=" ")
-            
-            # ===== FIN DE NUEVAS FÓRMULAS =====
-
+            # Fórmulas para columnas especiales
+            hoja.cell(row=2, column=34, value=int(anio))  # AH2 - Año
             
             # Guardar cambios
+            wb2.save(RUTA_ENTRADA)
+            
+            # Forzar cálculo de fórmulas
             try:
-                wb2.save(RUTA_ENTRADA)
-                
-                # Forzar actualización de fórmulas con Excel COM
-                try:
-                    pythoncom.CoInitialize()
-                    excel = win32.Dispatch("Excel.Application")
-                    excel.Visible = False
-                    excel.DisplayAlerts = False
-                    excel_wb = excel.Workbooks.Open(RUTA_ENTRADA)
-                    excel.CalculateFull()
-                    excel_wb.Save()
-                    excel_wb.Close()
-                    excel.Quit()
-                    pythoncom.CoUninitialize()
-                except Exception as com_error:
-                    print(f"Error al actualizar fórmulas: {str(com_error)}")
-                    pythoncom.CoUninitialize()
-                    
-            except Exception as save_error:
-                raise Exception(f"No se pudo guardar el archivo: {str(save_error)}")
+                pythoncom.CoInitialize()
+                excel = win32.Dispatch("Excel.Application")
+                excel.Visible = False
+                excel_wb = excel.Workbooks.Open(RUTA_ENTRADA)
+                excel.CalculateFull()
+                excel_wb.Save()
+                excel_wb.Close()
+                excel.Quit()
+                pythoncom.CoUninitialize()
+            except:
+                pythoncom.CoUninitialize()
         
         return True
         
@@ -749,6 +953,7 @@ def preparar_hoja_mes(mes, dia, anio):
                 wb2.close()
         except:
             pass
+
 
 
 def rotar_etiquetas_graficos(ruta_archivo, nombre_hoja):
