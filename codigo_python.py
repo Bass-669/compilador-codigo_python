@@ -792,7 +792,7 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
 
 
 def preparar_hoja_mes(mes, dia, anio):
-    """Crea la hoja del mes si no existe, limpia el día y configura fórmulas"""
+    """Crea la hoja del mes si no existe y configura fórmulas iniciales"""
     nombre_hoja = f"IR {mes} {anio}"
     col_dia = dia + 1  # columna B es 2, día 1 → columna 2
     hoja_nueva_creada = False
@@ -802,6 +802,24 @@ def preparar_hoja_mes(mes, dia, anio):
         wb_check = openpyxl.load_workbook(RUTA_ENTRADA)
         if nombre_hoja in wb_check.sheetnames:
             wb_check.close()
+            # Verificar si el día ya tiene datos
+            wb_existente = openpyxl.load_workbook(RUTA_ENTRADA)
+            hoja_existente = wb_existente[nombre_hoja]
+            
+            # Comprobar si las celdas clave para este día están vacías
+            celdas_clave = [
+                hoja_existente.cell(row=3, column=col_dia).value,  # Torno 1 regular
+                hoja_existente.cell(row=4, column=col_dia).value,  # Torno 1 podado
+                hoja_existente.cell(row=8, column=col_dia).value,  # Torno 2 regular
+                hoja_existente.cell(row=9, column=col_dia).value   # Torno 2 podado
+            ]
+            
+            dia_con_datos = any(cell is not None and str(cell).strip() != "" for cell in celdas_clave)
+            wb_existente.close()
+            
+            if dia_con_datos:
+                messagebox.showinfo("Información", f"El día {dia} ya tiene datos en la hoja {nombre_hoja}. Se agregarán los nuevos datos.")
+                return True
         else:
             wb_check.close()
             
@@ -869,77 +887,57 @@ def preparar_hoja_mes(mes, dia, anio):
             # Rotar etiquetas de gráficos en la nueva hoja
             rotar_etiquetas_graficos(RUTA_ENTRADA, nombre_hoja)
 
-        # 3. Limpiar datos del día y configurar fórmulas
-        wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
-        hoja = wb2[nombre_hoja]
-        
-        if hoja_nueva_creada or hoja.cell(row=2, column=col_dia).value is None:
-            # Limpiar solo las celdas necesarias del día específico
-            filas_a_limpiar = [3, 4, 8, 9, 13, 14, 18, 19, 32, 33, 34, 40]
-            for fila in filas_a_limpiar:
-                try:
-                    celda = hoja.cell(row=fila, column=col_dia)
-                    if not isinstance(celda, openpyxl.cell.cell.MergedCell):
-                        celda.value = ""
-                except Exception as e:
-                    messagebox.showwarning("Advertencia", f"Error limpiando celda {fila},{col_dia}: {str(e)}")
-                    continue
-
-            # Escribir nueva fecha solo en las celdas necesarias
-            nueva_fecha = f"{dia:02d}/{MESES_NUM[mes]:02d}/{anio}"
-            for fila in [2, 7, 12, 17, 22, 27, 31, 37]:
-                try:
-                    hoja.cell(row=fila, column=col_dia, value=nueva_fecha)
-                except Exception as e:
-                    messagebox.showwarning("Advertencia", f"Error escribiendo fecha en fila {fila}: {str(e)}")
-                    continue
-
-            # Configurar fórmulas solo para el día específico
-            letra = openpyxl.utils.get_column_letter(col_dia)
+        # 3. Configurar solo para nueva hoja (no limpiar nada para días nuevos)
+        if hoja_nueva_creada:
+            wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
+            hoja = wb2[nombre_hoja]
             
-            try:
-                # Fórmula para fila 40 (IR diario)
-                hoja.cell(row=40, column=col_dia, value=f"=IFERROR({letra}34/{letra}28, 0)")
-                hoja.cell(row=40, column=col_dia).number_format = '0.00%'
-                hoja.cell(row=40, column=col_dia).alignment = Alignment(horizontal='right')
-                hoja.cell(row=40, column=col_dia).border = BORDER
+            # LIMPIEZA COMPLETA SOLO PARA NUEVA HOJA
+            filas_a_limpiar = [2,3,4,7,8,9,12,13,14,17,18,19,22,23,24,27,28,31,32,33,34,37,38,39,40]
+            for fila in filas_a_limpiar:
+                for col in range(2, 35):  # Columnas B a AH (2-34)
+                    try:
+                        celda = hoja.cell(row=fila, column=col)
+                        if not isinstance(celda, openpyxl.cell.cell.MergedCell):
+                            celda.value = ""
+                    except Exception as e:
+                        messagebox.showwarning("Advertencia", f"Error limpiando celda {fila},{col}: {str(e)}")
+                        continue
+            
+            # Configuración inicial completa para nueva hoja
+            for col in range(2, 33):  # Columnas B a AF (2-32)
+                letra = openpyxl.utils.get_column_letter(col)
                 
-                # Fórmula para fila 34 (Promedio)
-                hoja.cell(row=34, column=col_dia, value=f"=IFERROR(AVERAGE({letra}32:{letra}33), 0)")
-                hoja.cell(row=34, column=col_dia).number_format = '0.00%'
-                hoja.cell(row=34, column=col_dia).alignment = Alignment(horizontal='right')
-                hoja.cell(row=34, column=col_dia).border = BORDER
+                # Fórmulas básicas
+                hoja.cell(row=40, column=col, value=f"=IFERROR({letra}34/{letra}28, 0)").number_format = '0.00%'
+                hoja.cell(row=34, column=col, value=f"=IFERROR(AVERAGE({letra}32:{letra}33), 0)").number_format = '0.00%'
                 
-                # Configurar fórmulas especiales (no limpiar estas filas)
-                hoja.cell(row=23, column=col_dia, 
+                # Fórmulas especiales
+                hoja.cell(row=23, column=col, 
                          value=f"=IFERROR(({letra}3*{letra}13+{letra}8*{letra}18)/({letra}3+{letra}8), 0)")
-                hoja.cell(row=24, column=col_dia, 
+                hoja.cell(row=24, column=col, 
                          value=f"=IFERROR(({letra}4*{letra}14+{letra}9*{letra}19)/({letra}4+{letra}9), 0)")
-                hoja.cell(row=28, column=col_dia, 
+                hoja.cell(row=28, column=col, 
                          value=f"=IFERROR(({letra}23*({letra}3+{letra}8)+{letra}24*({letra}4+{letra}9))/({letra}3+{letra}4+{letra}8+{letra}9), 0)")
-                hoja.cell(row=38, column=col_dia, 
+                hoja.cell(row=38, column=col, 
                          value=f"=IFERROR({letra}32/{letra}23, 0)")
-                hoja.cell(row=39, column=col_dia, 
+                hoja.cell(row=39, column=col, 
                          value=f"=IFERROR({letra}33/{letra}24, 0)")
-                
-            except Exception as e:
-                messagebox.showwarning("Advertencia", f"Error configurando fórmulas: {str(e)}")
-
-            # Configuración de columna AH (solo para nuevas hojas)
-            if hoja_nueva_creada:
-                hoja.cell(row=2, column=34, value=int(anio))  # AH2 - Año
-                for fila in [3, 4, 8, 9]:
-                    hoja.cell(row=fila, column=34, value=f"=SUM(B{fila}:AG{fila})")
-                for fila in [13, 14, 18, 19]:
-                    hoja.cell(row=fila, column=34, value=" ")
-                hoja.cell(row=39, column=34, value="=AH33/AH28").number_format = '0.00%'
-                hoja.cell(row=40, column=34, value="=AH34/AH28").number_format = '0.00%'
-
+            
+            # Configuración columna AH
+            hoja.cell(row=2, column=34, value=int(anio))
+            for fila in [3,4,8,9]:
+                hoja.cell(row=fila, column=34, value=f"=SUM(B{fila}:AG{fila})")
+            for fila in [13,14,18,19]:
+                hoja.cell(row=fila, column=34, value=" ")
+            hoja.cell(row=39, column=34, value="=AH33/AH28").number_format = '0.00%'
+            hoja.cell(row=40, column=34, value="=AH34/AH28").number_format = '0.00%'
+            
             # Guardar cambios
             try:
                 wb2.save(RUTA_ENTRADA)
                 
-                # Forzar actualización de fórmulas con Excel COM
+                # Forzar actualización de fórmulas
                 try:
                     pythoncom.CoInitialize()
                     excel = win32.Dispatch("Excel.Application")
@@ -958,6 +956,8 @@ def preparar_hoja_mes(mes, dia, anio):
             except Exception as save_error:
                 messagebox.showerror("Error", f"No se pudo guardar el archivo: {str(save_error)}")
                 return False
+            finally:
+                wb2.close()
         
         return True
         
@@ -968,13 +968,6 @@ def preparar_hoja_mes(mes, dia, anio):
             "Verifique que el archivo no esté abierto en Excel."
         )
         return False
-        
-    finally:
-        try:
-            if 'wb2' in locals():
-                wb2.close()
-        except:
-            pass
 
 
 
