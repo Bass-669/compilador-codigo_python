@@ -239,72 +239,148 @@ def es_valor_valido(valor):
     except:
         return False
 
+# def crear_archivo_temporal_con_ae(celda_origen):
+#     """Calcula el valor absoluto de la celda AD usando Excel COM"""
+#     pythoncom.CoInitialize()
+#     excel = wb = None
+#     try:
+#         # Validar formato de celda_origen
+#         if not re.match(r'^AD\d+$', celda_origen):
+#             raise ValueError(f"Formato de celda inválido: {celda_origen}")
+
+#         # Extraer número de fila
+#         fila = int(re.search(r'\d+', celda_origen).group())
+#         # Iniciar Excel
+#         excel = win32.Dispatch("Excel.Application")
+#         excel.Visible = False
+#         excel.DisplayAlerts = False
+#         # Abrir archivo
+#         wb = excel.Workbooks.Open(RUTA_ENTRADA)
+#         hoja = wb.Sheets("IR diario ")
+#         # Verificar que la fila existe
+#         if fila > hoja.UsedRange.Rows.Count or fila < 1:
+#             raise ValueError(f"Fila {fila} está fuera de rango")
+
+#         # Calcular valor en AE{fila}
+#         celda_ae = f"AE{fila}"
+#         hoja.Range(celda_ae).Formula = f"=ABS({celda_origen})"
+#         excel.Calculate()  # Forzar cálculo
+#         # Obtener valor
+#         valor_ae = hoja.Range(celda_ae).Value
+#         # Crear archivo temporal
+#         temp_dir = os.path.join(BASE_DIR, CARPETA)
+#         os.makedirs(temp_dir, exist_ok=True)
+#         temp_path = os.path.join(temp_dir, "temp_report.xlsx")
+#         # Guardar y cerrar
+#         wb.SaveAs(temp_path)
+#         wb.Close(False)
+
+#         # Convertir valor a float seguro
+#         try:
+#             if valor_ae in (None, "#N/A", "#VALUE!", "#REF!", "#DIV/0!"):
+#                 return temp_path, 0.0
+
+#             if isinstance(valor_ae, (int, float)):
+#                 valor_final = float(valor_ae)
+#             else:
+#                 valor_final = float(str(valor_ae).replace(",", "."))
+
+#             return temp_path, valor_final
+
+#         except (ValueError, TypeError):
+#             return temp_path, 0.0
+
+#     except Exception as e:
+#         print(f"Error en crear_archivo_temporal_con_ae: {str(e)}")
+#         return None, 0.0
+#     finally:
+#         try:
+#             if 'wb' in locals():
+#                 wb.Close(False)
+#         except:
+#             pass
+#         try:
+#             if excel:
+#                 excel.Quit()
+#         except:
+#             pass
+#         pythoncom.CoUninitialize()
+
+
 def crear_archivo_temporal_con_ae(celda_origen):
-    """Calcula el valor absoluto de la celda AD usando Excel COM"""
+    """Calcula el valor absoluto de la celda AD usando Excel COM sin afectar archivos abiertos por el usuario"""
     pythoncom.CoInitialize()
     excel = wb = None
+    temp_path = os.path.join(BASE_DIR, CARPETA, "temp_report.xlsx")
+    
     try:
-        # Validar formato de celda_origen
+        # 1. Iniciar Excel en modo invisible
+        excel = win32.Dispatch("Excel.Application")
+        excel.Visible = False  # Esto debe ser LO PRIMERO
+        excel.DisplayAlerts = False
+        excel.ScreenUpdating = False
+
+        # 2. Validar formato de celda_origen
         if not re.match(r'^AD\d+$', celda_origen):
             raise ValueError(f"Formato de celda inválido: {celda_origen}")
 
-        # Extraer número de fila
-        fila = int(re.search(r'\d+', celda_origen).group())
-        # Iniciar Excel
-        excel = win32.Dispatch("Excel.Application")
-        excel.Visible = False
-        excel.DisplayAlerts = False
-        # Abrir archivo
+        # 3. Abrir solo el archivo necesario (no afectar otros archivos abiertos)
         wb = excel.Workbooks.Open(RUTA_ENTRADA)
         hoja = wb.Sheets("IR diario ")
-        # Verificar que la fila existe
+        
+        # 4. Extraer número de fila y validar
+        fila = int(re.search(r'\d+', celda_origen).group())
         if fila > hoja.UsedRange.Rows.Count or fila < 1:
             raise ValueError(f"Fila {fila} está fuera de rango")
 
-        # Calcular valor en AE{fila}
+        # 5. Calcular valor en AE{fila}
         celda_ae = f"AE{fila}"
         hoja.Range(celda_ae).Formula = f"=ABS({celda_origen})"
         excel.Calculate()  # Forzar cálculo
-        # Obtener valor
+        
+        # 6. Obtener valor con manejo seguro
         valor_ae = hoja.Range(celda_ae).Value
-        # Crear archivo temporal
-        temp_dir = os.path.join(BASE_DIR, CARPETA)
-        os.makedirs(temp_dir, exist_ok=True)
-        temp_path = os.path.join(temp_dir, "temp_report.xlsx")
-        # Guardar y cerrar
+        
+        # 7. Guardar como temporal (sin cerrar Excel si ya estaba abierto)
+        os.makedirs(os.path.dirname(temp_path), exist_ok=True)
         wb.SaveAs(temp_path)
-        wb.Close(False)
-
-        # Convertir valor a float seguro
+        
+        # 8. Convertir valor a float seguro
+        if valor_ae in (None, "#N/A", "#VALUE!", "#REF!", "#DIV/0!", ""):
+            return temp_path, 0.0
+            
         try:
-            if valor_ae in (None, "#N/A", "#VALUE!", "#REF!", "#DIV/0!"):
-                return temp_path, 0.0
-
-            if isinstance(valor_ae, (int, float)):
-                valor_final = float(valor_ae)
-            else:
-                valor_final = float(str(valor_ae).replace(",", "."))
-
-            return temp_path, valor_final
-
+            valor_final = float(str(valor_ae).replace(",", ".")) if isinstance(valor_ae, str) else float(valor_ae)
+            return temp_path, abs(valor_final)  # Valor absoluto garantizado
         except (ValueError, TypeError):
             return temp_path, 0.0
 
     except Exception as e:
         print(f"Error en crear_archivo_temporal_con_ae: {str(e)}")
         return None, 0.0
+        
     finally:
+        # 9. Limpieza segura (no cerrar Excel si tenía otros archivos abiertos)
         try:
-            if 'wb' in locals():
-                wb.Close(False)
+            if wb:
+                wb.Close(False)  # Cerrar solo este libro
         except:
             pass
+            
         try:
             if excel:
-                excel.Quit()
+                # Verificar si hay otros libros abiertos antes de cerrar Excel
+                if excel.Workbooks.Count == 0:
+                    excel.Quit()
+                else:
+                    # Si había archivos abiertos, dejamos Excel en estado original
+                    excel.Visible = True  
+                    excel.DisplayAlerts = True
         except:
             pass
+            
         pythoncom.CoUninitialize()
+
 
 def extraer_bloques(txt):
     lineas = [l.strip() for l in txt.strip().split("\n") if l.strip()]
@@ -816,6 +892,8 @@ def dias_en_mes(mes, anio):
 
 
 #---------------------------------------------------------------------
+
+
 
 ventana = tk.Tk()
 ventana.title("Ingresar datos")
