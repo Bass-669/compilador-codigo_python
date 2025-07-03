@@ -814,6 +814,9 @@ def dias_en_mes(mes, anio):
     meses_31_dias = ["Enero", "Marzo", "Mayo", "Julio", "Agosto", "Octubre", "Diciembre"]
     return 31 if mes in meses_31_dias else 30
 
+
+#---------------------------------------------------------------------
+
 ventana = tk.Tk()
 ventana.title("Ingresar datos")
 entrada_texto = tk.Text(ventana, width=100, height=30)
