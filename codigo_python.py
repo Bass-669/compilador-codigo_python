@@ -309,66 +309,31 @@ def escribir_valor_bloque(hoja, col_dia, torno, valor, tipo_bloque):
     celda.number_format = '0' # cambio de 0.00 a 0
 
 def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque, tipos_bloque):
-    """Versión corregida que maneja fórmulas y referencias correctamente"""
-    try:
-        wb = hoja.parent
-        hoja_ir = wb["IR diario "]
-        
-        # Necesitamos usar Excel COM para obtener valores calculados
-        excel = win32.Dispatch("Excel.Application")
-        excel.Visible = False
-        excel_wb = excel.Workbooks.Open(RUTA_ENTRADA)
-        excel_hoja_ir = excel_wb.Sheets("IR diario ")
-        
-        for i, (tipo_bloque, referencia) in enumerate(zip(tipos_bloque, valores_ae_por_bloque)):
-            try:
-                tipo_bloque = tipo_bloque.strip().upper()
-                
-                # Determinar fila destino
-                if tipo_bloque == "PODADO":
-                    fila_valor = 13 if torno == 1 else 14
-                elif tipo_bloque == "REGULAR":
-                    fila_valor = 18 if torno == 1 else 19
-                else:
-                    continue
-
-                # Obtener el valor REAL usando Excel COM
-                try:
-                    # Extraer referencia como "AD43649"
-                    celda_ad = referencia.split("!")[-1]
-                    valor_real = excel_hoja_ir.Range(celda_ad).Value
-                    
-                    # Calcular porcentaje
-                    valor_porcentaje = (valor_real / 100) if valor_real > 1 else valor_real
-                except:
-                    valor_porcentaje = 0.0
-
-                # Escribir el valor
-                celda = hoja.cell(row=fila_valor, column=col_dia)
-                celda.value = valor_porcentaje
-                celda.number_format = '0.00%'
-                celda.alignment = ALIGN_R
-                
-                messagebox.showinfo("DEBUG Escritura", 
-                                  f"Bloque {i} ({tipo_bloque})\n"
-                                  f"Referencia: {referencia}\n"
-                                  f"Valor obtenido: {valor_real}\n"
-                                  f"Porcentaje escrito: {valor_porcentaje}")
-                
-            except Exception as e:
-                messagebox.showerror("Error en bloque", 
-                                   f"Error procesando bloque {i}:\n{str(e)}")
-                continue
-                
-    except Exception as e:
-        messagebox.showerror("Error crítico", f"Error general:\n{str(e)}")
-    finally:
-        # Limpieza garantizada
+    """Escribe las referencias de Excel directamente sin calcular valores."""
+    for i, (tipo_bloque, referencia) in enumerate(zip(tipos_bloque, valores_ae_por_bloque)):
         try:
-            excel_wb.Close(False)
-            excel.Quit()
-        except:
-            pass
+            tipo_bloque = tipo_bloque.strip().upper()
+            
+            # Determinar fila destino
+            if tipo_bloque == "PODADO":
+                fila_valor = 13 if torno == 1 else 14
+            elif tipo_bloque == "REGULAR":
+                fila_valor = 18 if torno == 1 else 19
+            else:
+                continue  # Saltar tipos no reconocidos
+
+            # Escribir la referencia DIRECTAMENTE (sin Excel COM)
+            celda = hoja.cell(row=fila_valor, column=col_dia)
+            celda.value = referencia  # Ej: ='IR diario '!AD123
+            celda.alignment = ALIGN_R  # Alineación derecha (opcional)
+
+            # DEBUG (opcional)
+            print(f"Bloque {i} ({tipo_bloque}) | Torno {torno} | Fila {fila_valor}")
+            print(f"Referencia escrita: {referencia}")
+            
+        except Exception as e:
+            print(f"Error en bloque {i}: {str(e)}")
+            continue  # Continuar con el siguiente bloque
 
 def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
     """Escribe los datos en la hoja del mes incluyendo las fechas"""
