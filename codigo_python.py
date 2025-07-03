@@ -239,148 +239,14 @@ def es_valor_valido(valor):
     except:
         return False
 
-# def crear_archivo_temporal_con_ae(celda_origen):
-#     """Calcula el valor absoluto de la celda AD usando Excel COM"""
-#     pythoncom.CoInitialize()
-#     excel = wb = None
-#     try:
-#         # Validar formato de celda_origen
-#         if not re.match(r'^AD\d+$', celda_origen):
-#             raise ValueError(f"Formato de celda inválido: {celda_origen}")
-
-#         # Extraer número de fila
-#         fila = int(re.search(r'\d+', celda_origen).group())
-#         # Iniciar Excel
-#         excel = win32.Dispatch("Excel.Application")
-#         excel.Visible = False
-#         excel.DisplayAlerts = False
-#         # Abrir archivo
-#         wb = excel.Workbooks.Open(RUTA_ENTRADA)
-#         hoja = wb.Sheets("IR diario ")
-#         # Verificar que la fila existe
-#         if fila > hoja.UsedRange.Rows.Count or fila < 1:
-#             raise ValueError(f"Fila {fila} está fuera de rango")
-
-#         # Calcular valor en AE{fila}
-#         celda_ae = f"AE{fila}"
-#         hoja.Range(celda_ae).Formula = f"=ABS({celda_origen})"
-#         excel.Calculate()  # Forzar cálculo
-#         # Obtener valor
-#         valor_ae = hoja.Range(celda_ae).Value
-#         # Crear archivo temporal
-#         temp_dir = os.path.join(BASE_DIR, CARPETA)
-#         os.makedirs(temp_dir, exist_ok=True)
-#         temp_path = os.path.join(temp_dir, "temp_report.xlsx")
-#         # Guardar y cerrar
-#         wb.SaveAs(temp_path)
-#         wb.Close(False)
-
-#         # Convertir valor a float seguro
-#         try:
-#             if valor_ae in (None, "#N/A", "#VALUE!", "#REF!", "#DIV/0!"):
-#                 return temp_path, 0.0
-
-#             if isinstance(valor_ae, (int, float)):
-#                 valor_final = float(valor_ae)
-#             else:
-#                 valor_final = float(str(valor_ae).replace(",", "."))
-
-#             return temp_path, valor_final
-
-#         except (ValueError, TypeError):
-#             return temp_path, 0.0
-
-#     except Exception as e:
-#         print(f"Error en crear_archivo_temporal_con_ae: {str(e)}")
-#         return None, 0.0
-#     finally:
-#         try:
-#             if 'wb' in locals():
-#                 wb.Close(False)
-#         except:
-#             pass
-#         try:
-#             if excel:
-#                 excel.Quit()
-#         except:
-#             pass
-#         pythoncom.CoUninitialize()
-
-
 def crear_archivo_temporal_con_ae(celda_origen):
-    """Calcula el valor absoluto de la celda AD usando Excel COM sin afectar archivos abiertos por el usuario"""
-    pythoncom.CoInitialize()
-    excel = wb = None
-    temp_path = os.path.join(BASE_DIR, CARPETA, "temp_report.xlsx")
+    """Retorna solo la referencia a la celda AD en formato Excel"""
+    # Validar que sea formato AD + número (ej: "AD123")
+    if not re.match(r'^AD\d+$', celda_origen):
+        raise ValueError(f"Formato de celda inválido: {celda_origen}")
     
-    try:
-        # 1. Iniciar Excel en modo invisible
-        excel = win32.Dispatch("Excel.Application")
-        excel.Visible = False  # Esto debe ser LO PRIMERO
-        excel.DisplayAlerts = False
-        excel.ScreenUpdating = False
-
-        # 2. Validar formato de celda_origen
-        if not re.match(r'^AD\d+$', celda_origen):
-            raise ValueError(f"Formato de celda inválido: {celda_origen}")
-
-        # 3. Abrir solo el archivo necesario (no afectar otros archivos abiertos)
-        wb = excel.Workbooks.Open(RUTA_ENTRADA)
-        hoja = wb.Sheets("IR diario ")
-        
-        # 4. Extraer número de fila y validar
-        fila = int(re.search(r'\d+', celda_origen).group())
-        if fila > hoja.UsedRange.Rows.Count or fila < 1:
-            raise ValueError(f"Fila {fila} está fuera de rango")
-
-        # 5. Calcular valor en AE{fila}
-        celda_ae = f"AE{fila}"
-        hoja.Range(celda_ae).Formula = f"=ABS({celda_origen})"
-        excel.Calculate()  # Forzar cálculo
-        
-        # 6. Obtener valor con manejo seguro
-        valor_ae = hoja.Range(celda_ae).Value
-        
-        # 7. Guardar como temporal (sin cerrar Excel si ya estaba abierto)
-        os.makedirs(os.path.dirname(temp_path), exist_ok=True)
-        wb.SaveAs(temp_path)
-        
-        # 8. Convertir valor a float seguro
-        if valor_ae in (None, "#N/A", "#VALUE!", "#REF!", "#DIV/0!", ""):
-            return temp_path, 0.0
-            
-        try:
-            valor_final = float(str(valor_ae).replace(",", ".")) if isinstance(valor_ae, str) else float(valor_ae)
-            return temp_path, abs(valor_final)  # Valor absoluto garantizado
-        except (ValueError, TypeError):
-            return temp_path, 0.0
-
-    except Exception as e:
-        print(f"Error en crear_archivo_temporal_con_ae: {str(e)}")
-        return None, 0.0
-        
-    finally:
-        # 9. Limpieza segura (no cerrar Excel si tenía otros archivos abiertos)
-        try:
-            if wb:
-                wb.Close(False)  # Cerrar solo este libro
-        except:
-            pass
-            
-        try:
-            if excel:
-                # Verificar si hay otros libros abiertos antes de cerrar Excel
-                if excel.Workbooks.Count == 0:
-                    excel.Quit()
-                else:
-                    # Si había archivos abiertos, dejamos Excel en estado original
-                    excel.Visible = True  
-                    excel.DisplayAlerts = True
-        except:
-            pass
-            
-        pythoncom.CoUninitialize()
-
+    # Retornar referencia completa (None como primer valor para mantener compatibilidad)
+    return None, f"='IR diario '!{celda_origen}"
 
 def extraer_bloques(txt):
     lineas = [l.strip() for l in txt.strip().split("\n") if l.strip()]
@@ -432,43 +298,27 @@ def escribir_valor_bloque(hoja, col_dia, torno, valor, tipo_bloque):
     celda.number_format = '0' # cambio de 0.00 a 0
 
 def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque, tipos_bloque):
-    """Escribe los valores de porcentaje en las celdas correspondientes"""
-    for i, (tipo_bloque, valor_ae) in enumerate(zip(tipos_bloque, valores_ae_por_bloque)):
+    """Escribe las referencias directas a las celdas AD en formato Excel"""
+    for tipo_bloque, referencia in zip(tipos_bloque, valores_ae_por_bloque):
         try:
             tipo_bloque = tipo_bloque.strip().upper()
+            
             # Determinar fila según el tipo de bloque y torno
             if tipo_bloque == "PODADO":
                 fila_valor = 13 if torno == 1 else 14
             elif tipo_bloque == "REGULAR":
                 fila_valor = 18 if torno == 1 else 19
             else:
-                continue  # ignorar bloques con tipo desconocido
-            # Validar y convertir el valor
-            try:
-                if valor_ae is None:
-                    valor_porcentaje = 0.0
-                elif isinstance(valor_ae, str) and valor_ae.startswith("='IR diario '!AD"):
-                    # Es una referencia, obtener el valor real
-                    ref_fila = int(valor_ae.split("!AD")[1])
-                    valor_celda = hoja.parent["IR diario "].cell(row=ref_fila, column=30).value
-                    valor_porcentaje = float(valor_celda) / 100 if valor_celda else 0.0
-                else:
-                    # Es un valor directo
-                    valor_num = float(str(valor_ae).replace(",", ".")) if valor_ae else 0.0
-                    valor_porcentaje = valor_num / 100 if valor_num > 1 else valor_num
-            except:
-                valor_porcentaje = 0.0
+                continue  # ignorar tipos desconocidos
 
-            # Escribir el valor
+            # Escribir EXACTAMENTE la referencia recibida
             celda = hoja.cell(row=fila_valor, column=col_dia)
-            celda.value = valor_porcentaje
+            celda.value = referencia  # Ej: ='IR diario '!AD123
             celda.number_format = '0.00%'
             celda.alignment = ALIGN_R
-            # celda.border = BORDER
 
         except Exception as e:
-            print(f"Error escribiendo bloque {i} ({tipo_bloque}): {str(e)}")
-            continue
+            print(f"Error escribiendo bloque {tipo_bloque}: {str(e)}")
 
 def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
     """Escribe los datos en la hoja del mes incluyendo las fechas"""
@@ -889,11 +739,6 @@ def dias_en_mes(mes, anio):
         return 28
     meses_31_dias = ["Enero", "Marzo", "Mayo", "Julio", "Agosto", "Octubre", "Diciembre"]
     return 31 if mes in meses_31_dias else 30
-
-
-#---------------------------------------------------------------------
-
-
 
 ventana = tk.Tk()
 ventana.title("Ingresar datos")
