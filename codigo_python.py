@@ -241,25 +241,23 @@ def es_valor_valido(valor):
 
 
 def crear_archivo_temporal_con_ae(celda_origen):
-    """Retorna la referencia a la celda AD correctamente formateada"""
+    """Retorna la referencia CORRECTAMENTE formateada"""
     if not re.match(r'^AD\d+$', celda_origen):
         messagebox.showerror("Error", f"Formato de celda inválido: {celda_origen}")
         raise ValueError(f"Formato de celda inválido: {celda_origen}")
     
-    # FORMATO CORRECTO: ='IR diario '!AD123
+    # FORMATO EXACTO REQUERIDO POR EXCEL:
     referencia = f"='IR diario '!{celda_origen}"
     
     messagebox.showinfo("DEBUG Referencia", 
                       f"Referencia generada:\n{referencia}\n"
-                      f"Validar que tenga:\n"
-                      f"1. Signo = al inicio\n"
-                      f"2. Comillas simples alrededor de 'IR diario '\n"
-                      f"3. Signo ! antes de AD\n"
-                      f"4. Número de celda válido")
+                      f"Verificar que tenga:\n"
+                      f"1. = al inicio\n"
+                      f"2. 'IR diario ' entre comillas simples\n"
+                      f"3. ! antes de AD\n"
+                      f"4. Número válido")
     
     return None, referencia
-
-
 
 def extraer_bloques(txt):
     lineas = [l.strip() for l in txt.strip().split("\n") if l.strip()]
@@ -311,109 +309,66 @@ def escribir_valor_bloque(hoja, col_dia, torno, valor, tipo_bloque):
     celda.number_format = '0' # cambio de 0.00 a 0
 
 def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque, tipos_bloque):
-    """Escribe los valores de porcentaje con mensajes de depuración"""
-    debug_info = []
-    debug_info.append("Iniciando escribir_valores_resumen_bloques")
-    debug_info.append(f"Parámetros recibidos:")
-    debug_info.append(f"- col_dia: {col_dia}, torno: {torno}")
-    debug_info.append(f"- valores_ae_por_bloque: {valores_ae_por_bloque}")
-    debug_info.append(f"- tipos_bloque: {tipos_bloque}")
-    
+    """Versión corregida que maneja fórmulas y referencias correctamente"""
     try:
         wb = hoja.parent
-        debug_info.append("Workbook padre obtenido correctamente")
+        hoja_ir = wb["IR diario "]
         
-        try:
-            hoja_ir = wb["IR diario "]
-            debug_info.append("Hoja 'IR diario' accedida correctamente")
-        except KeyError:
-            error_msg = "No se encontró la hoja 'IR diario '"
-            debug_info.append(f"ERROR: {error_msg}")
-            messagebox.showerror("Error", "\n".join(debug_info))
-            return
+        # Necesitamos usar Excel COM para obtener valores calculados
+        excel = win32.Dispatch("Excel.Application")
+        excel.Visible = False
+        excel_wb = excel.Workbooks.Open(RUTA_ENTRADA)
+        excel_hoja_ir = excel_wb.Sheets("IR diario ")
         
-        for i, (tipo_bloque, valor_ae) in enumerate(zip(tipos_bloque, valores_ae_por_bloque)):
-            bloque_info = []
-            bloque_info.append(f"\nProcesando bloque {i}:")
-            bloque_info.append(f"- Tipo: {tipo_bloque}")
-            bloque_info.append(f"- Valor AE: {valor_ae} (tipo: {type(valor_ae)})")
-            
+        for i, (tipo_bloque, referencia) in enumerate(zip(tipos_bloque, valores_ae_por_bloque)):
             try:
                 tipo_bloque = tipo_bloque.strip().upper()
-                bloque_info.append(f"Tipo de bloque normalizado: {tipo_bloque}")
                 
-                # Determinar fila según el tipo de bloque y torno
+                # Determinar fila destino
                 if tipo_bloque == "PODADO":
                     fila_valor = 13 if torno == 1 else 14
                 elif tipo_bloque == "REGULAR":
                     fila_valor = 18 if torno == 1 else 19
                 else:
-                    warn_msg = f"Tipo de bloque no reconocido: '{tipo_bloque}'"
-                    bloque_info.append(f"WARNING: {warn_msg}")
-                    messagebox.showwarning("Depuración", "\n".join(bloque_info))
                     continue
-                
-                bloque_info.append(f"Fila destino: {fila_valor}")
 
-                # Obtener el valor numérico real
-                if isinstance(valor_ae, str) and valor_ae.startswith("='IR diario '!AD"):
-                    bloque_info.append("Valor AE es una referencia a celda")
-                    try:
-                        fila_origen = int(valor_ae.split("!AD")[1])
-                        bloque_info.append(f"Fila origen extraída: {fila_origen}")
-                        
-                        valor_celda = hoja_ir.cell(row=fila_origen, column=30).value
-                        bloque_info.append(f"Valor obtenido de AD{fila_origen}: {valor_celda} (tipo: {type(valor_celda)})")
-                    except Exception as e:
-                        error_msg = f"Error extrayendo fila origen: {str(e)}"
-                        bloque_info.append(f"ERROR: {error_msg}")
-                        valor_celda = 0.0
-                else:
-                    bloque_info.append("Valor AE es un valor directo")
-                    valor_celda = valor_ae
-                
-                # Calcular el porcentaje
+                # Obtener el valor REAL usando Excel COM
                 try:
-                    if valor_celda is None:
-                        valor_num = 0.0
-                        bloque_info.append("Valor celda es None, usando 0.0")
-                    else:
-                        valor_str = str(valor_celda).replace(",", ".")
-                        valor_num = float(valor_str)
-                        bloque_info.append(f"Valor convertido a float: {valor_num}")
+                    # Extraer referencia como "AD43649"
+                    celda_ad = referencia.split("!")[-1]
+                    valor_real = excel_hoja_ir.Range(celda_ad).Value
                     
-                    valor_porcentaje = valor_num / 100 if valor_num > 1 else valor_num
-                    bloque_info.append(f"Valor porcentaje calculado: {valor_porcentaje}")
-                except (ValueError, TypeError) as e:
-                    error_msg = f"Error calculando porcentaje: {str(e)}"
-                    bloque_info.append(f"ERROR: {error_msg}")
+                    # Calcular porcentaje
+                    valor_porcentaje = (valor_real / 100) if valor_real > 1 else valor_real
+                except:
                     valor_porcentaje = 0.0
 
-                # Escribir el valor en la celda
+                # Escribir el valor
                 celda = hoja.cell(row=fila_valor, column=col_dia)
                 celda.value = valor_porcentaje
                 celda.number_format = '0.00%'
                 celda.alignment = ALIGN_R
-                bloque_info.append(f"Valor escrito en celda {fila_valor},{col_dia}: {valor_porcentaje}")
-
-                # Mostrar información de depuración para este bloque
-                messagebox.showinfo("Depuración - Procesando bloque", "\n".join(bloque_info))
-
+                
+                messagebox.showinfo("DEBUG Escritura", 
+                                  f"Bloque {i} ({tipo_bloque})\n"
+                                  f"Referencia: {referencia}\n"
+                                  f"Valor obtenido: {valor_real}\n"
+                                  f"Porcentaje escrito: {valor_porcentaje}")
+                
             except Exception as e:
-                error_msg = f"Error procesando bloque {i} ({tipo_bloque}):\n{str(e)}"
-                bloque_info.append(f"ERROR: {error_msg}")
-                messagebox.showerror("Error en bloque", "\n".join(bloque_info))
+                messagebox.showerror("Error en bloque", 
+                                   f"Error procesando bloque {i}:\n{str(e)}")
                 continue
                 
-        # Mostrar resumen final
-        messagebox.showinfo("Depuración - Finalizado", 
-                          "Proceso completado con los siguientes detalles:\n\n" + 
-                          "\n".join(debug_info))
-                
     except Exception as e:
-        error_msg = f"Error grave en escribir_valores_resumen_bloques:\n{str(e)}"
-        debug_info.append(f"CRITICAL: {error_msg}")
-        messagebox.showerror("Error crítico", "\n".join(debug_info))
+        messagebox.showerror("Error crítico", f"Error general:\n{str(e)}")
+    finally:
+        # Limpieza garantizada
+        try:
+            excel_wb.Close(False)
+            excel.Quit()
+        except:
+            pass
 
 def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
     """Escribe los datos en la hoja del mes incluyendo las fechas"""
