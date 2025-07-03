@@ -298,12 +298,13 @@ def escribir_valor_bloque(hoja, col_dia, torno, valor, tipo_bloque):
     celda.number_format = '0' # cambio de 0.00 a 0
 
 def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque, tipos_bloque):
-    """Escribe las referencias directas a las celdas AD en formato Excel y fuerza el cálculo"""
+    """Escribe los valores de porcentaje en las celdas correspondientes"""
     try:
+        # Primero necesitamos acceder a la hoja "IR diario" para obtener los valores reales
         wb = hoja.parent
-        hoja_ir = wb["IR diario "]  # Obtenemos la hoja de origen
+        hoja_ir = wb["IR diario "]
         
-        for (tipo_bloque, referencia), valor_ae in zip(zip(tipos_bloque, valores_ae_por_bloque[::2]), valores_ae_por_bloque[1::2]):
+        for i, (tipo_bloque, valor_ae) in enumerate(zip(tipos_bloque, valores_ae_por_bloque)):
             try:
                 tipo_bloque = tipo_bloque.strip().upper()
                 
@@ -313,31 +314,38 @@ def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque
                 elif tipo_bloque == "REGULAR":
                     fila_valor = 18 if torno == 1 else 19
                 else:
-                    continue  # ignorar tipos desconocidos
+                    messagebox.showwarning("Tipo desconocido", f"Tipo de bloque no reconocido: '{tipo_bloque}'")
+                    continue
 
-                # Extraer número de fila de la referencia (ej: "AD123" -> 123)
-                fila_origen = int(re.search(r'\d+', referencia.split('!')[-1]).group())
-                
-                # Obtener el valor directamente de la celda origen
-                valor = hoja_ir.cell(row=fila_origen, column=30).value  # Columna AD=30
-                
-                # Escribir el valor calculado como porcentaje
-                celda = hoja.cell(row=fila_valor, column=col_dia)
+                # Obtener el valor numérico real
+                if isinstance(valor_ae, str) and valor_ae.startswith("='IR diario '!AD"):
+                    # Extraer número de fila de referencia (ej: "AD123")
+                    fila_origen = int(valor_ae.split("!AD")[1])
+                    valor_celda = hoja_ir.cell(row=fila_origen, column=30).value  # Columna AD=30
+                else:
+                    valor_celda = valor_ae
+
+                # Calcular el porcentaje
                 try:
-                    valor_porcentaje = float(valor)/100 if valor else 0.0
-                    celda.value = valor_porcentaje
+                    valor_num = float(str(valor_celda).replace(",", ".")) if valor_celda else 0.0
+                    valor_porcentaje = valor_num / 100 if valor_num > 1 else valor_num
                 except (ValueError, TypeError):
-                    celda.value = 0.0
-                
+                    valor_porcentaje = 0.0
+
+                # Escribir el valor en la celda
+                celda = hoja.cell(row=fila_valor, column=col_dia)
+                celda.value = valor_porcentaje
                 celda.number_format = '0.00%'
                 celda.alignment = ALIGN_R
 
             except Exception as e:
-                messagebox.showwarning("Advertencia", f"Error escribiendo bloque {tipo_bloque}:\n{str(e)}")
+                messagebox.showwarning("Error en bloque", 
+                    f"Error procesando bloque {i} ({tipo_bloque}):\n{str(e)}")
                 continue
                 
     except Exception as e:
-        messagebox.showerror("Error", f"Error grave en escribir_valores_resumen_bloques:\n{str(e)}")
+        messagebox.showerror("Error crítico", 
+            f"Error grave en escribir_valores_resumen_bloques:\n{str(e)}")
 
 def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
     """Escribe los datos en la hoja del mes incluyendo las fechas"""
