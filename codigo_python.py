@@ -197,7 +197,7 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                 # Procesar archivo temporal para obtener valor AE
                 try:
                     temp_path, valor_ae = crear_archivo_temporal_con_ae(f"AD{f_fin}")
-                    sumas_ad_por_bloque.append(float(valor_ae) if es_valor_valido(valor_ae) else 0.0)
+                    sumas_ad_por_bloque.append(valor_ae) 
                 except Exception as e:
                     sumas_ad_por_bloque.append(0.0)
                 # Guardar cambios finales del bloque
@@ -241,15 +241,21 @@ def es_valor_valido(valor):
 
 
 def crear_archivo_temporal_con_ae(celda_origen):
-    """Retorna la referencia a la celda AD con mensajes de depuración"""
+    """Retorna la referencia a la celda AD correctamente formateada"""
     if not re.match(r'^AD\d+$', celda_origen):
-        error_msg = f"Formato de celda inválido: {celda_origen}"
-        messagebox.showerror("Error en crear_archivo_temporal_con_ae", error_msg)
-        raise ValueError(error_msg)
+        messagebox.showerror("Error", f"Formato de celda inválido: {celda_origen}")
+        raise ValueError(f"Formato de celda inválido: {celda_origen}")
     
+    # FORMATO CORRECTO: ='IR diario '!AD123
     referencia = f"='IR diario '!{celda_origen}"
-    messagebox.showinfo("DEBUG crear_archivo_temporal_con_ae", 
-                      f"Referencia generada:\n{referencia}")
+    
+    messagebox.showinfo("DEBUG Referencia", 
+                      f"Referencia generada:\n{referencia}\n"
+                      f"Validar que tenga:\n"
+                      f"1. Signo = al inicio\n"
+                      f"2. Comillas simples alrededor de 'IR diario '\n"
+                      f"3. Signo ! antes de AD\n"
+                      f"4. Número de celda válido")
     
     return None, referencia
 
