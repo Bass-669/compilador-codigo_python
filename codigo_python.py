@@ -577,7 +577,6 @@ def preparar_hoja_mes(mes, dia, anio):
             else:
                 print(f"La hoja {nombre_hoja} ya existe y se usará tal cual.")
                 wb_check.close()
-                rotar_etiquetas_graficos(RUTA_ENTRADA, nombre_hoja)
                 return True  # ✅ Ya existe y se usará
 
         wb_check.close()
