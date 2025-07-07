@@ -5,7 +5,7 @@ from tkinter import messagebox, ttk
 from tkcalendar import DateEntry
 import win32com.client as win32, pythoncom
 import threading
-
+messagebox.showwarning(openpyxl.__version__)
 BASE_DIR = os.path.dirname(sys.executable if getattr(sys, 'frozen', False) else os.path.abspath(__file__))
 CARPETA, ARCHIVO = "reportes", "Reporte IR Tornos.xlsx"
 RUTA_ENTRADA = os.path.join(BASE_DIR, CARPETA, ARCHIVO)
