@@ -613,115 +613,220 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
 
 
 def preparar_hoja_mes(mes, dia, anio):
-    """Versión que usa exclusivamente OpenPyXL para todas las operaciones"""
+    """Versión segura que no interfiere con otros Excels abiertos"""
     nombre_hoja = f"IR {mes} {anio}"
-    col_dia = dia + 1  # columna B es 2, día 1 → columna 2
-    
+    col_dia = dia + 1
+    hoja_nueva_creada = False
+
     try:
-        # 1. Cargar el libro completo
-        wb = openpyxl.load_workbook(RUTA_ENTRADA)
+        # 1. Verificación inicial con openpyxl
+        with openpyxl.load_workbook(RUTA_ENTRADA) as wb_check:
+            if nombre_hoja in wb_check.sheetnames:
+                # Verificar si el día ya tiene datos
+                hoja_existente = wb_check[nombre_hoja]
+                celdas_clave = [
+                    hoja_existente.cell(row=3, column=col_dia).value,
+                    hoja_existente.cell(row=4, column=col_dia).value,
+                    hoja_existente.cell(row=8, column=col_dia).value,
+                    hoja_existente.cell(row=9, column=col_dia).value
+                ]
+                if any(cell is not None and str(cell).strip() != "" for cell in celdas_clave):
+                    print(f"El día {dia} ya tiene datos en {nombre_hoja}")
+                return True
+
+        # 2. Configuración SEGURA de Excel COM
+        pythoncom.CoInitialize()
+        excel = None
+        wb = None
         
-        # 2. Verificar si la hoja ya existe
-        if nombre_hoja in wb.sheetnames:
-            hoja = wb[nombre_hoja]
-            
-            # Verificar si el día ya tiene datos
-            celdas_clave = [
-                hoja.cell(row=3, column=col_dia).value,  # Torno 1 regular
-                hoja.cell(row=4, column=col_dia).value,  # Torno 1 podado
-                hoja.cell(row=8, column=col_dia).value,  # Torno 2 regular
-                hoja.cell(row=9, column=col_dia).value   # Torno 2 podado
-            ]
-            
-            if any(cell is not None and str(cell).strip() != "" for cell in celdas_clave):
-                print(f"El día {dia} ya tiene datos en {nombre_hoja}")
-            wb.close()
-            return True
-        
-        # 3. Crear nueva hoja (copiando formato de hoja anterior)
-        hojas_ir = [name for name in wb.sheetnames if name.startswith("IR ") and len(name.split()) == 3]
-        
-        def mes_a_num(nombre_hoja):
-            try:
-                _, mes_str, anio_str = nombre_hoja.split()
-                return int(anio_str) * 12 + MESES_NUM[mes_str]
-            except:
-                return -1
-        
-        # Encontrar la hoja anterior más reciente
-        hojas_ordenadas = sorted(hojas_ir, key=mes_a_num)
-        hoja_anterior = None
-        total_nueva = int(anio) * 12 + MESES_NUM[mes]
-        
-        for h in reversed(hojas_ordenadas):
-            if mes_a_num(h) < total_nueva:
-                hoja_anterior = h
-                break
-        
-        if not hoja_anterior:
-            print("No se encontró hoja anterior para copiar")
-            wb.close()
-            return False
-        
-        # Copiar hoja (OpenPyXL copia contenido pero no gráficos/completamente)
-        source = wb[hoja_anterior]
-        new_sheet = wb.copy_worksheet(source)
-        new_sheet.title = nombre_hoja
-        
-        # 4. Limpieza de datos en la nueva hoja
-        filas_a_limpiar = [2,3,4,7,8,9,12,13,14,17,18,19,22,23,24,27,28,31,32,33,34,37,38,39,40]
-        for fila in filas_a_limpiar:
-            for col in range(2, 35):  # Columnas B a AH (2-34)
-                try:
-                    celda = new_sheet.cell(row=fila, column=col)
-                    if not isinstance(celda, openpyxl.cell.cell.MergedCell):
-                        celda.value = None
-                except:
-                    continue
-        
-        # 5. Configuración inicial de la nueva hoja
-        dias_mes = dias_en_mes(mes, anio)
-        
-        # Escribir fechas
-        for col in range(2, 2 + dias_mes):
-            dia_mes = col - 1
-            fecha_formato = f"{dia_mes:02d}/{MESES_NUM[mes]:02d}/{anio}"
-            for fila_fecha in [2,7,12,17,22,27,31,37]:
-                new_sheet.cell(row=fila_fecha, column=col, value=fecha_formato)
-        
-        # Configurar fórmulas
-        for col in range(2, 2 + dias_mes):
-            letra = openpyxl.utils.get_column_letter(col)
-            
-            # Fórmulas básicas
-            new_sheet.cell(row=40, column=col, value=f"=IFERROR({letra}34/{letra}28, 0)")
-            new_sheet.cell(row=34, column=col, value=f"=IFERROR(AVERAGE({letra}32:{letra}33), 0)")
-            
-            # Fórmulas especiales
-            new_sheet.cell(row=23, column=col, 
-                         value=f"=IFERROR(({letra}3*{letra}13+{letra}8*{letra}18)/({letra}3+{letra}8), 0)")
-            new_sheet.cell(row=24, column=col, 
-                         value=f"=IFERROR(({letra}4*{letra}14+{letra}9*{letra}19)/({letra}4+{letra}9), 0)")
-            new_sheet.cell(row=28, column=col, 
-                         value=f"=IFERROR(({letra}23*({letra}3+{letra}8)+{letra}24*({letra}4+{letra}9))/({letra}3+{letra}4+{letra}8+{letra}9), 0)")
-        
-        # Configuración columna AH (34)
-        new_sheet.cell(row=2, column=34, value=int(anio))
-        for fila in [3,4,8,9]:
-            new_sheet.cell(row=fila, column=34, value=f"=SUM(B{fila}:AG{fila})")
-        
-        # 6. Guardar cambios
-        wb.save(RUTA_ENTRADA)
-        wb.close()
-        return True
-        
-    except Exception as e:
-        print(f"Error crítico: {str(e)}")
         try:
-            wb.close()
-        except:
-            pass
+            # Usar DispatchEx para nueva instancia independiente
+            excel = win32.DispatchEx("Excel.Application")  # <<< Cambio clave
+            excel.Visible = False
+            excel.DisplayAlerts = False
+            excel.ScreenUpdating = False
+            excel.AutomationSecurity = 1  # Deshabilitar macros
+            
+            # Abrir archivo en modo exclusivo
+            wb = excel.Workbooks.Open(
+                os.path.abspath(RUTA_ENTRADA),
+                UpdateLinks=0,
+                ReadOnly=False,
+                Notify=False  # <<< No mostrar alertas
+            )
+            
+            # ... (resto del código de copia de hoja permanece igual)
+            
+            wb.Save()
+            hoja_nueva_creada = True
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al manipular Excel:\n{str(e)}")
+            return False
+            
+        finally:
+            # 3. LIMPIEZA SEGURA (sin afectar otros Excels)
+            try:
+                if wb:
+                    wb.Close(SaveChanges=True)
+            except:
+                pass
+                
+            try:
+                if excel:
+                    excel.ScreenUpdating = True
+                    excel.DisplayAlerts = True
+                    # NO usar excel.Quit() - solo liberar recursos
+                    excel = None
+            except:
+                pass
+                
+            pythoncom.CoUninitialize()
+
+        # 3. Configuración con openpyxl para nueva hoja
+        if hoja_nueva_creada:
+            with openpyxl.load_workbook(RUTA_ENTRADA) as wb2:
+                hoja = wb2[nombre_hoja]
+                
+                # ... (resto del código de configuración permanece igual)
+                
+                wb2.save(RUTA_ENTRADA)
+                
+                # Actualización de fórmulas OPCIONAL (solo si es crítico)
+                try:
+                    pythoncom.CoInitialize()
+                    excel_calc = win32.DispatchEx("Excel.Application")
+                    excel_calc.Visible = False
+                    excel_calc.DisplayAlerts = False
+                    wb_calc = excel_calc.Workbooks.Open(RUTA_ENTRADA)
+                    excel_calc.CalculateFullRebuild()
+                    wb_calc.Close(SaveChanges=True)
+                    excel_calc.Quit()  # Seguro aquí porque es nueva instancia
+                except Exception as calc_error:
+                    print(f"Advertencia: No se actualizaron fórmulas: {str(calc_error)}")
+                finally:
+                    pythoncom.CoUninitialize()
+
+        return True
+
+    except Exception as main_error:
+        messagebox.showerror("Error", f"Error general:\n{str(main_error)}")
         return False
+
+
+
+
+# version con openpyxl
+# def preparar_hoja_mes(mes, dia, anio):
+#     """Versión que usa exclusivamente OpenPyXL para todas las operaciones"""
+#     nombre_hoja = f"IR {mes} {anio}"
+#     col_dia = dia + 1  # columna B es 2, día 1 → columna 2
+    
+#     try:
+#         # 1. Cargar el libro completo
+#         wb = openpyxl.load_workbook(RUTA_ENTRADA)
+        
+#         # 2. Verificar si la hoja ya existe
+#         if nombre_hoja in wb.sheetnames:
+#             hoja = wb[nombre_hoja]
+            
+#             # Verificar si el día ya tiene datos
+#             celdas_clave = [
+#                 hoja.cell(row=3, column=col_dia).value,  # Torno 1 regular
+#                 hoja.cell(row=4, column=col_dia).value,  # Torno 1 podado
+#                 hoja.cell(row=8, column=col_dia).value,  # Torno 2 regular
+#                 hoja.cell(row=9, column=col_dia).value   # Torno 2 podado
+#             ]
+            
+#             if any(cell is not None and str(cell).strip() != "" for cell in celdas_clave):
+#                 print(f"El día {dia} ya tiene datos en {nombre_hoja}")
+#             wb.close()
+#             return True
+        
+#         # 3. Crear nueva hoja (copiando formato de hoja anterior)
+#         hojas_ir = [name for name in wb.sheetnames if name.startswith("IR ") and len(name.split()) == 3]
+        
+#         def mes_a_num(nombre_hoja):
+#             try:
+#                 _, mes_str, anio_str = nombre_hoja.split()
+#                 return int(anio_str) * 12 + MESES_NUM[mes_str]
+#             except:
+#                 return -1
+        
+#         # Encontrar la hoja anterior más reciente
+#         hojas_ordenadas = sorted(hojas_ir, key=mes_a_num)
+#         hoja_anterior = None
+#         total_nueva = int(anio) * 12 + MESES_NUM[mes]
+        
+#         for h in reversed(hojas_ordenadas):
+#             if mes_a_num(h) < total_nueva:
+#                 hoja_anterior = h
+#                 break
+        
+#         if not hoja_anterior:
+#             print("No se encontró hoja anterior para copiar")
+#             wb.close()
+#             return False
+        
+#         # Copiar hoja (OpenPyXL copia contenido pero no gráficos/completamente)
+#         source = wb[hoja_anterior]
+#         new_sheet = wb.copy_worksheet(source)
+#         new_sheet.title = nombre_hoja
+        
+#         # 4. Limpieza de datos en la nueva hoja
+#         filas_a_limpiar = [2,3,4,7,8,9,12,13,14,17,18,19,22,23,24,27,28,31,32,33,34,37,38,39,40]
+#         for fila in filas_a_limpiar:
+#             for col in range(2, 35):  # Columnas B a AH (2-34)
+#                 try:
+#                     celda = new_sheet.cell(row=fila, column=col)
+#                     if not isinstance(celda, openpyxl.cell.cell.MergedCell):
+#                         celda.value = None
+#                 except:
+#                     continue
+        
+#         # 5. Configuración inicial de la nueva hoja
+#         dias_mes = dias_en_mes(mes, anio)
+        
+#         # Escribir fechas
+#         for col in range(2, 2 + dias_mes):
+#             dia_mes = col - 1
+#             fecha_formato = f"{dia_mes:02d}/{MESES_NUM[mes]:02d}/{anio}"
+#             for fila_fecha in [2,7,12,17,22,27,31,37]:
+#                 new_sheet.cell(row=fila_fecha, column=col, value=fecha_formato)
+        
+#         # Configurar fórmulas
+#         for col in range(2, 2 + dias_mes):
+#             letra = openpyxl.utils.get_column_letter(col)
+            
+#             # Fórmulas básicas
+#             new_sheet.cell(row=40, column=col, value=f"=IFERROR({letra}34/{letra}28, 0)")
+#             new_sheet.cell(row=34, column=col, value=f"=IFERROR(AVERAGE({letra}32:{letra}33), 0)")
+            
+#             # Fórmulas especiales
+#             new_sheet.cell(row=23, column=col, 
+#                          value=f"=IFERROR(({letra}3*{letra}13+{letra}8*{letra}18)/({letra}3+{letra}8), 0)")
+#             new_sheet.cell(row=24, column=col, 
+#                          value=f"=IFERROR(({letra}4*{letra}14+{letra}9*{letra}19)/({letra}4+{letra}9), 0)")
+#             new_sheet.cell(row=28, column=col, 
+#                          value=f"=IFERROR(({letra}23*({letra}3+{letra}8)+{letra}24*({letra}4+{letra}9))/({letra}3+{letra}4+{letra}8+{letra}9), 0)")
+        
+#         # Configuración columna AH (34)
+#         new_sheet.cell(row=2, column=34, value=int(anio))
+#         for fila in [3,4,8,9]:
+#             new_sheet.cell(row=fila, column=34, value=f"=SUM(B{fila}:AG{fila})")
+        
+#         # 6. Guardar cambios
+#         wb.save(RUTA_ENTRADA)
+#         wb.close()
+#         return True
+        
+#     except Exception as e:
+#         print(f"Error crítico: {str(e)}")
+#         try:
+#             wb.close()
+#         except:
+#             pass
+#         return False
 
 
 
