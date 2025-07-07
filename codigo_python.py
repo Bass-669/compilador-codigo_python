@@ -725,66 +725,74 @@ def preparar_hoja_mes(mes, dia, anio):
 #     return resultado
 
 
+# def rotar_etiquetas_graficos(ruta_archivo, nombre_hoja):
+#     """Versión que no cierra otros Excels y trabaja en segundo plano."""
+#     pythoncom.CoInitialize()
+#     excel = wb = None
+#     resultado = False
+#     try:
+#         # 1. Configuración de Excel sin afectar otros archivos
+#         excel = win32.Dispatch("Excel.Application")
+#         excel.Visible = False  # <<< Asegurar que nunca sea visible
+#         excel.DisplayAlerts = False
+#         excel.ScreenUpdating = False
+
+#         # 2. Abrir archivo (manejo de errores)
+#         try:
+#             wb = excel.Workbooks.Open(os.path.abspath(ruta_archivo))
+#         except Exception as e:
+#             messagebox.showerror("Error", f"No se pudo abrir el archivo:\n{str(e)}")
+#             return False
+
+#         # 3. Procesar gráficos (código original)
+#         sheet = wb.Sheets(nombre_hoja)
+#         graficos = sheet.ChartObjects()
+#         rotados = 0
+#         problemas = []
+
+#         for chart_obj in graficos:
+#             try:
+#                 chart = chart_obj.Chart
+#                 x_axis = chart.Axes(1)  # Eje X
+#                 if hasattr(x_axis, 'TickLabels'):
+#                     x_axis.TickLabels.Orientation = 45
+#                     rotados += 1
+#             except Exception as e:
+#                 problemas.append(str(e))
+
+#         # 4. Guardar cambios si hubo rotaciones
+#         if rotados > 0:
+#             try:
+#                 wb.Save()
+#             except Exception as e:
+#                 messagebox.showwarning("Advertencia", f"No se guardaron cambios:\n{str(e)}")
+
+#         resultado = (rotados > 0)
+
+#     except Exception as e:
+#         messagebox.showerror("Error crítico", f"Error inesperado:\n{str(e)}")
+#     finally:
+#         # 5. Limpieza SIN cerrar otros Excels
+#         try:
+#             if wb:
+#                 wb.Close(SaveChanges=False)  # Cierra solo este archivo
+#         except:
+#             pass
+#         try:
+#             if excel:
+#                 excel.ScreenUpdating = True  # Restaurar configuración
+#                 # No ejecutar excel.Quit() para no cerrar otros archivos
+#         except:
+#             pass
+#         pythoncom.CoUninitialize()
+#     return resultado
+
+
 def rotar_etiquetas_graficos(ruta_archivo, nombre_hoja):
-    """Versión que no cierra otros Excels y trabaja en segundo plano."""
-    pythoncom.CoInitialize()
-    excel = wb = None
-    resultado = False
-    try:
-        # 1. Configuración de Excel sin afectar otros archivos
-        excel = win32.Dispatch("Excel.Application")
-        excel.Visible = False  # <<< Asegurar que nunca sea visible
-        excel.DisplayAlerts = False
-        excel.ScreenUpdating = False
-
-        # 2. Abrir archivo (manejo de errores)
-        try:
-            wb = excel.Workbooks.Open(os.path.abspath(ruta_archivo))
-        except Exception as e:
-            messagebox.showerror("Error", f"No se pudo abrir el archivo:\n{str(e)}")
-            return False
-
-        # 3. Procesar gráficos (código original)
-        sheet = wb.Sheets(nombre_hoja)
-        graficos = sheet.ChartObjects()
-        rotados = 0
-        problemas = []
-
-        for chart_obj in graficos:
-            try:
-                chart = chart_obj.Chart
-                x_axis = chart.Axes(1)  # Eje X
-                if hasattr(x_axis, 'TickLabels'):
-                    x_axis.TickLabels.Orientation = 45
-                    rotados += 1
-            except Exception as e:
-                problemas.append(str(e))
-
-        # 4. Guardar cambios si hubo rotaciones
-        if rotados > 0:
-            try:
-                wb.Save()
-            except Exception as e:
-                messagebox.showwarning("Advertencia", f"No se guardaron cambios:\n{str(e)}")
-
-        resultado = (rotados > 0)
-
-    except Exception as e:
-        messagebox.showerror("Error crítico", f"Error inesperado:\n{str(e)}")
-    finally:
-        # 5. Limpieza SIN cerrar otros Excels
-        try:
-            if wb:
-                wb.Close(SaveChanges=False)  # Cierra solo este archivo
-        except:
-            pass
-        try:
-            if excel:
-                excel.ScreenUpdating = True  # Restaurar configuración
-                # No ejecutar excel.Quit() para no cerrar otros archivos
-        except:
-            pass
-        pythoncom.CoUninitialize()
+    print("entrando a rotar etiquetas ")
+    print(ruta_archivo)
+    print(nombre_hoja)
+    resultado = 1
     return resultado
 
 
