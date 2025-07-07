@@ -619,19 +619,22 @@ def preparar_hoja_mes(mes, dia, anio):
     hoja_nueva_creada = False
 
     try:
-        # 1. Verificación inicial con openpyxl
-        with openpyxl.load_workbook(RUTA_ENTRADA) as wb_check:
-            if nombre_hoja in wb_check.sheetnames:
-                hoja_existente = wb_check[nombre_hoja]
-                celdas_clave = [
-                    hoja_existente.cell(row=3, column=col_dia).value,
-                    hoja_existente.cell(row=4, column=col_dia).value,
-                    hoja_existente.cell(row=8, column=col_dia).value,
-                    hoja_existente.cell(row=9, column=col_dia).value
-                ]
-                if any(cell is not None and str(cell).strip() != "" for cell in celdas_clave):
-                    print(f"El día {dia} ya tiene datos en {nombre_hoja}")
+        # 1. Verificación inicial con openpyxl (sin usar 'with')
+        wb_check = openpyxl.load_workbook(RUTA_ENTRADA)
+        if nombre_hoja in wb_check.sheetnames:
+            hoja_existente = wb_check[nombre_hoja]
+            celdas_clave = [
+                hoja_existente.cell(row=3, column=col_dia).value,
+                hoja_existente.cell(row=4, column=col_dia).value,
+                hoja_existente.cell(row=8, column=col_dia).value,
+                hoja_existente.cell(row=9, column=col_dia).value
+            ]
+            if any(cell is not None and str(cell).strip() != "" for cell in celdas_clave):
+                print(f"El día {dia} ya tiene datos en {nombre_hoja}")
+                wb_check.close()
                 return True
+        wb_check.close()
+
 
         # 2. Crear hoja nueva con Excel COM
         pythoncom.CoInitialize()
