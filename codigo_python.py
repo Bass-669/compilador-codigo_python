@@ -633,9 +633,7 @@ def preparar_hoja_mes(mes, dia, anio):
             if excel: excel.Quit()
             pythoncom.CoUninitialize()
 
-        rotar_etiquetas_graficos(RUTA_ENTRADA, nombre_hoja)  # Si ya tienes esta función
-
-        # 3. Configurar hoja con openpyxl
+               # 3. Configurar hoja con openpyxl
         wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
         hoja = wb2[nombre_hoja]
 
