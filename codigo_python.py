@@ -81,17 +81,14 @@ def ejecutar(txt, torno, mes, dia, anio):
     try:
         barra['value'] = 25
         ventana_carga.update_idletasks()
-
         # Paso 1: Preparar hoja del mes antes de cualquier escritura
         if not preparar_hoja_mes(mes, dia, anio):
             return
 
         barra['value'] = 50
         ventana_carga.update_idletasks()
-
         # Paso 2: Procesar los datos y escribir en "IR diario"
         bloques, porcentajes = procesar_datos(txt, torno, mes, dia, anio)
-
         barra['value'] = 75
         ventana_carga.update_idletasks()
 
@@ -100,7 +97,6 @@ def ejecutar(txt, torno, mes, dia, anio):
             fecha(mes, dia, anio, torno, bloques, porcentajes)
 
         barra['value'] = 100
-
     except Exception as e:
         messagebox.showerror("Error", f"Ocurrió un error en ejecutar():\n{e}")
     finally:
@@ -111,7 +107,6 @@ def ejecutar(txt, torno, mes, dia, anio):
 def procesar_datos(entrada, torno, mes, dia, anio):
     bloques_detectados = []
     sumas_ad_por_bloque = []
-
     if not os.path.exists(RUTA_ENTRADA):
         messagebox.showerror("Error", f"No se encontró:\n{RUTA_ENTRADA}")
         return None, None
@@ -120,15 +115,12 @@ def procesar_datos(entrada, torno, mes, dia, anio):
         wb = openpyxl.load_workbook(RUTA_ENTRADA)
         hoja = wb["IR diario "]
         ultima_fila = None
-
         # Buscar última fila con patrón "* * ..."
         for fila in hoja.iter_rows():
             if [str(c.value).strip() if c.value else "" for c in fila[:3]] == ["*", "*", "..."]:
                 ultima_fila = fila[0].row
-
         if not ultima_fila:
             raise ValueError("No se encontró '* * ...'")
-
         fila = ultima_fila + 1
         for b in extraer_bloques(entrada):
             try:
@@ -139,7 +131,6 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                 for sub in subs:
                     txt = sub[0] if not re.match(r'^\d', sub[0]) else ""
                     datos = sub[1:] if txt else sub
-
                     # Construir datos de columnas
                     p = txt.split()
                     col_txt = (
@@ -151,7 +142,6 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                     )
                     col_nums = [val for l in datos for val in l.strip().split()]
                     fila_vals = col_txt + col_nums
-
                     # Escribir valores en las celdas (columnas 1-24)
                     for col, val in enumerate(fila_vals[:24], 1):
                         try:
@@ -159,7 +149,6 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                             escribir(hoja, fila, col, n, isinstance(n, float))
                         except:
                             escribir(hoja, fila, col, val)
-
                     # Escribir metadatos (columnas 25-28)
                     for col, val in zip(range(25, 29), [torno, mes, dia, anio]):
                         hoja.cell(row=fila, column=col, value=val).alignment = ALIGN_R
@@ -167,16 +156,13 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                 f_fin = fila - 1
                 tipo_bloque = "PODADO" if "PODADO" in txt.upper() else "REGULAR"
                 bloques_detectados.append((tipo_bloque, f_fin))
-
                 # Insertar fórmulas proporcionales (columna AD)
                 if len(subs) > 1:
                     for f in range(f_ini, f_fin):
                         hoja.cell(row=f, column=30, value=f"=IFERROR(AC{f}*D{f}/D{f_fin}, 0)")
-
                 # Configurar celda de autosuma (última fila del bloque)
                 for col in range(25, 30):# 29
                     hoja.cell(row=f_fin, column=col, value="")
-
                 celda_autosuma = hoja.cell(row=f_fin, column=30)
                 celda_autosuma.value = f"=SUM(AD{f_ini}:AD{f_fin-1})"
                 celda_autosuma.fill = FILL_AMARILLO
@@ -238,7 +224,6 @@ def es_valor_valido(valor):
         return True
     except:
         return False
-
 
 def crear_archivo_temporal_con_ae(celda_origen):
     """Retorna la referencia CORRECTAMENTE formateada"""
@@ -313,7 +298,6 @@ def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque
     for i, (tipo_bloque, referencia) in enumerate(zip(tipos_bloque, valores_ae_por_bloque)):
         try:
             tipo_bloque = tipo_bloque.strip().upper()
-            
             # Determinar fila destino
             if tipo_bloque == "PODADO":
                 fila_valor = 13 if torno == 1 else 14
@@ -405,154 +389,6 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
             except:
                 messagebox.showwarning("Advertencia", "Error al cerrar el workbook")
                 pass
-
-# def preparar_hoja_mes(mes, dia, anio):
-
-#     nombre_hoja = f"IR {mes} {anio}"
-#     col_dia = dia + 1
-#     hoja_nueva_creada = False
-
-#     try:
-#         # 1. Verificación inicial con openpyxl
-#         wb_check = openpyxl.load_workbook(RUTA_ENTRADA)
-#         if nombre_hoja in wb_check.sheetnames:
-#             hoja_existente = wb_check[nombre_hoja]
-#             celdas_clave = [
-#                 hoja_existente.cell(row=3, column=col_dia).value,
-#                 hoja_existente.cell(row=4, column=col_dia).value,
-#                 hoja_existente.cell(row=8, column=col_dia).value,
-#                 hoja_existente.cell(row=9, column=col_dia).value
-#             ]
-#             if any(cell is not None and str(cell).strip() != "" for cell in celdas_clave):
-#                 print(f"El día {dia} ya tiene datos en {nombre_hoja}")
-#                 wb_check.close()
-#                 return True
-#         wb_check.close()
-
-#         # 2. Crear hoja nueva con Excel COM (DispatchEx siempre crea instancia aislada)
-#         pythoncom.CoInitialize()
-#         excel = None
-#         wb = None
-#         try:
-#             excel = win32.DispatchEx("Excel.Application")
-#             excel.Visible = False
-#             excel.DisplayAlerts = False
-
-#             wb = excel.Workbooks.Open(os.path.abspath(RUTA_ENTRADA), UpdateLinks=0)
-
-#             hojas = [h.Name for h in wb.Sheets]
-#             hojas_ir = [h for h in hojas if h.startswith("IR ") and len(h.split()) == 3]
-
-#             def total_meses(nombre):
-#                 try:
-#                     _, mes_str, anio_str = nombre.split()
-#                     return int(anio_str) * 12 + MESES_NUM[mes_str]
-#                 except:
-#                     return -1
-
-#             hojas_ordenadas = sorted(hojas_ir, key=total_meses)
-#             total_nueva = int(anio) * 12 + MESES_NUM[mes]
-#             hoja_anterior = None
-
-#             for h in hojas_ordenadas:
-#                 if total_meses(h) < total_nueva:
-#                     hoja_anterior = h
-#                 else:
-#                     break
-
-#             if not hoja_anterior:
-#                 messagebox.showwarning("Orden inválido", f"No se encontró hoja anterior para '{nombre_hoja}'")
-#                 return False
-
-#             idx_anterior = hojas.index(hoja_anterior)
-#             insert_idx = min(idx_anterior + 2, wb.Sheets.Count)
-#             wb.Sheets(hoja_anterior).Copy(After=wb.Sheets(insert_idx - 1))
-#             nueva_hoja = wb.ActiveSheet
-#             nueva_hoja.Name = nombre_hoja
-#             wb.Save()
-#             hoja_nueva_creada = True
-
-#         except Exception as e:
-#             messagebox.showerror("Error", f"No se pudo crear hoja nueva:\n{e}")
-#             return False
-#         finally:
-#             if wb: wb.Close(SaveChanges=True)
-#             if excel: excel.Quit()
-#             pythoncom.CoUninitialize()
-
-#         # 3. Configurar hoja nueva con openpyxl
-#         if hoja_nueva_creada:
-#             wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
-#             hoja = wb2[nombre_hoja]
-
-#             filas_a_limpiar = [2,3,4,7,8,9,12,13,14,17,18,19,22,23,24,27,28,31,32,33,34,37,38,39,40]
-#             for fila in filas_a_limpiar:
-#                 for col in range(2, 35):
-#                     celda = hoja.cell(row=fila, column=col)
-#                     if not isinstance(celda, openpyxl.cell.cell.MergedCell):
-#                         celda.value = ""
-
-#             dias_mes = dias_en_mes(mes, anio)
-#             for col in range(2, 2 + dias_mes):
-#                 dia_mes = col - 1
-#                 fecha = f"{dia_mes:02d}/{MESES_NUM[mes]:02d}/{anio}"
-#                 for fila in [2,7,12,17,22,27,31,37]:
-#                     hoja.cell(row=fila, column=col, value=fecha)
-
-#             for col in range(2, 2 + dias_mes):
-#                 letra = openpyxl.utils.get_column_letter(col)
-#                 hoja.cell(row=40, column=col, value=f"=IFERROR({letra}34/{letra}28, 0)").number_format = '0.00%'
-#                 hoja.cell(row=40, column=col).font = Font(color='000000')
-#                 hoja.cell(row=34, column=col, value=f"=IFERROR(AVERAGE({letra}32:{letra}33), 0)").number_format = '0.00%'
-#                 hoja.cell(row=23, column=col, value=f"=IFERROR(({letra}3*{letra}13+{letra}8*{letra}18)/({letra}3+{letra}8), 0)")
-#                 hoja.cell(row=24, column=col, value=f"=IFERROR(({letra}4*{letra}14+{letra}9*{letra}19)/({letra}4+{letra}9), 0)")
-#                 hoja.cell(row=28, column=col, value=f"=IFERROR(({letra}23*({letra}3+{letra}8)+{letra}24*({letra}4+{letra}9))/({letra}3+{letra}4+{letra}8+{letra}9), 0)")
-#                 hoja.cell(row=38, column=col, value=f"=IFERROR({letra}32/{letra}23, 0)").font = Font(color='000000')
-#                 hoja.cell(row=39, column=col, value=f"=IFERROR({letra}33/{letra}24, 0)").font = Font(color='000000')
-
-#             hoja.cell(row=32, column=34, value="R%").font = Font(bold=True)
-#             hoja.cell(row=32, column=34).alignment = Alignment(horizontal='center', vertical='center')
-#             hoja.cell(row=38, column=34, value="IR%").font = Font(bold=True)
-#             hoja.cell(row=38, column=34).alignment = Alignment(horizontal='center', vertical='center')
-
-#             for fila in [49,50,51]:
-#                 for col_limpiar in [27,28,29,30]:
-#                     hoja.cell(row=fila, column=col_limpiar, value=" ")
-
-#             hoja.cell(row=2, column=34, value=int(anio))
-#             for fila in [3,4,8,9]:
-#                 hoja.cell(row=fila, column=34, value=f"=SUM(B{fila}:AG{fila})")
-
-#             hoja.cell(row=23, column=34, value="=(AH3*AH13+AH8*AH18)/(AH3+AH8)")
-#             hoja.cell(row=24, column=34, value="=(AH4*AH14+AH9*AH19)/(AH4+AH9)")
-#             hoja.cell(row=28, column=34, value="=(AH23*(AH3+AH8)+AH24*(AH4+AH9))/(AH3+AH4+AH8+AH9)")
-#             hoja.cell(row=39, column=34, value="=AH33/AH28").number_format = '0.00%'
-#             hoja.cell(row=40, column=34, value="=AH34/AH28").number_format = '0.00%'
-
-#             try:
-#                 wb2.save(RUTA_ENTRADA)
-#                 wb2.close()
-#                 pythoncom.CoInitialize()
-#                 excel = win32.DispatchEx("Excel.Application")
-#                 excel.Visible = False
-#                 excel.DisplayAlerts = False
-#                 wb_calc = excel.Workbooks.Open(RUTA_ENTRADA)
-#                 excel.CalculateFull()
-#                 wb_calc.Save()
-#                 wb_calc.Close()
-#                 excel.Quit()
-#                 pythoncom.CoUninitialize()
-#             except Exception as calc_err:
-#                 messagebox.showwarning("Advertencia", f"Error al recalcular fórmulas: {calc_err}")
-#                 pythoncom.CoUninitialize()
-
-#         return True
-
-#     except Exception as e:
-#         messagebox.showerror("Error crítico", f"No se pudo completar la operación:\n{str(e)}\n\nVerifique que el archivo no esté abierto.")
-#         return False
-
-
 
 def preparar_hoja_mes(mes, dia, anio):
     """Crea la hoja del mes si no existe y la configura con fórmulas iniciales."""
@@ -697,9 +533,6 @@ def preparar_hoja_mes(mes, dia, anio):
     except Exception as e:
         messagebox.showerror("Error crítico", f"No se pudo completar la operación:\n{str(e)}")
         return False
-
-
-
 
 def escribir_division(hoja):
     """Versión con validación de existencia de hoja y columnas"""
