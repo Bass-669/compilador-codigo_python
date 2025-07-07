@@ -137,9 +137,9 @@ def ejecutar(txt, torno, mes, dia, anio):
         # Paso 3: Escribir en hoja mensual (75-100%)
         if bloques is not None and porcentajes is not None:
             fecha(mes, dia, anio, torno, bloques, porcentajes)
+            # Completar la barra
+            incrementar_barra(100)
         
-        # Completar la barra
-        incrementar_barra(100)
         
     except Exception as e:
         messagebox.showerror("Error", f"Ocurrió un error en ejecutar():\n{e}")
