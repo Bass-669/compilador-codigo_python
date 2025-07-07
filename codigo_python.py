@@ -492,7 +492,7 @@ def preparar_hoja_mes(mes, dia, anio):
                     pass
                 try:
                     if excel:
-                        excel.Quit()
+                        excel.Close() #cambio 
                 except:
                     pass
                 pythoncom.CoUninitialize()
