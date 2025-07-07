@@ -77,26 +77,70 @@ def mostrar_carga():
 def cerrar_carga():
     if ventana_carga: ventana_carga.destroy()
 
+# def ejecutar(txt, torno, mes, dia, anio):
+#     try:
+#         barra['value'] = 25
+#         ventana_carga.update_idletasks()
+#         # Paso 1: Preparar hoja del mes antes de cualquier escritura
+#         if not preparar_hoja_mes(mes, dia, anio):
+#             return
+
+#         barra['value'] = 50
+#         ventana_carga.update_idletasks()
+#         # Paso 2: Procesar los datos y escribir en "IR diario"
+#         bloques, porcentajes = procesar_datos(txt, torno, mes, dia, anio)
+#         barra['value'] = 75
+#         ventana_carga.update_idletasks()
+
+#         # Paso 3: Escribir los valores procesados en hoja mensual
+#         if bloques is not None and porcentajes is not None:
+#             fecha(mes, dia, anio, torno, bloques, porcentajes)
+
+#         barra['value'] = 100
+#     except Exception as e:
+#         messagebox.showerror("Error", f"Ocurrió un error en ejecutar():\n{e}")
+#     finally:
+#         cerrar_carga()
+#         ventana.destroy()
+
+
+
+import time
+
 def ejecutar(txt, torno, mes, dia, anio):
     try:
-        barra['value'] = 25
+        # Configuración inicial de la barra
+        barra['value'] = 0
         ventana_carga.update_idletasks()
-        # Paso 1: Preparar hoja del mes antes de cualquier escritura
+        
+        # Función para incremento fluido de la barra
+        def incrementar_barra(hasta, paso=1):
+            actual = barra['value']
+            for i in range(actual, hasta + 1, paso):
+                barra['value'] = i
+                ventana_carga.update_idletasks()
+                time.sleep(0.01)  # Pequeña pausa para suavizar la animación
+        
+        # Paso 1: Preparar hoja del mes (0-25%)
+        incrementar_barra(25)
         if not preparar_hoja_mes(mes, dia, anio):
+            incrementar_barra(100)  # Si falla, completar barra
             return
 
-        barra['value'] = 50
-        ventana_carga.update_idletasks()
-        # Paso 2: Procesar los datos y escribir en "IR diario"
+        # Paso 2: Procesar datos (25-75%)
+        incrementar_barra(50)
         bloques, porcentajes = procesar_datos(txt, torno, mes, dia, anio)
-        barra['value'] = 75
-        ventana_carga.update_idletasks()
+        
+        # Paso intermedio (50-75%)
+        incrementar_barra(75)
 
-        # Paso 3: Escribir los valores procesados en hoja mensual
+        # Paso 3: Escribir en hoja mensual (75-100%)
         if bloques is not None and porcentajes is not None:
             fecha(mes, dia, anio, torno, bloques, porcentajes)
-
-        barra['value'] = 100
+        
+        # Completar la barra
+        incrementar_barra(100)
+        
     except Exception as e:
         messagebox.showerror("Error", f"Ocurrió un error en ejecutar():\n{e}")
     finally:
