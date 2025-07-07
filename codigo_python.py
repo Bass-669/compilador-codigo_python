@@ -613,13 +613,13 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
 
 
 def preparar_hoja_mes(mes, dia, anio):
-    """Crea la hoja del mes si no existe y la configura con fórmulas iniciales."""
+
     nombre_hoja = f"IR {mes} {anio}"
     col_dia = dia + 1
     hoja_nueva_creada = False
 
     try:
-        # 1. Verificación inicial con openpyxl (sin usar 'with')
+        # 1. Verificación inicial con openpyxl
         wb_check = openpyxl.load_workbook(RUTA_ENTRADA)
         if nombre_hoja in wb_check.sheetnames:
             hoja_existente = wb_check[nombre_hoja]
@@ -635,15 +635,15 @@ def preparar_hoja_mes(mes, dia, anio):
                 return True
         wb_check.close()
 
-
-        # 2. Crear hoja nueva con Excel COM
+        # 2. Crear hoja nueva con Excel COM (DispatchEx siempre crea instancia aislada)
         pythoncom.CoInitialize()
         excel = None
         wb = None
         try:
-            excel = win32.DispatchEx("Excel.Application")  # Instancia independiente
+            excel = win32.DispatchEx("Excel.Application")
             excel.Visible = False
             excel.DisplayAlerts = False
+
             wb = excel.Workbooks.Open(os.path.abspath(RUTA_ENTRADA), UpdateLinks=0)
 
             hojas = [h.Name for h in wb.Sheets]
@@ -686,7 +686,7 @@ def preparar_hoja_mes(mes, dia, anio):
             if excel: excel.Quit()
             pythoncom.CoUninitialize()
 
-        rotar_etiquetas_graficos(RUTA_ENTRADA, nombre_hoja)  # Función que ya tienes definida
+        rotar_etiquetas_graficos(RUTA_ENTRADA, nombre_hoja)
 
         # 3. Configurar hoja nueva con openpyxl
         if hoja_nueva_creada:
@@ -712,7 +712,6 @@ def preparar_hoja_mes(mes, dia, anio):
                 hoja.cell(row=40, column=col, value=f"=IFERROR({letra}34/{letra}28, 0)").number_format = '0.00%'
                 hoja.cell(row=40, column=col).font = Font(color='000000')
                 hoja.cell(row=34, column=col, value=f"=IFERROR(AVERAGE({letra}32:{letra}33), 0)").number_format = '0.00%'
-
                 hoja.cell(row=23, column=col, value=f"=IFERROR(({letra}3*{letra}13+{letra}8*{letra}18)/({letra}3+{letra}8), 0)")
                 hoja.cell(row=24, column=col, value=f"=IFERROR(({letra}4*{letra}14+{letra}9*{letra}19)/({letra}4+{letra}9), 0)")
                 hoja.cell(row=28, column=col, value=f"=IFERROR(({letra}23*({letra}3+{letra}8)+{letra}24*({letra}4+{letra}9))/({letra}3+{letra}4+{letra}8+{letra}9), 0)")
@@ -738,12 +737,11 @@ def preparar_hoja_mes(mes, dia, anio):
             hoja.cell(row=39, column=34, value="=AH33/AH28").number_format = '0.00%'
             hoja.cell(row=40, column=34, value="=AH34/AH28").number_format = '0.00%'
 
-            # Guardar archivo y actualizar fórmulas
             try:
                 wb2.save(RUTA_ENTRADA)
                 wb2.close()
                 pythoncom.CoInitialize()
-                excel = win32.Dispatch("Excel.Application")
+                excel = win32.DispatchEx("Excel.Application")
                 excel.Visible = False
                 excel.DisplayAlerts = False
                 wb_calc = excel.Workbooks.Open(RUTA_ENTRADA)
