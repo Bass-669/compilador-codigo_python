@@ -558,10 +558,9 @@ def preparar_hoja_mes(mes, dia, anio):
     """Crea la hoja del mes si no existe y la configura con fórmulas iniciales."""
     nombre_hoja = f"IR {mes} {anio}"
     col_dia = dia + 1
-    hoja_nueva_creada = False
 
     try:
-        # 1. Verificación inicial con openpyxl
+        # Paso 1: Verificar si la hoja ya existe con openpyxl
         wb_check = openpyxl.load_workbook(RUTA_ENTRADA)
         if nombre_hoja in wb_check.sheetnames:
             hoja_existente = wb_check[nombre_hoja]
@@ -575,65 +574,65 @@ def preparar_hoja_mes(mes, dia, anio):
                 print(f"El día {dia} ya tiene datos en {nombre_hoja}")
                 wb_check.close()
                 return True
+            else:
+                print(f"La hoja {nombre_hoja} ya existe y se usará tal cual.")
+                wb_check.close()
+                rotar_etiquetas_graficos(RUTA_ENTRADA, nombre_hoja)
+                return True  # ✅ Ya existe y se usará
+
         wb_check.close()
 
-        # 2. Crear hoja nueva si no existe con Excel COM
+        # Paso 2: Crear hoja nueva si no existe
         pythoncom.CoInitialize()
-        excel = None
-        wb = None
-        try:
-            excel = win32.DispatchEx("Excel.Application")
-            excel.Visible = False
-            excel.DisplayAlerts = False
-            wb = excel.Workbooks.Open(os.path.abspath(RUTA_ENTRADA), UpdateLinks=0)
+        excel = win32.DispatchEx("Excel.Application")
+        excel.Visible = False
+        excel.DisplayAlerts = False
+        wb = excel.Workbooks.Open(os.path.abspath(RUTA_ENTRADA), UpdateLinks=0)
 
-            hojas = [h.Name for h in wb.Sheets]
+        hojas = [h.Name for h in wb.Sheets]
 
-            if nombre_hoja in hojas:
-                print(f"La hoja '{nombre_hoja}' ya existe, se usará directamente.")
-                hoja_nueva_creada = False  # Ya existe
-            else:
-                # Buscar hoja anterior para copiar
-                hojas_ir = [h for h in hojas if h.startswith("IR ") and len(h.split()) == 3]
+        if nombre_hoja not in hojas:
+            # Buscar hoja anterior para copiar
+            hojas_ir = [h for h in hojas if h.startswith("IR ") and len(h.split()) == 3]
 
-                def total_meses(nombre):
-                    try:
-                        _, mes_str, anio_str = nombre.split()
-                        return int(anio_str) * 12 + MESES_NUM[mes_str]
-                    except:
-                        return -1
+            def total_meses(nombre):
+                try:
+                    _, mes_str, anio_str = nombre.split()
+                    return int(anio_str) * 12 + MESES_NUM[mes_str]
+                except:
+                    return -1
 
-                hojas_ordenadas = sorted(hojas_ir, key=total_meses)
-                total_nueva = int(anio) * 12 + MESES_NUM[mes]
-                hoja_anterior = None
+            hojas_ordenadas = sorted(hojas_ir, key=total_meses)
+            total_nueva = int(anio) * 12 + MESES_NUM[mes]
+            hoja_anterior = None
 
-                for h in hojas_ordenadas:
-                    if total_meses(h) < total_nueva:
-                        hoja_anterior = h
-                    else:
-                        break
+            for h in hojas_ordenadas:
+                if total_meses(h) < total_nueva:
+                    hoja_anterior = h
+                else:
+                    break
 
-                if not hoja_anterior:
-                    messagebox.showwarning("Orden inválido", f"No se encontró hoja anterior para '{nombre_hoja}'")
-                    return False
+            if not hoja_anterior:
+                messagebox.showwarning("Orden inválido", f"No se encontró hoja anterior para '{nombre_hoja}'")
+                wb.Close(SaveChanges=False)
+                excel.Quit()
+                pythoncom.CoUninitialize()
+                return False
 
-                idx_anterior = hojas.index(hoja_anterior)
-                insert_idx = min(idx_anterior + 2, wb.Sheets.Count)
-                wb.Sheets(hoja_anterior).Copy(After=wb.Sheets(insert_idx - 1))
-                nueva_hoja = wb.ActiveSheet
-                nueva_hoja.Name = nombre_hoja
-                hoja_nueva_creada = True
-                wb.Save()
+            idx_anterior = hojas.index(hoja_anterior)
+            insert_idx = min(idx_anterior + 2, wb.Sheets.Count)
+            wb.Sheets(hoja_anterior).Copy(After=wb.Sheets(insert_idx - 1))
+            nueva_hoja = wb.ActiveSheet
+            nueva_hoja.Name = nombre_hoja
+            wb.Save()
 
-        except Exception as e:
-            messagebox.showerror("Error", f"No se pudo crear hoja nueva:\n{e}")
-            return False
-        finally:
-            if wb: wb.Close(SaveChanges=True)
-            if excel: excel.Quit()
-            pythoncom.CoUninitialize()
+        wb.Close(SaveChanges=True)
+        excel.Quit()
+        pythoncom.CoUninitialize()
 
-               # 3. Configurar hoja con openpyxl
+        rotar_etiquetas_graficos(RUTA_ENTRADA, nombre_hoja)
+
+        # Paso 3: Configurar hoja con openpyxl
         wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
         hoja = wb2[nombre_hoja]
 
@@ -664,9 +663,8 @@ def preparar_hoja_mes(mes, dia, anio):
             hoja.cell(row=39, column=col, value=f"=IFERROR({letra}33/{letra}24, 0)").font = Font(color='000000')
 
         hoja.cell(row=32, column=34, value="R%").font = Font(bold=True)
-        hoja.cell(row=32, column=34).alignment = Alignment(horizontal='center', vertical='center')
         hoja.cell(row=38, column=34, value="IR%").font = Font(bold=True)
-        hoja.cell(row=38, column=34).alignment = Alignment(horizontal='center', vertical='center')
+        hoja.cell(row=32, column=34).alignment = hoja.cell(row=38, column=34).alignment = Alignment(horizontal='center', vertical='center')
 
         for fila in [49,50,51]:
             for col_limpiar in [27,28,29,30]:
@@ -682,27 +680,25 @@ def preparar_hoja_mes(mes, dia, anio):
         hoja.cell(row=39, column=34, value="=AH33/AH28").number_format = '0.00%'
         hoja.cell(row=40, column=34, value="=AH34/AH28").number_format = '0.00%'
 
-        try:
-            wb2.save(RUTA_ENTRADA)
-            wb2.close()
-            pythoncom.CoInitialize()
-            excel = win32.Dispatch("Excel.Application")
-            excel.Visible = False
-            excel.DisplayAlerts = False
-            wb_calc = excel.Workbooks.Open(RUTA_ENTRADA)
-            excel.CalculateFull()
-            wb_calc.Save()
-            wb_calc.Close()
-            excel.Quit()
-            pythoncom.CoUninitialize()
-        except Exception as calc_err:
-            messagebox.showwarning("Advertencia", f"Error al recalcular fórmulas: {calc_err}")
-            pythoncom.CoUninitialize()
+        wb2.save(RUTA_ENTRADA)
+        wb2.close()
+
+        # Recalcular fórmulas
+        pythoncom.CoInitialize()
+        excel = win32.DispatchEx("Excel.Application")
+        excel.Visible = False
+        excel.DisplayAlerts = False
+        wb_calc = excel.Workbooks.Open(os.path.abspath(RUTA_ENTRADA), UpdateLinks=0)
+        excel.CalculateFull()
+        wb_calc.Save()
+        wb_calc.Close()
+        excel.Quit()
+        pythoncom.CoUninitialize()
 
         return True
 
     except Exception as e:
-        messagebox.showerror("Error crítico", f"No se pudo completar la operación:\n{str(e)}\n\nVerifique que el archivo no esté abierto.")
+        messagebox.showerror("Error crítico", f"No se pudo completar la operación:\n{str(e)}")
         return False
 
 
