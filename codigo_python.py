@@ -249,13 +249,13 @@ def crear_archivo_temporal_con_ae(celda_origen):
     # FORMATO EXACTO REQUERIDO POR EXCEL:
     referencia = f"='IR diario '!{celda_origen}"
     
-    messagebox.showinfo("DEBUG Referencia", 
-                      f"Referencia generada:\n{referencia}\n"
-                      f"Verificar que tenga:\n"
-                      f"1. = al inicio\n"
-                      f"2. 'IR diario ' entre comillas simples\n"
-                      f"3. ! antes de AD\n"
-                      f"4. Número válido")
+    # messagebox.showinfo("DEBUG Referencia", 
+    #                   f"Referencia generada:\n{referencia}\n"
+    #                   f"Verificar que tenga:\n"
+    #                   f"1. = al inicio\n"
+    #                   f"2. 'IR diario ' entre comillas simples\n"
+    #                   f"3. ! antes de AD\n"
+    #                   f"4. Número válido")
     
     return None, referencia
 
