@@ -609,120 +609,184 @@ def preparar_hoja_mes(mes, dia, anio):
         )
         return False
 
+# def rotar_etiquetas_graficos(ruta_archivo, nombre_hoja):
+#     """Versión final que maneja todos los casos de gráficos y versiones de Excel"""
+#     pythoncom.CoInitialize()
+#     excel = wb = None
+#     resultado = False
+#     try:
+#         # 1. Configuración robusta de Excel
+#         excel = win32.Dispatch("Excel.Application")
+#         excel.Visible = False
+#         excel.DisplayAlerts = False
+#         excel.ScreenUpdating = False
+#         # 2. Abrir archivo con manejo de errores
+#         try:
+#             wb = excel.Workbooks.Open(os.path.abspath(ruta_archivo))
+#         except Exception as e:
+#             messagebox.showerror("Error", f"No se pudo abrir el archivo:\n{str(e)}")
+#             return False
+#         # 3. Verificar hoja
+#         try:
+#             if nombre_hoja not in [s.Name for s in wb.Sheets]:
+#                 messagebox.showerror("Error", f"Hoja '{nombre_hoja}' no encontrada")
+#                 return False
+#             sheet = wb.Sheets(nombre_hoja)
+#         except Exception as e:
+#             messagebox.showerror("Error", f"Error al acceder a la hoja:\n{str(e)}")
+#             return False
+
+#         # 4. Procesamiento mejorado de gráficos
+#         graficos = sheet.ChartObjects()
+#         total_graficos = graficos.Count
+#         rotados = 0
+#         problemas = []
+
+#         for i, chart_obj in enumerate(graficos, 1):
+#             try:
+#                 chart = chart_obj.Chart
+
+#                 # Método universal para diferentes versiones de Excel
+#                 try:
+#                     # Versión compatible con todas las versiones de Excel
+#                     x_axis = chart.Axes(1)  # 1 = xlCategory
+
+#                     # Verificación alternativa para HasTickLabels
+#                     try:
+#                         if hasattr(x_axis, 'HasTickLabels') and not x_axis.HasTickLabels:
+#                             problemas.append(f"Gráfico {i}: No tiene etiquetas visibles")
+#                             continue
+#                     except:
+#                         # Si falla HasTickLabels, verificamos de otra manera
+#                         try:
+#                             x_axis.TickLabels  # Intento acceder a TickLabels directamente
+#                         except:
+#                             problemas.append(f"Gráfico {i}: No se pueden acceder a las etiquetas")
+#                             continue
+#                     # Rotación segura
+#                     try:
+#                         x_axis.TickLabels.Orientation = 45
+#                         rotados += 1
+#                     except Exception as e:
+#                         problemas.append(f"Gráfico {i}: Error al rotar - {str(e)}")
+
+#                 except Exception as e:
+#                     problemas.append(f"Gráfico {i}: Tipo no soportado - {str(e)}")
+
+#             except Exception as e:
+#                 problemas.append(f"Gráfico {i}: Error grave - {str(e)}")
+#         # 5. Manejo de resultados mejorado
+#         if total_graficos == 0:
+#             messagebox.showinfo("Información", "No se encontraron gráficos en la hoja")
+#             resultado = True
+#         # elif rotados > 0:
+#         #     mensaje = f"Éxito: Se rotaron {rotados} de {total_graficos} gráficos"
+#             if problemas:
+#                 mensaje += "\n\nProblemas encontrados:\n" + "\n".join(problemas[:3])
+#             messagebox.showinfo("Resultado", mensaje)
+#             resultado = True
+#         # else:
+#         #     mensaje = (
+#         #         "No se pudo rotar ningún gráfico.\n\n"
+#         #         "Causas probables:\n"
+#         #         "1. Versión de Excel no compatible\n"
+#         #         "2. Gráficos de tipo especial (3D, combinados, etc.)\n"
+#         #         "3. El archivo está protegido o dañado\n\n"
+#         #         "Solución recomendada:\n"
+#         #         "1. Guardar los gráficos como imágenes\n"
+#         #         "2. Crear nuevos gráficos estándar\n"
+#         #         "3. Actualizar Microsoft Excel"
+#         #     )
+#         #     messagebox.showerror("Error", mensaje)
+#         #     resultado = False
+#         # 6. Guardar cambios si hubo éxito
+#         if rotados > 0:
+#             try:
+#                 wb.Save()
+#             except Exception as e:
+#                 messagebox.showwarning("Advertencia", f"Cambios realizados pero no guardados:\n{str(e)}")
+
+#     except Exception as e:
+#         messagebox.showerror("Error crítico", f"Error inesperado:\n{str(e)}")
+#     finally:
+#         # 7. Limpieza garantizada
+#         try:
+#             if wb:
+#                 wb.Close(SaveChanges=False)
+#         except:
+#             pass
+#         try:
+#             if excel:
+#                 excel.Quit()
+#                 del excel
+#         except:
+#             pass
+#         pythoncom.CoUninitialize()
+#     return resultado
+
+
 def rotar_etiquetas_graficos(ruta_archivo, nombre_hoja):
-    """Versión final que maneja todos los casos de gráficos y versiones de Excel"""
+    """Versión que no cierra otros Excels y trabaja en segundo plano."""
     pythoncom.CoInitialize()
     excel = wb = None
     resultado = False
     try:
-        # 1. Configuración robusta de Excel
+        # 1. Configuración de Excel sin afectar otros archivos
         excel = win32.Dispatch("Excel.Application")
-        excel.Visible = False
+        excel.Visible = False  # <<< Asegurar que nunca sea visible
         excel.DisplayAlerts = False
         excel.ScreenUpdating = False
-        # 2. Abrir archivo con manejo de errores
+
+        # 2. Abrir archivo (manejo de errores)
         try:
             wb = excel.Workbooks.Open(os.path.abspath(ruta_archivo))
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo abrir el archivo:\n{str(e)}")
             return False
-        # 3. Verificar hoja
-        try:
-            if nombre_hoja not in [s.Name for s in wb.Sheets]:
-                messagebox.showerror("Error", f"Hoja '{nombre_hoja}' no encontrada")
-                return False
-            sheet = wb.Sheets(nombre_hoja)
-        except Exception as e:
-            messagebox.showerror("Error", f"Error al acceder a la hoja:\n{str(e)}")
-            return False
 
-        # 4. Procesamiento mejorado de gráficos
+        # 3. Procesar gráficos (código original)
+        sheet = wb.Sheets(nombre_hoja)
         graficos = sheet.ChartObjects()
-        total_graficos = graficos.Count
         rotados = 0
         problemas = []
 
-        for i, chart_obj in enumerate(graficos, 1):
+        for chart_obj in graficos:
             try:
                 chart = chart_obj.Chart
-
-                # Método universal para diferentes versiones de Excel
-                try:
-                    # Versión compatible con todas las versiones de Excel
-                    x_axis = chart.Axes(1)  # 1 = xlCategory
-
-                    # Verificación alternativa para HasTickLabels
-                    try:
-                        if hasattr(x_axis, 'HasTickLabels') and not x_axis.HasTickLabels:
-                            problemas.append(f"Gráfico {i}: No tiene etiquetas visibles")
-                            continue
-                    except:
-                        # Si falla HasTickLabels, verificamos de otra manera
-                        try:
-                            x_axis.TickLabels  # Intento acceder a TickLabels directamente
-                        except:
-                            problemas.append(f"Gráfico {i}: No se pueden acceder a las etiquetas")
-                            continue
-                    # Rotación segura
-                    try:
-                        x_axis.TickLabels.Orientation = 45
-                        rotados += 1
-                    except Exception as e:
-                        problemas.append(f"Gráfico {i}: Error al rotar - {str(e)}")
-
-                except Exception as e:
-                    problemas.append(f"Gráfico {i}: Tipo no soportado - {str(e)}")
-
+                x_axis = chart.Axes(1)  # Eje X
+                if hasattr(x_axis, 'TickLabels'):
+                    x_axis.TickLabels.Orientation = 45
+                    rotados += 1
             except Exception as e:
-                problemas.append(f"Gráfico {i}: Error grave - {str(e)}")
-        # 5. Manejo de resultados mejorado
-        if total_graficos == 0:
-            messagebox.showinfo("Información", "No se encontraron gráficos en la hoja")
-            resultado = True
-        # elif rotados > 0:
-        #     mensaje = f"Éxito: Se rotaron {rotados} de {total_graficos} gráficos"
-            if problemas:
-                mensaje += "\n\nProblemas encontrados:\n" + "\n".join(problemas[:3])
-            messagebox.showinfo("Resultado", mensaje)
-            resultado = True
-        # else:
-        #     mensaje = (
-        #         "No se pudo rotar ningún gráfico.\n\n"
-        #         "Causas probables:\n"
-        #         "1. Versión de Excel no compatible\n"
-        #         "2. Gráficos de tipo especial (3D, combinados, etc.)\n"
-        #         "3. El archivo está protegido o dañado\n\n"
-        #         "Solución recomendada:\n"
-        #         "1. Guardar los gráficos como imágenes\n"
-        #         "2. Crear nuevos gráficos estándar\n"
-        #         "3. Actualizar Microsoft Excel"
-        #     )
-        #     messagebox.showerror("Error", mensaje)
-        #     resultado = False
-        # 6. Guardar cambios si hubo éxito
+                problemas.append(str(e))
+
+        # 4. Guardar cambios si hubo rotaciones
         if rotados > 0:
             try:
                 wb.Save()
             except Exception as e:
-                messagebox.showwarning("Advertencia", f"Cambios realizados pero no guardados:\n{str(e)}")
+                messagebox.showwarning("Advertencia", f"No se guardaron cambios:\n{str(e)}")
+
+        resultado = (rotados > 0)
 
     except Exception as e:
         messagebox.showerror("Error crítico", f"Error inesperado:\n{str(e)}")
     finally:
-        # 7. Limpieza garantizada
+        # 5. Limpieza SIN cerrar otros Excels
         try:
             if wb:
-                wb.Close(SaveChanges=False)
+                wb.Close(SaveChanges=False)  # Cierra solo este archivo
         except:
             pass
         try:
             if excel:
-                excel.Quit()
-                del excel
+                excel.ScreenUpdating = True  # Restaurar configuración
+                # No ejecutar excel.Quit() para no cerrar otros archivos
         except:
             pass
         pythoncom.CoUninitialize()
     return resultado
+
 
 def escribir_division(hoja):
     """Versión con validación de existencia de hoja y columnas"""
