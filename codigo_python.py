@@ -184,7 +184,7 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                     sumas_ad_por_bloque.append(valor_ae) 
                 except Exception as e:
                     sumas_ad_por_bloque.append(0.0)
-                Guardar cambios finales del bloque
+                # Guardar cambios finales del bloque
                 shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
                 wb.save(RUTA_ENTRADA)
                 shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
