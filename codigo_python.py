@@ -178,7 +178,7 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                     for col in range(25, 30):
                         hoja.cell(row=f_fin, column=col, value="")
                 try:
-                    temp_path, valor_ae = crear_archivo_temporal_con_ae(f"AD{f_fin}")
+                    temp_path, valor_ae = Pasar_referencia(f"AD{f_fin}")
                     sumas_ad_por_bloque.append(valor_ae) 
                 except Exception as e:
                     sumas_ad_por_bloque.append(0.0)
@@ -208,7 +208,7 @@ def escribir(hoja, fila, col, valor, es_numero=False):
     if es_numero:
         celda.number_format = '0.00'
 
-def crear_archivo_temporal_con_ae(celda_origen):
+def Pasar_referencia(celda_origen):
     """Retorna la referencia CORRECTAMENTE formateada"""
     if not re.match(r'^AD\d+$', celda_origen):
         messagebox.showerror("Error", f"Formato de celda inválido: {celda_origen}")
