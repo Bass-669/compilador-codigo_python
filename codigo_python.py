@@ -20,8 +20,8 @@ MESES_NUM = {
 BORDER = Border(*(Side(style='thin'),)*4)
 ALIGN_R = Alignment(horizontal='right')
 FILL_AMARILLO = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
-bloques_detectados = []
-sumas_ad_por_bloque = []
+# bloques_detectados = []
+# sumas_ad_por_bloque = []
 
 def obtener_datos():
     datos = entrada_texto.get("1.0", tk.END).strip()
