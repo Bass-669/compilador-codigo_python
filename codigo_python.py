@@ -481,24 +481,6 @@ def preparar_hoja_mes(mes, dia, anio):
         messagebox.showerror("Error crítico", f"No se pudo completar la operación:\n{str(e)}")
         return False
 
-# def escribir_division(hoja):
-#     """Versión con validación de existencia de hoja y columnas"""
-#     try:
-#         if not hoja:
-#             raise ValueError("El objeto hoja no es válido")
-#         # Columnas a procesar
-#         for col_num in range(2, 33):  # B (2) a AF (32)
-#             letra = openpyxl.utils.get_column_letter(col_num)
-#             # Verificar que las celdas referenciadas existen
-#             if hoja.max_row >= 40 and hoja.max_row >= 34 and hoja.max_row >= 28:
-#                 formula = f"=SI.ERROR({letra}34/{letra}28, 0)"
-#                 hoja.cell(row=40, column=col_num).value = formula
-#                 hoja.cell(row=40, column=col_num).number_format = '0.00'
-#     except Exception as e:
-#         messagebox.showerror("Error", f"No se pudo escribir fórmulas:\n{str(e)}")
-#         return False
-#     return True
-
 def dias_en_mes(mes, anio):
     """Devuelve el número de días en un mes, considerando años bisiestos para febrero"""
     if mes == "Febrero":
