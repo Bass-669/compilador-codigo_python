@@ -179,12 +179,12 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                 if tipo_bloque != "PODADO":
                     for col in range(25, 30):
                         hoja.cell(row=f_fin, column=col, value="")
-                # try:
-                #     temp_path, valor_ae = crear_archivo_temporal_con_ae(f"AD{f_fin}")
-                #     sumas_ad_por_bloque.append(valor_ae) 
-                # except Exception as e:
-                #     sumas_ad_por_bloque.append(0.0)
-                # Guardar cambios finales del bloque
+                try:
+                    temp_path, valor_ae = crear_archivo_temporal_con_ae(f"AD{f_fin}")
+                    sumas_ad_por_bloque.append(valor_ae) 
+                except Exception as e:
+                    sumas_ad_por_bloque.append(0.0)
+                Guardar cambios finales del bloque
                 shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
                 wb.save(RUTA_ENTRADA)
                 shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
