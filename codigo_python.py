@@ -113,33 +113,38 @@ def incrementar_barra(hasta, paso=1):
 
 def ejecutar(txt, torno, mes, dia, anio, incrementar_barra):
     try:
-        # Configuración inicial de la barra
         barra['value'] = 0
         ventana_carga.update_idletasks()
 
-        # Paso 1: Preparar hoja del mes (0-25%)
-        incrementar_barra(25)
+        # Paso 1: Preparar hoja del mes (0-30%)
+        incrementar_barra(30)
         if not preparar_hoja_mes(mes, dia, anio):
-            incrementar_barra(100)  # Si falla, completar barra
-            return
+            incrementar_barra(100)
+            cerrar_carga()
+            return  # No cerrar ventana principal aquí
 
-        # Paso 2: Procesar datos (25-75%)
-        incrementar_barra(50)
+        # Paso 2: Procesar datos (30-60%)
+        incrementar_barra(60)
         bloques, porcentajes = procesar_datos(txt, torno, mes, dia, anio)
         
-        # Paso intermedio (50-75%)
-        incrementar_barra(75)
+        if bloques is None or porcentajes is None:
+            incrementar_barra(100)
+            cerrar_carga()
+            return
 
-        # Paso 3: Escribir en hoja mensual (75-100%)
-        if bloques is not None and porcentajes is not None:
-            fecha(mes, dia, anio, torno, bloques, porcentajes)
-            # Completar la barra
-            
+        # Paso 3: Escribir en hoja mensual (60-100%)
+        if fecha(mes, dia, anio, torno, bloques, porcentajes, incrementar_barra):
+            incrementar_barra(100)  # Asegurar 100% al finalizar
+            messagebox.showinfo("Éxito", "✅ Valores actualizados correctamente.")
+        else:
+            incrementar_barra(100)  # Llegar al 100% incluso en error
+
     except Exception as e:
-        messagebox.showerror("Error", f"Ocurrió un error en ejecutar():\n{e}")
+        incrementar_barra(100)  # Llegar al 100% antes de mostrar error
+        messagebox.showerror("Error", f"Ocurrió un error:\n{e}")
     finally:
         cerrar_carga()
-        ventana.destroy()
+        # Opcional: Eliminar ventana.destroy() para mantener la ventana abierta
 
 def procesar_datos(entrada, torno, mes, dia, anio):
     bloques_detectados = []
