@@ -340,7 +340,8 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, increm
         for (tipo_bloque, valor), valor_ae in zip(zip(tipos_para_escribir, valores_para_escribir), sumas_ad_por_bloque):
             escribir_valor_bloque(hoja_mes, col_dia, torno, valor, tipo_bloque)
             escribir_valores_resumen_bloques(hoja_mes, col_dia, torno, [valor_ae], [tipo_bloque])
-        # 4. Guardar cambios
+        # 4. Guardar cambios y crear copia
+        shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
         wb.save(RUTA_ENTRADA)
         # 5. Copia de seguridad
         try:
