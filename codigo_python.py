@@ -138,7 +138,7 @@ def ejecutar(txt, torno, mes, dia, anio):
         if bloques is not None and porcentajes is not None:
             fecha(mes, dia, anio, torno, bloques, porcentajes)
             # Completar la barra
-            incrementar_barra(100)
+            
         
         
     except Exception as e:
@@ -411,6 +411,7 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
         except Exception as e:
             messagebox.showwarning("Advertencia", f"No se pudo crear copia de seguridad:\n{str(e)}")
 
+        incrementar_barra(100)
         messagebox.showinfo("Éxito", "✅ Valores actualizados correctamente.")
         return True
 
