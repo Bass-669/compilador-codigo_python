@@ -180,7 +180,7 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                     for col in range(25, 30):
                         hoja.cell(row=f_fin, column=col, value="")
                 # Guardar cambios ANTES de procesar archivo temporal
-                wb.save(RUTA_ENTRADA)
+                # wb.save(RUTA_ENTRADA)
                 # Procesar archivo temporal para obtener valor AE
                 try:
                     temp_path, valor_ae = crear_archivo_temporal_con_ae(f"AD{f_fin}")
@@ -188,6 +188,7 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                 except Exception as e:
                     sumas_ad_por_bloque.append(0.0)
                 # Guardar cambios finales del bloque
+                shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
                 wb.save(RUTA_ENTRADA)
                 shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
             except Exception as e:
