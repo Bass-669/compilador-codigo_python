@@ -3,7 +3,6 @@ from openpyxl.styles import Font, Border, Side, Alignment, PatternFill
 from datetime import datetime
 from tkinter import messagebox, ttk
 from tkcalendar import DateEntry
-
 import threading
 
 BASE_DIR = os.path.dirname(sys.executable if getattr(sys, 'frozen', False) else os.path.abspath(__file__))
