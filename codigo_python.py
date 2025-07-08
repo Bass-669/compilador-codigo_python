@@ -3,7 +3,7 @@ from openpyxl.styles import Font, Border, Side, Alignment, PatternFill
 from datetime import datetime
 from tkinter import messagebox, ttk
 from tkcalendar import DateEntry
-import win32com.client as win32, pythoncom
+
 import threading
 
 BASE_DIR = os.path.dirname(sys.executable if getattr(sys, 'frozen', False) else os.path.abspath(__file__))
@@ -396,6 +396,7 @@ def preparar_hoja_mes(mes, dia, anio):
                 return True
         wb_check.close()
         # Paso 2: Crear hoja nueva si no existe
+        import win32com.client as win32, pythoncom
         pythoncom.CoInitialize()
         excel = win32.DispatchEx("Excel.Application")
         excel.Visible = False
