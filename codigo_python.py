@@ -77,76 +77,6 @@ def mostrar_carga():
 def cerrar_carga():
     if ventana_carga: ventana_carga.destroy()
 
-# def ejecutar(txt, torno, mes, dia, anio):
-#     try:
-#         barra['value'] = 25
-#         ventana_carga.update_idletasks()
-#         # Paso 1: Preparar hoja del mes antes de cualquier escritura
-#         if not preparar_hoja_mes(mes, dia, anio):
-#             return
-
-#         barra['value'] = 50
-#         ventana_carga.update_idletasks()
-#         # Paso 2: Procesar los datos y escribir en "IR diario"
-#         bloques, porcentajes = procesar_datos(txt, torno, mes, dia, anio)
-#         barra['value'] = 75
-#         ventana_carga.update_idletasks()
-
-#         # Paso 3: Escribir los valores procesados en hoja mensual
-#         if bloques is not None and porcentajes is not None:
-#             fecha(mes, dia, anio, torno, bloques, porcentajes)
-
-#         barra['value'] = 100
-#     except Exception as e:
-#         messagebox.showerror("Error", f"Ocurrió un error en ejecutar():\n{e}")
-#     finally:
-#         cerrar_carga()
-#         ventana.destroy()
-
-
-# ---------------------------------------------------
-# def ejecutar(txt, torno, mes, dia, anio):
-#     try:
-#         # Configuración inicial de la barra
-#         barra['value'] = 0
-#         ventana_carga.update_idletasks()
-        
-#         # Función para incremento fluido de la barra
-#         def incrementar_barra(hasta, paso=1):
-#             actual = barra['value']
-#             for i in range(actual, hasta + 1, paso):
-#                 barra['value'] = i
-#                 ventana_carga.update_idletasks()
-#                 time.sleep(0.01)  # Pequeña pausa para suavizar la animación
-        
-#         # Paso 1: Preparar hoja del mes (0-25%)
-#         incrementar_barra(25)
-#         if not preparar_hoja_mes(mes, dia, anio):
-#             incrementar_barra(100)  # Si falla, completar barra
-#             return
-
-#         # Paso 2: Procesar datos (25-75%)
-#         incrementar_barra(50)
-#         bloques, porcentajes = procesar_datos(txt, torno, mes, dia, anio)
-        
-#         # Paso intermedio (50-75%)
-#         incrementar_barra(75)
-
-#         # Paso 3: Escribir en hoja mensual (75-100%)
-#         if bloques is not None and porcentajes is not None:
-#             fecha(mes, dia, anio, torno, bloques, porcentajes)
-        
-#         # Completar la barra
-#         incrementar_barra(100)
-        
-#     except Exception as e:
-#         messagebox.showerror("Error", f"Ocurrió un error en ejecutar():\n{e}")
-#     finally:
-#         cerrar_carga()
-#         ventana.destroy()
-
-
-
 def ejecutar(txt, torno, mes, dia, anio):
     try:
         # Configuración inicial de la barra
@@ -183,7 +113,6 @@ def ejecutar(txt, torno, mes, dia, anio):
     finally:
         cerrar_carga()
         ventana.destroy()
-
 
 def procesar_datos(entrada, torno, mes, dia, anio):
     bloques_detectados = []
@@ -400,79 +329,6 @@ def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque
             print(f"Error en bloque {i}: {str(e)}")
             continue  # Continuar con el siguiente bloque
 
-# def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, incrementar_barra):
-#     """Escribe los datos en la hoja del mes incluyendo las fechas"""
-#     nombre_hoja = f"IR {mes} {anio}"
-#     col_dia = dia + 1  # columna B es 2, día 1 → columna 2
-#     wb = None
-#     try:
-#         # messagebox.showinfo("Proceso", f"Iniciando escritura en hoja {nombre_hoja} para el día {dia}")
-#         # 1. Abrir el archivo principal
-#         wb = openpyxl.load_workbook(RUTA_ENTRADA)
-#         # Verificar si la hoja existe
-#         if nombre_hoja not in wb.sheetnames:
-#             messagebox.showerror("Error", f"No se encontró la hoja '{nombre_hoja}'")
-#             return False
-#         hoja_mes = wb[nombre_hoja]
-#         # 2. Escribir la fecha en las celdas correspondientes
-#         # messagebox.showinfo("Proceso", f"Escribiendo fecha {dia}/{MESES_NUM[mes]:02d}/{anio} en columna {col_dia}")
-#         nueva_fecha = f"{dia:02d}/{MESES_NUM[mes]:02d}/{anio}"
-
-#         # Celdas donde debe ir la fecha (filas basadas en tu estructura de Excel)
-#         filas_fecha = [2, 7, 12, 17, 22, 27, 31, 37]
-
-#         for fila in filas_fecha:
-#             try:
-#                 celda = hoja_mes.cell(row=fila, column=col_dia)
-#                 celda.value = nueva_fecha
-#                 # messagebox.showinfo("Detalle", f"Fecha escrita en {fila},{col_dia}")
-#             except Exception as e:
-#                 messagebox.showwarning("Advertencia", f"Error escribiendo fecha en {fila},{col_dia}: {str(e)}")
-
-#         # 3. Escribir valores de bloques
-#         # messagebox.showinfo("Proceso", "Escribiendo valores de bloques...")
-#         valores_para_escribir = [val for i, (tipo, val) in enumerate(bloques_detectados) if i % 2 == 1]
-#         tipos_para_escribir = [tipo for i, (tipo, val) in enumerate(bloques_detectados) if i % 2 == 1]
-
-#         for (tipo_bloque, valor), valor_ae in zip(zip(tipos_para_escribir, valores_para_escribir), sumas_ad_por_bloque):
-#             escribir_valor_bloque(hoja_mes, col_dia, torno, valor, tipo_bloque)
-#             escribir_valores_resumen_bloques(hoja_mes, col_dia, torno, [valor_ae], [tipo_bloque])
-#             # messagebox.showinfo("Detalle", f"Bloque {tipo_bloque} escrito en columna {col_dia}")
-#         # 4. Guardar cambios
-#         # messagebox.showinfo("Proceso", "Guardando cambios...")
-#         wb.save(RUTA_ENTRADA)
-#         # 5. Copia de seguridad
-#         try:
-#             shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
-#             # messagebox.showinfo("Proceso", "Copia de seguridad creada")
-#         except Exception as e:
-#             messagebox.showwarning("Advertencia", f"No se pudo crear copia de seguridad:\n{str(e)}")
-
-#         incrementar_barra(100)
-#         messagebox.showinfo("Éxito", "✅ Valores actualizados correctamente.")
-#         return True
-
-#     except Exception as e:
-#         messagebox.showerror("Error", 
-#             f"No se pudo escribir en hoja:\n{str(e)}\n\n"
-#             "Verifique que:\n"
-#             "1. El archivo no esté abierto en Excel\n"
-#             "2. Tenga permisos de escritura\n"
-#             "3. La hoja exista en el archivo"
-#         )
-#         return False
-
-#     finally:
-#         # 6. Cerrar el workbook si está abierto
-#         if wb is not None:
-#             try:
-#                 wb.close()
-#                 # messagebox.showinfo("Proceso", "Workbook cerrado correctamente")
-#             except:
-#                 messagebox.showwarning("Advertencia", "Error al cerrar el workbook")
-#                 pass
-
-
 def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, incrementar_barra):
     """Escribe los datos en la hoja del mes incluyendo las fechas"""
     nombre_hoja = f"IR {mes} {anio}"
@@ -546,7 +402,6 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, increm
         if exito:
             messagebox.showinfo("Éxito", "✅ Valores actualizados correctamente.")
 
-
 def preparar_hoja_mes(mes, dia, anio):
     """Crea la hoja del mes si no existe y la configura con fórmulas iniciales."""
     nombre_hoja = f"IR {mes} {anio}"
@@ -571,7 +426,6 @@ def preparar_hoja_mes(mes, dia, anio):
                 print(f"La hoja {nombre_hoja} ya existe y se usará tal cual.")
                 wb_check.close()
                 return True  # ✅ Ya existe y se usará
-
         wb_check.close()
 
         # Paso 2: Crear hoja nueva si no existe
@@ -580,7 +434,6 @@ def preparar_hoja_mes(mes, dia, anio):
         excel.Visible = False
         excel.DisplayAlerts = False
         wb = excel.Workbooks.Open(os.path.abspath(RUTA_ENTRADA), UpdateLinks=0)
-
         hojas = [h.Name for h in wb.Sheets]
 
         if nombre_hoja not in hojas:
@@ -625,7 +478,6 @@ def preparar_hoja_mes(mes, dia, anio):
         # Paso 3: Configurar hoja con openpyxl
         wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
         hoja = wb2[nombre_hoja]
-
         filas_a_limpiar = [2,3,4,7,8,9,12,13,14,17,18,19,22,23,24,27,28,31,32,33,34,37,38,39,40]
         for fila in filas_a_limpiar:
             for col in range(2, 35):
@@ -645,7 +497,6 @@ def preparar_hoja_mes(mes, dia, anio):
             hoja.cell(row=40, column=col, value=f"=IFERROR({letra}34/{letra}28, 0)").number_format = '0.00%'
             hoja.cell(row=40, column=col).font = Font(color='000000')
             hoja.cell(row=34, column=col, value=f"=IFERROR(AVERAGE({letra}32:{letra}33), 0)").number_format = '0.00%'
-
             hoja.cell(row=23, column=col, value=f"=IFERROR(({letra}3*{letra}13+{letra}8*{letra}18)/({letra}3+{letra}8), 0)")
             hoja.cell(row=24, column=col, value=f"=IFERROR(({letra}4*{letra}14+{letra}9*{letra}19)/({letra}4+{letra}9), 0)")
             hoja.cell(row=28, column=col, value=f"=IFERROR(({letra}23*({letra}3+{letra}8)+{letra}24*({letra}4+{letra}9))/({letra}3+{letra}4+{letra}8+{letra}9), 0)")
@@ -669,7 +520,6 @@ def preparar_hoja_mes(mes, dia, anio):
         hoja.cell(row=28, column=34, value="=(AH23*(AH3+AH8)+AH24*(AH4+AH9))/(AH3+AH4+AH8+AH9)")
         hoja.cell(row=39, column=34, value="=AH33/AH28").number_format = '0.00%'
         hoja.cell(row=40, column=34, value="=AH34/AH28").number_format = '0.00%'
-
         wb2.save(RUTA_ENTRADA)
         wb2.close()
 
@@ -684,7 +534,6 @@ def preparar_hoja_mes(mes, dia, anio):
         wb_calc.Close()
         excel.Quit()
         pythoncom.CoUninitialize()
-
         return True
 
     except Exception as e:
