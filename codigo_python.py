@@ -103,24 +103,20 @@ def cerrar_carga():
 #         cerrar_carga()
 #         ventana.destroy()
 
+# Función para incremento fluido de la barra
+def incrementar_barra(hasta, paso=1):
+    actual = barra['value']
+    for i in range(actual, hasta + 1, paso):
+        barra['value'] = i
+        ventana_carga.update_idletasks()
+        time.sleep(0.01)  # Pequeña pausa para suavizar la animación
 
-
-import time
-
-def ejecutar(txt, torno, mes, dia, anio):
+def ejecutar(txt, torno, mes, dia, anio, incrementar_barra):
     try:
         # Configuración inicial de la barra
         barra['value'] = 0
         ventana_carga.update_idletasks()
-        
-        # Función para incremento fluido de la barra
-        def incrementar_barra(hasta, paso=1):
-            actual = barra['value']
-            for i in range(actual, hasta + 1, paso):
-                barra['value'] = i
-                ventana_carga.update_idletasks()
-                time.sleep(0.01)  # Pequeña pausa para suavizar la animación
-        
+
         # Paso 1: Preparar hoja del mes (0-25%)
         incrementar_barra(25)
         if not preparar_hoja_mes(mes, dia, anio):
@@ -139,14 +135,11 @@ def ejecutar(txt, torno, mes, dia, anio):
             fecha(mes, dia, anio, torno, bloques, porcentajes)
             # Completar la barra
             
-        
-        
     except Exception as e:
         messagebox.showerror("Error", f"Ocurrió un error en ejecutar():\n{e}")
     finally:
         cerrar_carga()
         ventana.destroy()
-
 
 def procesar_datos(entrada, torno, mes, dia, anio):
     bloques_detectados = []
@@ -363,7 +356,7 @@ def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque
             print(f"Error en bloque {i}: {str(e)}")
             continue  # Continuar con el siguiente bloque
 
-def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque):
+def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, incrementar_barra):
     """Escribe los datos en la hoja del mes incluyendo las fechas"""
     nombre_hoja = f"IR {mes} {anio}"
     col_dia = dia + 1  # columna B es 2, día 1 → columna 2
