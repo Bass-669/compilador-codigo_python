@@ -210,15 +210,15 @@ def escribir(hoja, fila, col, valor, es_numero=False):
     if es_numero:
         celda.number_format = '0.00'
 
-def es_valor_valido(valor):
-    """Verifica si un valor es numérico y válido"""
-    if valor in (None, "#NIA", "#N/A", "#VALOR!", ""):
-        return False
-    try:
-        float(str(valor).replace(",", "."))
-        return True
-    except:
-        return False
+# def es_valor_valido(valor):
+#     """Verifica si un valor es numérico y válido"""
+#     if valor in (None, "#NIA", "#N/A", "#VALOR!", ""):
+#         return False
+#     try:
+#         float(str(valor).replace(",", "."))
+#         return True
+#     except:
+#         return False
 
 def crear_archivo_temporal_con_ae(celda_origen):
     """Retorna la referencia CORRECTAMENTE formateada"""
