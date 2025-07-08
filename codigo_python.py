@@ -432,7 +432,7 @@ def preparar_hoja_mes(mes, dia, anio):
             nueva_hoja = wb.ActiveSheet
             nueva_hoja.Name = nombre_hoja
             shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
-            wb.Save(RUTA_ENTRADA)
+            wb.Save()
         wb.Close(SaveChanges=True)
         excel.Quit()
         pythoncom.CoUninitialize()
