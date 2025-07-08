@@ -20,8 +20,8 @@ MESES_NUM = {
 BORDER = Border(*(Side(style='thin'),)*4)
 ALIGN_R = Alignment(horizontal='right')
 FILL_AMARILLO = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
-bloques_detectados = []
-sumas_ad_por_bloque = []
+# bloques_detectados = []
+# sumas_ad_por_bloque = []
 
 def obtener_datos():
     datos = entrada_texto.get("1.0", tk.END).strip()
@@ -210,15 +210,15 @@ def escribir(hoja, fila, col, valor, es_numero=False):
     if es_numero:
         celda.number_format = '0.00'
 
-def es_valor_valido(valor):
-    """Verifica si un valor es numérico y válido"""
-    if valor in (None, "#NIA", "#N/A", "#VALOR!", ""):
-        return False
-    try:
-        float(str(valor).replace(",", "."))
-        return True
-    except:
-        return False
+# def es_valor_valido(valor):
+#     """Verifica si un valor es numérico y válido"""
+#     if valor in (None, "#NIA", "#N/A", "#VALOR!", ""):
+#         return False
+#     try:
+#         float(str(valor).replace(",", "."))
+#         return True
+#     except:
+#         return False
 
 def crear_archivo_temporal_con_ae(celda_origen):
     """Retorna la referencia CORRECTAMENTE formateada"""
@@ -493,23 +493,23 @@ def preparar_hoja_mes(mes, dia, anio):
         messagebox.showerror("Error crítico", f"No se pudo completar la operación:\n{str(e)}")
         return False
 
-def escribir_division(hoja):
-    """Versión con validación de existencia de hoja y columnas"""
-    try:
-        if not hoja:
-            raise ValueError("El objeto hoja no es válido")
-        # Columnas a procesar
-        for col_num in range(2, 33):  # B (2) a AF (32)
-            letra = openpyxl.utils.get_column_letter(col_num)
-            # Verificar que las celdas referenciadas existen
-            if hoja.max_row >= 40 and hoja.max_row >= 34 and hoja.max_row >= 28:
-                formula = f"=SI.ERROR({letra}34/{letra}28, 0)"
-                hoja.cell(row=40, column=col_num).value = formula
-                hoja.cell(row=40, column=col_num).number_format = '0.00'
-    except Exception as e:
-        messagebox.showerror("Error", f"No se pudo escribir fórmulas:\n{str(e)}")
-        return False
-    return True
+# def escribir_division(hoja):
+#     """Versión con validación de existencia de hoja y columnas"""
+#     try:
+#         if not hoja:
+#             raise ValueError("El objeto hoja no es válido")
+#         # Columnas a procesar
+#         for col_num in range(2, 33):  # B (2) a AF (32)
+#             letra = openpyxl.utils.get_column_letter(col_num)
+#             # Verificar que las celdas referenciadas existen
+#             if hoja.max_row >= 40 and hoja.max_row >= 34 and hoja.max_row >= 28:
+#                 formula = f"=SI.ERROR({letra}34/{letra}28, 0)"
+#                 hoja.cell(row=40, column=col_num).value = formula
+#                 hoja.cell(row=40, column=col_num).number_format = '0.00'
+#     except Exception as e:
+#         messagebox.showerror("Error", f"No se pudo escribir fórmulas:\n{str(e)}")
+#         return False
+#     return True
 
 def dias_en_mes(mes, anio):
     """Devuelve el número de días en un mes, considerando años bisiestos para febrero"""
