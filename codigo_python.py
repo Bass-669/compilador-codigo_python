@@ -274,7 +274,6 @@ def procesar_datos(entrada, torno, mes, dia, anio):
 
 def escribir(hoja, fila, col, valor, es_numero=False):
     """Escribe un valor en la celda con formato adecuado"""
-    escribir_log("Inicio de escribir")
     celda = hoja.cell(row=fila, column=col, value=valor)
     celda.border = BORDER
     celda.alignment = ALIGN_R
