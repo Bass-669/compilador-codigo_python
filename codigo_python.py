@@ -28,9 +28,10 @@ def configurar_logging():
 
     class Logger:
         def __init__(self):
-            self.terminal = sys.stdout
+            self.original_stdout = sys.__stdout__  # importante para evitar recursión
+            self.terminal = self.original_stdout
             self.log_file = self._inicializar_archivo_log()
-            
+
         def _inicializar_archivo_log(self):
             """Intenta crear el archivo de log en múltiples ubicaciones"""
             posibles_rutas = [
