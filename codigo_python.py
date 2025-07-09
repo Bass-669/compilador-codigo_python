@@ -123,6 +123,7 @@ def pedir_fecha(callback):
     ventana.grab_set()
 
 def iniciar(texto, torno, mes, dia, anio):
+    escribir_log("Inicio de iniciar")
     mostrar_carga()
     threading.Thread(target=lambda: ejecutar(texto, torno, mes, dia, anio), daemon=True).start()
 
@@ -141,6 +142,7 @@ def cerrar_carga():
     if ventana_carga: ventana_carga.destroy()
 
 def ejecutar(txt, torno, mes, dia, anio):
+    escribir_log("Inicio de ejecutar")
     try:
         # Configuración inicial de la barra
         barra['value'] = 0
@@ -173,6 +175,7 @@ def ejecutar(txt, torno, mes, dia, anio):
         ventana.destroy()
 
 def procesar_datos(entrada, torno, mes, dia, anio):
+    escribir_log("Inicio de procesar_datos")
     bloques_detectados = []
     sumas_ad_por_bloque = []
     if not os.path.exists(RUTA_ENTRADA):
@@ -271,6 +274,7 @@ def procesar_datos(entrada, torno, mes, dia, anio):
 
 def escribir(hoja, fila, col, valor, es_numero=False):
     """Escribe un valor en la celda con formato adecuado"""
+    escribir_log("Inicio de escribir")
     celda = hoja.cell(row=fila, column=col, value=valor)
     celda.border = BORDER
     celda.alignment = ALIGN_R
@@ -279,6 +283,7 @@ def escribir(hoja, fila, col, valor, es_numero=False):
 
 def Pasar_referencia(celda_origen):
     """Retorna la referencia CORRECTAMENTE formateada"""
+    escribir_log("Inicio de pasar_referencia")
     if not re.match(r'^AD\d+$', celda_origen):
         messagebox.showerror("Error", f"Formato de celda inválido: {celda_origen}")
         escribir_log("Error", f"Formato de celda inválido: {celda_origen}")
@@ -295,6 +300,7 @@ def Pasar_referencia(celda_origen):
     return referencia
 
 def extraer_bloques(txt):
+    escribir_log("Inicio de extraer_bloques")
     lineas = [l.strip() for l in txt.strip().split("\n") if l.strip()]
     bloques, b, i = [], [], 0
     while i < len(lineas):
@@ -312,6 +318,7 @@ def extraer_bloques(txt):
     return bloques
 
 def sub_bloques(b):
+    escribir_log("Inicio de sub_bloques")
     subs, tmp = [], []
     for l in b:
         if re.match(r'^\D', l) or '*' in l:
@@ -322,6 +329,7 @@ def sub_bloques(b):
     return subs
 
 def escribir_valor_bloque(hoja, col_dia, torno, valor, tipo_bloque):
+    escribir_log("Inicio de escribir_valor_bloque")
     tipo_bloque = tipo_bloque.strip().upper()
     if tipo_bloque == "PODADO":
         fila_valor = 3 if torno == 1 else 4
@@ -346,6 +354,7 @@ def escribir_valor_bloque(hoja, col_dia, torno, valor, tipo_bloque):
 
 def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque, tipos_bloque):
     """Escribe las referencias de Excel directamente sin calcular valores."""
+    escribir_log("Inicio de esccribir_valores_resumen_bloques")
     for i, (tipo_bloque, referencia) in enumerate(zip(tipos_bloque, valores_ae_por_bloque)):
         try:
             tipo_bloque = tipo_bloque.strip().upper()
@@ -368,6 +377,7 @@ def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque
             continue  # Continuar con el siguiente bloque
 
 def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, incrementar_barra):
+    escribir_log("Inicio de fecha")
     """Escribe los datos en la hoja del mes incluyendo las fechas"""
     nombre_hoja = f"IR {mes} {anio}"
     col_dia = dia + 1
@@ -442,6 +452,7 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, increm
 
 def preparar_hoja_mes(mes, dia, anio):
     """Crea la hoja del mes si no existe y la configura con fórmulas iniciales."""
+    escribir_log("Inicio de preparar_hoja_mes")
     nombre_hoja = f"IR {mes} {anio}"
     col_dia = dia + 1
     try:
@@ -565,6 +576,7 @@ def preparar_hoja_mes(mes, dia, anio):
         return False
 
 def dias_en_mes(mes, anio):
+    escribir_log("Inicio de dias_en_mes")
     """Devuelve el número de días en un mes, considerando años bisiestos para febrero"""
     if mes == "Febrero":
         # Año bisiesto si es divisible por 4, pero no por 100, a menos que también sea divisible por 400
