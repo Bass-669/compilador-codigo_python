@@ -59,7 +59,7 @@ def configurar_logging():
             # logger.info(f"Logger configurado en: {ruta}")
             return logger
         except Exception as e:
-            escribir_log(f"No se pudo configurar log en {ruta}: {e}", file=sys.stderr)
+            escribir_log(f" \n No se pudo configurar log en {ruta}: {e}", file=sys.stderr)
     
     # Si fallan todas las rutas, crear logger de consola
     console_handler = logging.StreamHandler()
@@ -297,7 +297,7 @@ def procesar_datos(entrada, torno, mes, dia, anio):
     except PermissionError:
         error_msg = f"El archivo está abierto en Excel. Por favor cierre:\n{RUTA_ENTRADA}"
         messagebox.showerror("Error", error_msg)
-        escribir_log("ERROR - Archivo bloqueado (abierto en Excel)", nivel="error")
+        escribir_log("ERROR - El archivo esta abierto", nivel="error")
         return None, None
     except Exception as e:
         error_msg = f"No se puede acceder al archivo:\n{str(e)}"
