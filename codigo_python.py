@@ -90,20 +90,66 @@ def obtener_datos():
     if not datos: return messagebox.showwarning("Advertencia", "Ingresa los datos.")
     pedir_torno(lambda t: pedir_fecha(lambda m,d,a: iniciar(datos, t, m, d, a)))
 
+# def pedir_torno(callback):
+#     def confirmar():
+#         val = ent.get().strip()
+#         if not val: return messagebox.showwarning("Advertencia", "Ingresa el número de torno.")
+#         try: callback(int(val)); ventana.destroy()
+#         except: messagebox.showerror("Error", "Debe ser un número.")
+#     ventana = tk.Toplevel()
+#     ventana.title("Número de torno")
+#     ventana.geometry("300x120")
+#     ventana.resizable(False, False)
+#     tk.Label(ventana, text="Número de torno:", font=("Arial", 12)).pack(pady=10)
+#     ent = tk.Entry(ventana, font=("Arial", 12)); ent.pack(pady=5)
+#     tk.Button(ventana, text="Aceptar", command=confirmar).pack(pady=5)
+#     ventana.grab_set()
+
+
 def pedir_torno(callback):
     def confirmar():
         val = ent.get().strip()
-        if not val: return messagebox.showwarning("Advertencia", "Ingresa el número de torno.")
-        try: callback(int(val)); ventana.destroy()
-        except: messagebox.showerror("Error", "Debe ser un número.")
+        if not val:
+            messagebox.showwarning("Advertencia", "Ingresa el número de torno.")
+            return
+            
+        try:
+            num_torno = int(val)
+            if num_torno not in [1, 2]:
+                messagebox.showwarning("Valor incorrecto", "El número de torno debe ser 1 o 2.")
+                # Limpiar el campo y mantener la ventana abierta
+                ent.delete(0, tk.END)
+                ent.focus_set()
+                return
+                
+            callback(num_torno)
+            ventana.destroy()
+        except ValueError:
+            messagebox.showerror("Error", "Debe ingresar un número válido.")
+            # Limpiar el campo y mantener la ventana abierta
+            ent.delete(0, tk.END)
+            ent.focus_set()
+
     ventana = tk.Toplevel()
     ventana.title("Número de torno")
-    ventana.geometry("300x120")
+    ventana.geometry("300x150")  # Aumenté un poco el tamaño para mejor visualización
     ventana.resizable(False, False)
-    tk.Label(ventana, text="Número de torno:", font=("Arial", 12)).pack(pady=10)
-    ent = tk.Entry(ventana, font=("Arial", 12)); ent.pack(pady=5)
-    tk.Button(ventana, text="Aceptar", command=confirmar).pack(pady=5)
+    
+    tk.Label(ventana, 
+             text="Número de torno (1 o 2):",  # Especificamos los valores válidos
+             font=("Arial", 12)).pack(pady=10)
+             
+    ent = tk.Entry(ventana, font=("Arial", 12))
+    ent.pack(pady=5)
+    
+    tk.Button(ventana, 
+              text="Aceptar", 
+              command=confirmar).pack(pady=5)
+    
+    # Enfocar el campo de entrada al abrir la ventana
+    ent.focus_set()
     ventana.grab_set()
+
 
 def pedir_fecha(callback):
     ventana = tk.Toplevel()
