@@ -123,7 +123,6 @@ def pedir_fecha(callback):
     ventana.grab_set()
 
 def iniciar(texto, torno, mes, dia, anio):
-    escribir_log("Inicio de iniciar")
     mostrar_carga()
     threading.Thread(target=lambda: ejecutar(texto, torno, mes, dia, anio), daemon=True).start()
 
@@ -353,7 +352,7 @@ def escribir_valor_bloque(hoja, col_dia, torno, valor, tipo_bloque):
 
 def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque, tipos_bloque):
     """Escribe las referencias de Excel directamente sin calcular valores."""
-    escribir_log("Inicio de esccribir_valores_resumen_bloques")
+    escribir_log("Inicio de escribir_valores_resumen_bloques")
     for i, (tipo_bloque, referencia) in enumerate(zip(tipos_bloque, valores_ae_por_bloque)):
         try:
             tipo_bloque = tipo_bloque.strip().upper()
@@ -585,6 +584,7 @@ def dias_en_mes(mes, anio):
     meses_31_dias = ["Enero", "Marzo", "Mayo", "Julio", "Agosto", "Octubre", "Diciembre"]
     return 31 if mes in meses_31_dias else 30
 
+escribir_log("Inicio de la ejecucion")
 ventana = tk.Tk()
 ventana.title("Ingresar datos")
 entrada_texto = tk.Text(ventana, width=100, height=30)
