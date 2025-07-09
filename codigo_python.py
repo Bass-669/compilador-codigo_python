@@ -4,6 +4,7 @@ from datetime import datetime
 from tkinter import messagebox, ttk
 from tkcalendar import DateEntry
 import threading
+import tempfile
 
 BASE_DIR = os.path.dirname(sys.executable if getattr(sys, 'frozen', False) else os.path.abspath(__file__))
 CARPETA, ARCHIVO = "reportes", "Reporte IR Tornos.xlsx"
