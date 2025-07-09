@@ -189,31 +189,31 @@ def ejecutar(txt, torno, mes, dia, anio):
 #         wb = openpyxl.load_workbook(RUTA_ENTRADA)
 #         hoja = wb["IR diario "]
 #         ultima_fila = None
-#         # Buscar última fila con patrón "* * ..."
-#         for fila in hoja.iter_rows():
-#             if [str(c.value).strip() if c.value else "" for c in fila[:3]] == ["*", "*", "..."]:
-#                 ultima_fila = fila[0].row
-#         if not ultima_fila:
-#             raise ValueError("No se encontró '* * ...'")
-#         fila = ultima_fila + 1
-#         for b in extraer_bloques(entrada):
-#             try:
-#                 f_ini = fila
-#                 subs = sub_bloques(b)
-#                 filas_validas = []
-#                 # Procesar cada subbloque
-#                 for sub in subs:
-#                     txt = sub[0] if not re.match(r'^\d', sub[0]) else ""
-#                     datos = sub[1:] if txt else sub
-#                     # Construir datos de columnas
-#                     p = txt.split()
-#                     col_txt = (
-#                         [p[0], p[1], p[2], p[3], "", p[4]] if "*" in txt and len(p) >= 5 and p[0] == "*" else
-#                         ["*", "*", "...", "", "", ""] if "*" in txt else
-#                         [p[0], p[1], p[2], p[3], "", p[4]] if len(p) >= 5 else
-#                         ["", p[0], p[1], p[2], "", p[3]] if len(p) == 4 else
-#                         [""] * 6
-#                     )
+        # # Buscar última fila con patrón "* * ..."
+        # for fila in hoja.iter_rows():
+        #     if [str(c.value).strip() if c.value else "" for c in fila[:3]] == ["*", "*", "..."]:
+        #         ultima_fila = fila[0].row
+        # if not ultima_fila:
+        #     raise ValueError("No se encontró '* * ...'")
+        # fila = ultima_fila + 1
+        # for b in extraer_bloques(entrada):
+        #     try:
+        #         f_ini = fila
+        #         subs = sub_bloques(b)
+        #         filas_validas = []
+        #         # Procesar cada subbloque
+        #         for sub in subs:
+        #             txt = sub[0] if not re.match(r'^\d', sub[0]) else ""
+        #             datos = sub[1:] if txt else sub
+        #             # Construir datos de columnas
+        #             p = txt.split()
+        #             col_txt = (
+        #                 [p[0], p[1], p[2], p[3], "", p[4]] if "*" in txt and len(p) >= 5 and p[0] == "*" else
+        #                 ["*", "*", "...", "", "", ""] if "*" in txt else
+        #                 [p[0], p[1], p[2], p[3], "", p[4]] if len(p) >= 5 else
+        #                 ["", p[0], p[1], p[2], "", p[3]] if len(p) == 4 else
+        #                 [""] * 6
+        #             )
 #                     col_nums = [val for l in datos for val in l.strip().split()]
 #                     fila_vals = col_txt + col_nums
 #                     # Escribir valores en las celdas (columnas 1-24)
@@ -320,34 +320,22 @@ def procesar_datos(entrada, torno, mes, dia, anio):
             
         hoja = wb["IR diario "]
         ultima_fila = None
-        
         # Buscar última fila con patrón "* * ..."
         for fila in hoja.iter_rows():
             if [str(c.value).strip() if c.value else "" for c in fila[:3]] == ["*", "*", "..."]:
                 ultima_fila = fila[0].row
-                break
-                
         if not ultima_fila:
-            error_msg = "No se encontró el patrón '* * ...' en la hoja"
-            messagebox.showerror("Error", error_msg)
-            escribir_log("ERROR - Patrón '* * ...' no encontrado", nivel="error")
-            return None, None
-            
+            raise ValueError("No se encontró '* * ...'")
         fila = ultima_fila + 1
-        
-        # Procesar cada bloque de datos
-        escribir_log(f"Procesando {len(extraer_bloques(entrada))} bloques...")
         for b in extraer_bloques(entrada):
             try:
                 f_ini = fila
                 subs = sub_bloques(b)
                 filas_validas = []
-                
                 # Procesar cada subbloque
                 for sub in subs:
                     txt = sub[0] if not re.match(r'^\d', sub[0]) else ""
                     datos = sub[1:] if txt else sub
-                    
                     # Construir datos de columnas
                     p = txt.split()
                     col_txt = (
