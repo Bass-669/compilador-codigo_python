@@ -309,7 +309,6 @@ def procesar_datos(entrada, torno, mes, dia, anio):
     wb = None
     try:
         # Intentar abrir el workbook
-        escribir_log("Abriendo workbook...")
         wb = openpyxl.load_workbook(RUTA_ENTRADA)
         
         # Verificar si existe la hoja "IR diario "
@@ -323,11 +322,9 @@ def procesar_datos(entrada, torno, mes, dia, anio):
         ultima_fila = None
         
         # Buscar última fila con patrón "* * ..."
-        escribir_log("Buscando última fila con datos...")
         for fila in hoja.iter_rows():
             if [str(c.value).strip() if c.value else "" for c in fila[:3]] == ["*", "*", "..."]:
                 ultima_fila = fila[0].row
-                escribir_log(f"Última fila encontrada: {ultima_fila}")
                 break
                 
         if not ultima_fila:
@@ -419,7 +416,6 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                 # Guardar cambios después de cada bloque
                 try:
                     wb.save(RUTA_ENTRADA)
-                    escribir_log(f"Bloque guardado (filas {f_ini}-{f_fin})")
                 except PermissionError:
                     error_msg = "El archivo Excel fue bloqueado durante la ejecución. Por favor ciérrelo."
                     messagebox.showerror("Error", error_msg)
