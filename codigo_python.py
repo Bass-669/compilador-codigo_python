@@ -5,6 +5,8 @@ from tkinter import messagebox, ttk
 from tkcalendar import DateEntry
 import threading
 import tempfile
+import logging
+from logging.handlers import RotatingFileHandler
 
 BASE_DIR = os.path.dirname(sys.executable if getattr(sys, 'frozen', False) else os.path.abspath(__file__))
 CARPETA, ARCHIVO = "reportes", "Reporte IR Tornos.xlsx"
@@ -21,11 +23,6 @@ MESES_NUM = {
 BORDER = Border(*(Side(style='thin'),)*4)
 ALIGN_R = Alignment(horizontal='right')
 FILL_AMARILLO = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
-
-import logging
-from logging.handlers import RotatingFileHandler
-import os
-import tempfile
 
 def configurar_logging():
     """Configura un sistema de logging robusto con rotación de archivos"""
@@ -73,6 +70,7 @@ def configurar_logging():
 
 # Uso en el código:
 logger = configurar_logging()
+escribir_log(f"------------------------------------------------------------")
 
 def escribir_log(mensaje, nivel="info"):
     """Función para escribir en el log de manera segura"""
@@ -87,7 +85,6 @@ def escribir_log(mensaje, nivel="info"):
             logger.debug(mensaje)
     except Exception as e:
         escribir_log(f"Error al escribir en log: {e}", file=sys.stderr)
-
 
 def obtener_datos():
     datos = entrada_texto.get("1.0", tk.END).strip()
@@ -169,6 +166,7 @@ def ejecutar(txt, torno, mes, dia, anio):
             fecha(mes, dia, anio, torno, bloques, porcentajes, incrementar_barra)
     except Exception as e:
         messagebox.showerror("Error", f"Ocurrió un error en ejecutar():\n{e}")
+        escribir_log("Error", f"Ocurrió un error en ejecutar():\n{e}")
     finally:
         cerrar_carga()
         ventana.destroy()
@@ -178,6 +176,7 @@ def procesar_datos(entrada, torno, mes, dia, anio):
     sumas_ad_por_bloque = []
     if not os.path.exists(RUTA_ENTRADA):
         messagebox.showerror("Error", f"No se encontró:\n{RUTA_ENTRADA}")
+        escribir_log("Error", f"No se encontró:\n{RUTA_ENTRADA}")
         return None, None
     try:
         wb = openpyxl.load_workbook(RUTA_ENTRADA)
@@ -263,6 +262,7 @@ def procesar_datos(entrada, torno, mes, dia, anio):
         return bloques_detectados, sumas_ad_por_bloque
     except Exception as e:
         messagebox.showerror("Error", f"Error general: {e}")
+        escribir_log("Error", f"Error general: {e}")
         return None, None
     finally:
         if 'wb' in locals():
@@ -280,6 +280,7 @@ def Pasar_referencia(celda_origen):
     """Retorna la referencia CORRECTAMENTE formateada"""
     if not re.match(r'^AD\d+$', celda_origen):
         messagebox.showerror("Error", f"Formato de celda inválido: {celda_origen}")
+        escribir_log("Error", f"Formato de celda inválido: {celda_origen}")
         raise ValueError(f"Formato de celda inválido: {celda_origen}")
     # FORMATO REQUERIDO POR EXCEL:
     referencia = f"='IR diario '!{celda_origen}"
@@ -327,6 +328,7 @@ def escribir_valor_bloque(hoja, col_dia, torno, valor, tipo_bloque):
         fila_valor = 8 if torno == 1 else 9
     else:
         messagebox.showwarning("Advertencia", f"Tipo de bloque no reconocido: '{tipo_bloque}'")
+        escribir_log("Advertencia", f"Tipo de bloque no reconocido: '{tipo_bloque}'")
         return
     try:
         if valor is None:
@@ -376,6 +378,7 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, increm
         # Verificar si la hoja existe
         if nombre_hoja not in wb.sheetnames:
             messagebox.showerror("Error", f"No se encontró la hoja '{nombre_hoja}'")
+            escribir_log("Error", f"No se encontró la hoja '{nombre_hoja}'")
             return False
         hoja_mes = wb[nombre_hoja]
         nueva_fecha = f"{dia:02d}/{MESES_NUM[mes]:02d}/{anio}"
@@ -387,6 +390,7 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, increm
                 celda.value = nueva_fecha
             except Exception as e:
                 messagebox.showwarning("Advertencia", f"Error escribiendo fecha en {fila},{col_dia}: {str(e)}")
+                escribir_log("Advertencia", f"Error escribiendo fecha en {fila},{col_dia}: {str(e)}")
         # 3. Escribir valores de bloques
         valores_para_escribir = [val for i, (tipo, val) in enumerate(bloques_detectados) if i % 2 == 1]
         tipos_para_escribir = [tipo for i, (tipo, val) in enumerate(bloques_detectados) if i % 2 == 1]
@@ -411,6 +415,12 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, increm
             "2. Tenga permisos de escritura\n"
             "3. La hoja exista en el archivo"
         )
+        escribir_log(f"Error", 
+            f"No se pudo escribir en hoja:\n{str(e)}\n\n"
+            "Verifique que:\n"
+            "1. El archivo no esté abierto en Excel\n"
+            "2. Tenga permisos de escritura\n"
+            "3. La hoja exista en el archivo")
         return False
     finally:
         # 6. Cerrar el workbook si está abierto
@@ -419,12 +429,15 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, increm
                 wb.close()
             except:
                 messagebox.showwarning("Advertencia", "Error al cerrar el workbook")
+                escribir_log("Advertencia", "Error al cerrar el workbook")
         # 7. Actualizar barra de progreso
         incrementar_barra(100)
         # 8. Mostrar mensaje de éxito solo si todo salió bien
         if exito:
             messagebox.showinfo("Éxito", "✅ Valores actualizados correctamente.")
+            escribir_log("Éxito", "✅ Valores actualizados correctamente")
             escribir_log(f"Fin de la ejecucucion")
+            escribir_log(" \n ")
 
 def preparar_hoja_mes(mes, dia, anio):
     """Crea la hoja del mes si no existe y la configura con fórmulas iniciales."""
