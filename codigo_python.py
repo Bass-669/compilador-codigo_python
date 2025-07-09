@@ -70,7 +70,6 @@ def configurar_logging():
 
 # Uso en el código:
 logger = configurar_logging()
-escribir_log(f"------------------------------------------------------------")
 
 def escribir_log(mensaje, nivel="info"):
     """Función para escribir en el log de manera segura"""
@@ -85,6 +84,8 @@ def escribir_log(mensaje, nivel="info"):
             logger.debug(mensaje)
     except Exception as e:
         escribir_log(f"Error al escribir en log: {e}", file=sys.stderr)
+
+escribir_log(f"------------------------------------------------------------")
 
 def obtener_datos():
     datos = entrada_texto.get("1.0", tk.END).strip()
