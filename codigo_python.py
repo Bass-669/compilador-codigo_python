@@ -24,6 +24,8 @@ FILL_AMARILLO = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type=
 
 def configurar_logging():
     """Configuración de logging definitiva que evita el error NoneType"""
+    from tkinter import messagebox  # Por si aún no se ha importado
+
     class Logger:
         def __init__(self):
             self.terminal = sys.stdout
@@ -36,21 +38,32 @@ def configurar_logging():
                 os.path.join(BASE_DIR, "log.txt"),
                 os.path.join(tempfile.gettempdir(), "log_tornos.txt")
             ]
-            
-            os.makedirs(os.path.join(BASE_DIR, CARPETA), exist_ok=True)
-            
+            try:
+                os.makedirs(os.path.join(BASE_DIR, CARPETA), exist_ok=True)
+            except Exception as e:
+                print(f"No se pudo crear la carpeta de logs: {str(e)}", file=sys.stderr)
+
             for ruta in posibles_rutas:
                 try:
                     return open(ruta, "a", encoding='utf-8')
                 except (IOError, OSError) as e:
                     print(f"No se pudo crear log en {ruta}: {str(e)}", file=sys.stderr)
-            
-            print("ADVERTENCIA: No se pudo crear archivo de log en ninguna ubicación", file=sys.stderr)
+
+            # Si falla todo
+            print("⚠ ADVERTENCIA: No se pudo crear archivo de log en ninguna ubicación", file=sys.stderr)
+            messagebox.showwarning(
+                "Logging deshabilitado",
+                "⚠ No se pudo crear el archivo de log.\nLa aplicación seguirá funcionando, pero sin registro."
+            )
             return None
-            
+
         def write(self, message):
             """Escribe tanto en consola como en archivo"""
-            self.terminal.write(message)
+            try:
+                self.terminal.write(message)
+            except Exception as e:
+                print(f"Error al escribir en terminal: {e}", file=sys.stderr)
+
             if self.log_file:
                 try:
                     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -58,23 +71,37 @@ def configurar_logging():
                     self.log_file.flush()
                 except Exception as e:
                     self.terminal.write(f"\nError en logger: {str(e)}\n")
+                    try:
+                        self.log_file.close()
+                    except:
+                        pass
                     self.log_file = None
-            
+
         def flush(self):
             """Forzar descarga de buffers"""
-            self.terminal.flush()
+            try:
+                self.terminal.flush()
+            except:
+                pass
             if self.log_file:
-                self.log_file.flush()
-                
+                try:
+                    self.log_file.flush()
+                except:
+                    pass
+
         def close(self):
             """Cierre seguro del archivo"""
             if self.log_file:
-                self.log_file.close()
-    
+                try:
+                    self.log_file.close()
+                except:
+                    pass
+
     # Configuración final
     logger = Logger()
     sys.stdout = logger
     return logger  # Para mantener referencia activa
+
 
 # Configurar logging
 logger_global = configurar_logging()  # Mantiene referencia activa
