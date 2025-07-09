@@ -506,7 +506,7 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, increm
         # 8. Mostrar mensaje de éxito solo si todo salió bien
         if exito:
             messagebox.showinfo("Éxito", "✅ Valores actualizados correctamente.")
-            escribir_log("Éxito", "✅ Valores actualizados correctamente")
+            escribir_log(f"Éxito", "✅ Valores actualizados correctamente")
             escribir_log(f"Fin de la ejecucucion \n")
 
 def preparar_hoja_mes(mes, dia, anio):
