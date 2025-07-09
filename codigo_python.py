@@ -23,54 +23,61 @@ ALIGN_R = Alignment(horizontal='right')
 FILL_AMARILLO = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
 
 def configurar_logging():
-    """Configura el sistema de logging con múltiples fallbacks"""
+    """Configuración de logging definitiva que evita el error NoneType"""
     class Logger:
         def __init__(self):
             self.terminal = sys.stdout
-            self.log = None
-            log_paths = [
-                os.path.join(BASE_DIR, CARPETA, "log.txt"),  # Primera opción: carpeta reportes
-                os.path.join(BASE_DIR, "log.txt"),           # Segunda opción: carpeta principal
-                os.path.join(tempfile.gettempdir(), "log_tornos.txt")  # Tercera opción: temp
+            self.log_file = self._inicializar_archivo_log()
+            
+        def _inicializar_archivo_log(self):
+            """Intenta crear el archivo de log en múltiples ubicaciones"""
+            posibles_rutas = [
+                os.path.join(BASE_DIR, CARPETA, "log.txt"),
+                os.path.join(BASE_DIR, "log.txt"),
+                os.path.join(tempfile.gettempdir(), "log_tornos.txt")
             ]
             
-            # Asegurar que la carpeta reportes existe
             os.makedirs(os.path.join(BASE_DIR, CARPETA), exist_ok=True)
             
-            for path in log_paths:
+            for ruta in posibles_rutas:
                 try:
-                    self.log = open(path, "a", encoding='utf-8')
-                    print(f"Log activo en: {path}")  # Confirmación de ubicación
-                    break
-                except Exception as e:
-                    print(f"No se pudo abrir log en {path}: {str(e)}")
+                    return open(ruta, "a", encoding='utf-8')
+                except (IOError, OSError) as e:
+                    print(f"No se pudo crear log en {ruta}: {str(e)}", file=sys.stderr)
             
-            if self.log is None:
-                print("Advertencia: No se pudo crear archivo de log en ninguna ubicación")
+            print("ADVERTENCIA: No se pudo crear archivo de log en ninguna ubicación", file=sys.stderr)
+            return None
             
         def write(self, message):
+            """Escribe tanto en consola como en archivo"""
             self.terminal.write(message)
-            if self.log is not None:
+            if self.log_file:
                 try:
                     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                    self.log.write(f"[{timestamp}] {message}")
-                    self.log.flush()  # Forzar escritura inmediata
+                    self.log_file.write(f"[{timestamp}] {message}")
+                    self.log_file.flush()
                 except Exception as e:
-                    self.terminal.write(f"\nError escribiendo en log: {str(e)}\n")
-                    self.log = None  # Desactivar log tras error
+                    self.terminal.write(f"\nError en logger: {str(e)}\n")
+                    self.log_file = None
             
         def flush(self):
-            if self.log is not None:
-                self.log.flush()
-            
+            """Forzar descarga de buffers"""
+            self.terminal.flush()
+            if self.log_file:
+                self.log_file.flush()
+                
         def close(self):
-            if self.log is not None:
-                self.log.close()
+            """Cierre seguro del archivo"""
+            if self.log_file:
+                self.log_file.close()
     
-    sys.stdout = Logger()
+    # Configuración final
+    logger = Logger()
+    sys.stdout = logger
+    return logger  # Para mantener referencia activa
 
 # Configurar logging
-configurar_logging()
+logger_global = configurar_logging()  # Mantiene referencia activa
 
 def obtener_datos():
     datos = entrada_texto.get("1.0", tk.END).strip()
