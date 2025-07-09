@@ -297,7 +297,7 @@ def procesar_datos(entrada, torno, mes, dia, anio):
     except PermissionError:
         error_msg = f"El archivo está abierto en Excel. Por favor cierre:\n{RUTA_ENTRADA}"
         messagebox.showerror("Error", error_msg)
-        escribir_log("ERROR - El archivo esta abierto", nivel="error")
+        escribir_log("ERROR - El archivo esta abierto \n", nivel="error")
         return None, None
     except Exception as e:
         error_msg = f"No se puede acceder al archivo:\n{str(e)}"
