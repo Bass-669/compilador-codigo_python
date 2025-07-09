@@ -5,9 +5,6 @@ from tkinter import messagebox, ttk
 from tkcalendar import DateEntry
 import threading
 
-# Configurar logging
-configurar_logging()
-
 BASE_DIR = os.path.dirname(sys.executable if getattr(sys, 'frozen', False) else os.path.abspath(__file__))
 CARPETA, ARCHIVO = "reportes", "Reporte IR Tornos.xlsx"
 RUTA_ENTRADA = os.path.join(BASE_DIR, CARPETA, ARCHIVO)
@@ -52,6 +49,9 @@ def configurar_logging():
                 self.log.close()
     
     sys.stdout = Logger()
+
+# Configurar logging
+configurar_logging()
 
 def obtener_datos():
     datos = entrada_texto.get("1.0", tk.END).strip()
