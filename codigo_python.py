@@ -5,6 +5,9 @@ from tkinter import messagebox, ttk
 from tkcalendar import DateEntry
 import threading
 
+# Configurar logging
+configurar_logging()
+
 BASE_DIR = os.path.dirname(sys.executable if getattr(sys, 'frozen', False) else os.path.abspath(__file__))
 CARPETA, ARCHIVO = "reportes", "Reporte IR Tornos.xlsx"
 RUTA_ENTRADA = os.path.join(BASE_DIR, CARPETA, ARCHIVO)
@@ -20,6 +23,35 @@ MESES_NUM = {
 BORDER = Border(*(Side(style='thin'),)*4)
 ALIGN_R = Alignment(horizontal='right')
 FILL_AMARILLO = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+
+def configurar_logging():
+    """Configura el sistema de logging con manejo de errores"""
+    class Logger:
+        def __init__(self):
+            self.terminal = sys.stdout
+            try:
+                self.log = open("log.txt", "a", encoding='utf-8')
+            except Exception as e:
+                print(f"No se pudo abrir el archivo de log: {e}")
+                self.log = None
+            
+        def write(self, message):
+            self.terminal.write(message)
+            if self.log:
+                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                try:
+                    self.log.write(f"[{timestamp}] {message}")
+                except Exception as e:
+                    self.terminal.write(f"Error escribiendo en log: {e}\n")
+            
+        def flush(self):
+            pass
+            
+        def close(self):
+            if self.log:
+                self.log.close()
+    
+    sys.stdout = Logger()
 
 def obtener_datos():
     datos = entrada_texto.get("1.0", tk.END).strip()
