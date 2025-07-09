@@ -23,46 +23,48 @@ ALIGN_R = Alignment(horizontal='right')
 FILL_AMARILLO = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
 
 def configurar_logging():
-    """Configura el sistema de logging en la carpeta de reportes"""
+    """Configura el sistema de logging con múltiples fallbacks"""
     class Logger:
         def __init__(self):
             self.terminal = sys.stdout
             self.log = None
+            log_paths = [
+                os.path.join(BASE_DIR, CARPETA, "log.txt"),  # Primera opción: carpeta reportes
+                os.path.join(BASE_DIR, "log.txt"),           # Segunda opción: carpeta principal
+                os.path.join(tempfile.gettempdir(), "log_tornos.txt")  # Tercera opción: temp
+            ]
             
             # Asegurar que la carpeta reportes existe
             os.makedirs(os.path.join(BASE_DIR, CARPETA), exist_ok=True)
             
-            try:
-                # Ruta completa del log en la carpeta reportes
-                log_path = os.path.join(BASE_DIR, CARPETA, "log.txt")
-                self.log = open(log_path, "a", encoding='utf-8')
-                print(f"Archivo de log creado en: {log_path}")
-            except Exception as e:
-                print(f"No se pudo crear el archivo de log: {str(e)}")
-                # Intento alternativo en directorio temporal
+            for path in log_paths:
                 try:
-                    temp_path = os.path.join(tempfile.gettempdir(), "log_tornos.txt")
-                    self.log = open(temp_path, "a", encoding='utf-8')
-                    print(f"Usando log alternativo en: {temp_path}")
-                except Exception as e2:
-                    print(f"No se pudo crear log alternativo: {str(e2)}")
+                    self.log = open(path, "a", encoding='utf-8')
+                    print(f"Log activo en: {path}")  # Confirmación de ubicación
+                    break
+                except Exception as e:
+                    print(f"No se pudo abrir log en {path}: {str(e)}")
+            
+            if self.log is None:
+                print("Advertencia: No se pudo crear archivo de log en ninguna ubicación")
             
         def write(self, message):
             self.terminal.write(message)
-            if self.log and not self.log.closed:
+            if self.log is not None:
                 try:
                     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                     self.log.write(f"[{timestamp}] {message}")
-                    self.log.flush()
+                    self.log.flush()  # Forzar escritura inmediata
                 except Exception as e:
                     self.terminal.write(f"\nError escribiendo en log: {str(e)}\n")
+                    self.log = None  # Desactivar log tras error
             
         def flush(self):
-            if self.log and not self.log.closed:
+            if self.log is not None:
                 self.log.flush()
             
         def close(self):
-            if self.log and not self.log.closed:
+            if self.log is not None:
                 self.log.close()
     
     sys.stdout = Logger()
