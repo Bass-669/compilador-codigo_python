@@ -6,6 +6,7 @@ from tkcalendar import DateEntry
 import threading
 import tempfile
 
+escribir_log(f"Inicio de la ejecucion")
 BASE_DIR = os.path.dirname(sys.executable if getattr(sys, 'frozen', False) else os.path.abspath(__file__))
 CARPETA, ARCHIVO = "reportes", "Reporte IR Tornos.xlsx"
 RUTA_ENTRADA = os.path.join(BASE_DIR, CARPETA, ARCHIVO)
@@ -424,6 +425,7 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, increm
         # 8. Mostrar mensaje de éxito solo si todo salió bien
         if exito:
             messagebox.showinfo("Éxito", "✅ Valores actualizados correctamente.")
+            escribir_log(f"Fin de la ejecucucion")
 
 def preparar_hoja_mes(mes, dia, anio):
     """Crea la hoja del mes si no existe y la configura con fórmulas iniciales."""
