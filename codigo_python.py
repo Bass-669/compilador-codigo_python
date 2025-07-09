@@ -30,22 +30,18 @@ def configurar_logging():
         os.path.join(BASE_DIR, CARPETA, "log_tornos.log"),
         os.path.join(tempfile.gettempdir(), "log_tornos.log")
     ]
-    
     # Configuración básica del logger
     logger = logging.getLogger('TornosLogger')
     logger.setLevel(logging.INFO)
-    
     # Formato del log
     formatter = logging.Formatter(
         '%(asctime)s - %(levelname)s - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
-    
     # Probar distintas ubicaciones
     for ruta in posibles_rutas:
         try:
             os.makedirs(os.path.dirname(ruta), exist_ok=True)
-            
             # Handler con rotación (5MB por archivo, 3 backups)
             handler = RotatingFileHandler(
                 ruta,
@@ -54,13 +50,11 @@ def configurar_logging():
                 encoding='utf-8'
             )
             handler.setFormatter(formatter)
-            
             logger.addHandler(handler)
             # logger.info(f"Logger configurado en: {ruta}")
             return logger
         except Exception as e:
             escribir_log(f" \n No se pudo configurar log en {ruta}: {e}", file=sys.stderr)
-    
     # Si fallan todas las rutas, crear logger de consola
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
@@ -68,7 +62,6 @@ def configurar_logging():
     logger.warning("No se pudo crear archivo de log. Usando consola.")
     return logger
 
-# Uso en el código:
 logger = configurar_logging()
 
 def escribir_log(mensaje, nivel="info"):
@@ -90,29 +83,12 @@ def obtener_datos():
     if not datos: return messagebox.showwarning("Advertencia", "Ingresa los datos.")
     pedir_torno(lambda t: pedir_fecha(lambda m,d,a: iniciar(datos, t, m, d, a)))
 
-# def pedir_torno(callback):
-#     def confirmar():
-#         val = ent.get().strip()
-#         if not val: return messagebox.showwarning("Advertencia", "Ingresa el número de torno.")
-#         try: callback(int(val)); ventana.destroy()
-#         except: messagebox.showerror("Error", "Debe ser un número.")
-#     ventana = tk.Toplevel()
-#     ventana.title("Número de torno")
-#     ventana.geometry("300x120")
-#     ventana.resizable(False, False)
-#     tk.Label(ventana, text="Número de torno:", font=("Arial", 12)).pack(pady=10)
-#     ent = tk.Entry(ventana, font=("Arial", 12)); ent.pack(pady=5)
-#     tk.Button(ventana, text="Aceptar", command=confirmar).pack(pady=5)
-#     ventana.grab_set()
-
-
 def pedir_torno(callback):
     def confirmar():
         val = ent.get().strip()
         if not val:
             messagebox.showwarning("Advertencia", "Ingresa el número de torno.")
             return
-            
         try:
             num_torno = int(val)
             if num_torno not in [1, 2]:
@@ -121,7 +97,6 @@ def pedir_torno(callback):
                 ent.delete(0, tk.END)
                 ent.focus_set()
                 return
-                
             callback(num_torno)
             ventana.destroy()
         except ValueError:
@@ -129,27 +104,21 @@ def pedir_torno(callback):
             # Limpiar el campo y mantener la ventana abierta
             ent.delete(0, tk.END)
             ent.focus_set()
-
     ventana = tk.Toplevel()
     ventana.title("Número de torno")
     ventana.geometry("300x150")  # Aumenté un poco el tamaño para mejor visualización
     ventana.resizable(False, False)
-    
     tk.Label(ventana, 
              text="Número de torno (1 o 2):",  # Especificamos los valores válidos
              font=("Arial", 12)).pack(pady=10)
-             
     ent = tk.Entry(ventana, font=("Arial", 12))
     ent.pack(pady=5)
-    
     tk.Button(ventana, 
               text="Aceptar", 
               command=confirmar).pack(pady=5)
-    
     # Enfocar el campo de entrada al abrir la ventana
     ent.focus_set()
     ventana.grab_set()
-
 
 def pedir_fecha(callback):
     ventana = tk.Toplevel()
