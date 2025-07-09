@@ -22,102 +22,71 @@ BORDER = Border(*(Side(style='thin'),)*4)
 ALIGN_R = Alignment(horizontal='right')
 FILL_AMARILLO = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
 
+import logging
+from logging.handlers import RotatingFileHandler
+import os
+import tempfile
+
 def configurar_logging():
-    """Configuración de logging robusta que captura todos los prints"""
-    class Logger:
-        def __init__(self):
-            self.terminal = sys.__stdout__  # Salida original
-            self.log_file = self._inicializar_archivo_log()
-            self._disabled = False
-            self._lock = threading.Lock()  # Para mayor seguridad en hilos
-
-        def _inicializar_archivo_log(self):
-            posibles_rutas = [
-                os.path.join(BASE_DIR, CARPETA, "log.txt"),
-                os.path.join(BASE_DIR, "log.txt"),
-                os.path.join(tempfile.gettempdir(), "log_tornos.txt")
-            ]
+    """Configura un sistema de logging robusto con rotación de archivos"""
+    posibles_rutas = [
+        os.path.join(BASE_DIR, CARPETA, "log_tornos.log"),
+        os.path.join(tempfile.gettempdir(), "log_tornos.log")
+    ]
+    
+    # Configuración básica del logger
+    logger = logging.getLogger('TornosLogger')
+    logger.setLevel(logging.INFO)
+    
+    # Formato del log
+    formatter = logging.Formatter(
+        '%(asctime)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    
+    # Probar distintas ubicaciones
+    for ruta in posibles_rutas:
+        try:
+            os.makedirs(os.path.dirname(ruta), exist_ok=True)
             
-            try:
-                os.makedirs(os.path.join(BASE_DIR, CARPETA), exist_ok=True)
-            except Exception as e:
-                self._safe_print(f"No se pudo crear carpeta de reportes: {e}")
-
-            for ruta in posibles_rutas:
-                try:
-                    return open(ruta, "a", encoding='utf-8')
-                except Exception as e:
-                    self._safe_print(f"Error en {ruta}: {str(e)}")
-            return None
-
-        def _safe_print(self, message):
-            """Método seguro para errores del propio logger"""
-            with self._lock:
-                if not self._disabled:
-                    self._disabled = True
-                    try:
-                        print(message, file=sys.__stderr__)
-                        if self.log_file:
-                            self.log_file.write(f"[!] {message}\n")
-                            self.log_file.flush()
-                    finally:
-                        self._disabled = False
-
-        def write(self, message):
-            """Escribe en terminal y archivo (captura TODOS los prints)"""
-            if not message.strip() or self._disabled:
-                return
-
-            with self._lock:
-                self._disabled = True
-                try:
-                    # Escribir en terminal
-                    self.terminal.write(message)
-                    
-                    # Escribir en log con timestamp
-                    if self.log_file:
-                        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                        self.log_file.write(f"[{timestamp}] {message}")
-                        self.log_file.flush()
-                except Exception as e:
-                    self._safe_print(f"Error en logger.write(): {str(e)}")
-                finally:
-                    self._disabled = False
-
-        def flush(self):
-            """Forzar escritura inmediata"""
-            with self._lock:
-                try:
-                    if self.terminal:
-                        self.terminal.flush()
-                    if self.log_file:
-                        self.log_file.flush()
-                except:
-                    pass
-
-        def close(self):
-            """Cierre seguro"""
-            with self._lock:
-                try:
-                    if self.log_file and not self.log_file.closed:
-                        self.log_file.close()
-                except:
-                    pass
-
-    # Configurar logger global
-    logger = Logger()
-    sys.stdout = logger
+            # Handler con rotación (5MB por archivo, 3 backups)
+            handler = RotatingFileHandler(
+                ruta,
+                maxBytes=5*1024*1024,
+                backupCount=3,
+                encoding='utf-8'
+            )
+            handler.setFormatter(formatter)
+            
+            logger.addHandler(handler)
+            logger.info(f"Logger configurado en: {ruta}")
+            return logger
+        except Exception as e:
+            escribir_log(f"No se pudo configurar log en {ruta}: {e}", file=sys.stderr)
     
-    # Mensaje inicial de prueba
-    print("\n" + "="*50)
-    print(f"Inicio de sesión: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"Ruta de log: {logger.log_file.name if logger.log_file else 'No se creó archivo'}")
-    print("="*50 + "\n")
-    
+    # Si fallan todas las rutas, crear logger de consola
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+    logger.warning("No se pudo crear archivo de log. Usando consola.")
     return logger
 
-# # Configurar logging
-# logger_global = configurar_logging()  # Mantiene referencia activa
+# Uso en el código:
+logger = configurar_logging()
+
+def escribir_log(mensaje, nivel="info"):
+    """Función para escribir en el log de manera segura"""
+    try:
+        if nivel.lower() == "info":
+            logger.info(mensaje)
+        elif nivel.lower() == "warning":
+            logger.warning(mensaje)
+        elif nivel.lower() == "error":
+            logger.error(mensaje)
+        else:
+            logger.debug(mensaje)
+    except Exception as e:
+        escribir_log(f"Error al escribir en log: {e}", file=sys.stderr)
 
 
 def obtener_datos():
@@ -286,7 +255,7 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                 wb.save(RUTA_ENTRADA)
                 shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
             except Exception as e:
-                print(f"Error en bloque: {e}")
+                escribir_log(f"Error en bloque: {e}")
                 continue
         # Copia de seguridad final
         backup_path = os.path.join(CARPETA, "Reporte IR Tornos copia_de_seguridad.xlsx")
@@ -389,10 +358,10 @@ def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque
             celda.value = referencia  # Ej: ='IR diario '!AD123
             celda.alignment = ALIGN_R  # Alineación derecha (opcional)
             # DEBUG (opcional)
-            print(f"Bloque {i} ({tipo_bloque}) | Torno {torno} | Fila {fila_valor}")
-            print(f"Referencia escrita: {referencia}")
+            escribir_log(f"Bloque {i} ({tipo_bloque}) | Torno {torno} | Fila {fila_valor}")
+            escribir_log(f"Referencia escrita: {referencia}")
         except Exception as e:
-            print(f"Error en bloque {i}: {str(e)}")
+            escribir_log(f"Error en bloque {i}: {str(e)}")
             continue  # Continuar con el siguiente bloque
 
 def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, incrementar_barra):
@@ -472,11 +441,11 @@ def preparar_hoja_mes(mes, dia, anio):
                 hoja_existente.cell(row=9, column=col_dia).value
             ]
             if any(cell is not None and str(cell).strip() != "" for cell in celdas_clave):
-                print(f"El día {dia} ya tiene datos en {nombre_hoja}")
+                escribir_log(f"El día {dia} ya tiene datos en {nombre_hoja}")
                 wb_check.close()
                 return True
             else:
-                print(f"La hoja {nombre_hoja} ya existe y se usará tal cual.")
+                escribir_log(f"La hoja {nombre_hoja} ya existe y se usará tal cual.")
                 wb_check.close()
                 return True
         wb_check.close()
