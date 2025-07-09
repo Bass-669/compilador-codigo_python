@@ -56,7 +56,7 @@ def configurar_logging():
             handler.setFormatter(formatter)
             
             logger.addHandler(handler)
-            logger.info(f"Logger configurado en: {ruta}")
+            # logger.info(f"Logger configurado en: {ruta}")
             return logger
         except Exception as e:
             escribir_log(f"No se pudo configurar log en {ruta}: {e}", file=sys.stderr)
@@ -84,8 +84,6 @@ def escribir_log(mensaje, nivel="info"):
             logger.debug(mensaje)
     except Exception as e:
         escribir_log(f"Error al escribir en log: {e}", file=sys.stderr)
-
-escribir_log(f"------------------------------------------------------------")
 
 def obtener_datos():
     datos = entrada_texto.get("1.0", tk.END).strip()
@@ -445,8 +443,7 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, increm
         if exito:
             messagebox.showinfo("Éxito", "✅ Valores actualizados correctamente.")
             escribir_log("Éxito", "✅ Valores actualizados correctamente")
-            escribir_log(f"Fin de la ejecucucion")
-            escribir_log(" \n ")
+            escribir_log(f"Fin de la ejecucucion \n")
 
 def preparar_hoja_mes(mes, dia, anio):
     """Crea la hoja del mes si no existe y la configura con fórmulas iniciales."""
@@ -584,7 +581,6 @@ def dias_en_mes(mes, anio):
     meses_31_dias = ["Enero", "Marzo", "Mayo", "Julio", "Agosto", "Octubre", "Diciembre"]
     return 31 if mes in meses_31_dias else 30
 
-escribir_log("Inicio de la ejecucion")
 ventana = tk.Tk()
 ventana.title("Ingresar datos")
 entrada_texto = tk.Text(ventana, width=100, height=30)
