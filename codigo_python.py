@@ -23,100 +23,101 @@ ALIGN_R = Alignment(horizontal='right')
 FILL_AMARILLO = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
 
 def configurar_logging():
-    """Configuración de logging completamente robusta sin recursión"""
+    """Configuración de logging robusta que captura todos los prints"""
     class Logger:
         def __init__(self):
-            self.terminal = sys.__stdout__  # Usamos __stdout__ directamente
+            self.terminal = sys.__stdout__  # Salida original
             self.log_file = self._inicializar_archivo_log()
-            self._disabled = False  # Bandera para evitar recursión
-            
+            self._disabled = False
+            self._lock = threading.Lock()  # Para mayor seguridad en hilos
+
         def _inicializar_archivo_log(self):
-            """Intenta crear el archivo de log con múltiples fallbacks"""
             posibles_rutas = [
                 os.path.join(BASE_DIR, CARPETA, "log.txt"),
                 os.path.join(BASE_DIR, "log.txt"),
                 os.path.join(tempfile.gettempdir(), "log_tornos.txt")
             ]
             
-            # Asegurar que la carpeta reportes existe
             try:
                 os.makedirs(os.path.join(BASE_DIR, CARPETA), exist_ok=True)
             except Exception as e:
                 self._safe_print(f"No se pudo crear carpeta de reportes: {e}")
-                return None
-            
+
             for ruta in posibles_rutas:
                 try:
                     return open(ruta, "a", encoding='utf-8')
-                except (IOError, OSError) as e:
-                    self._safe_print(f"No se pudo crear log en {ruta}: {e}")
-            
-            self._safe_print("ADVERTENCIA: No se pudo crear archivo de log en ninguna ubicación")
+                except Exception as e:
+                    self._safe_print(f"Error en {ruta}: {str(e)}")
             return None
-            
+
         def _safe_print(self, message):
-            """Método seguro para imprimir mensajes de error"""
-            if not self._disabled:
+            """Método seguro para errores del propio logger"""
+            with self._lock:
+                if not self._disabled:
+                    self._disabled = True
+                    try:
+                        print(message, file=sys.__stderr__)
+                        if self.log_file:
+                            self.log_file.write(f"[!] {message}\n")
+                            self.log_file.flush()
+                    finally:
+                        self._disabled = False
+
+        def write(self, message):
+            """Escribe en terminal y archivo (captura TODOS los prints)"""
+            if not message.strip() or self._disabled:
+                return
+
+            with self._lock:
                 self._disabled = True
                 try:
-                    print(message, file=sys.__stderr__)
-                finally:
-                    self._disabled = False
-            
-        def write(self, message):
-            """Escribe en terminal y archivo de forma segura"""
-            if self._disabled:
-                return
-                
-            self._disabled = True
-            try:
-                # Escribir en terminal
-                self.terminal.write(message)
-                
-                # Escribir en archivo si está disponible
-                if self.log_file and not self.log_file.closed:
-                    try:
+                    # Escribir en terminal
+                    self.terminal.write(message)
+                    
+                    # Escribir en log con timestamp
+                    if self.log_file:
                         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                         self.log_file.write(f"[{timestamp}] {message}")
                         self.log_file.flush()
-                    except Exception as e:
-                        self.log_file = None
-                        self._safe_print(f"Error escribiendo en log: {e}")
-            except Exception as e:
-                self._safe_print(f"Error crítico en logger: {e}")
-            finally:
-                self._disabled = False
-                
+                except Exception as e:
+                    self._safe_print(f"Error en logger.write(): {str(e)}")
+                finally:
+                    self._disabled = False
+
         def flush(self):
-            """Forzar descarga de buffers de forma segura"""
-            if self._disabled:
-                return
-                
-            try:
-                self.terminal.flush()
-                if self.log_file and not self.log_file.closed:
-                    self.log_file.flush()
-            except:
-                pass
-                
+            """Forzar escritura inmediata"""
+            with self._lock:
+                try:
+                    if self.terminal:
+                        self.terminal.flush()
+                    if self.log_file:
+                        self.log_file.flush()
+                except:
+                    pass
+
         def close(self):
-            """Cierre seguro del logger"""
-            if self._disabled:
-                return
-                
-            try:
-                if self.log_file and not self.log_file.closed:
-                    self.log_file.close()
-            except:
-                pass
-    
-    # Configurar y mantener referencia
+            """Cierre seguro"""
+            with self._lock:
+                try:
+                    if self.log_file and not self.log_file.closed:
+                        self.log_file.close()
+                except:
+                    pass
+
+    # Configurar logger global
     logger = Logger()
     sys.stdout = logger
+    
+    # Mensaje inicial de prueba
+    print("\n" + "="*50)
+    print(f"Inicio de sesión: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Ruta de log: {logger.log_file.name if logger.log_file else 'No se creó archivo'}")
+    print("="*50 + "\n")
+    
     return logger
 
-# Configurar logging
-logger_global = configurar_logging()  # Mantiene referencia activa
+# # Configurar logging
+# logger_global = configurar_logging()  # Mantiene referencia activa
 
 
 def obtener_datos():
