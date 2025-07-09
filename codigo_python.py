@@ -178,7 +178,7 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                     for col in range(25, 30):
                         hoja.cell(row=f_fin, column=col, value="")
                 try:
-                    temp_path, valor_ae = Pasar_referencia(f"AD{f_fin}")
+                    valor_ae = Pasar_referencia(f"AD{f_fin}")
                     sumas_ad_por_bloque.append(valor_ae) 
                 except Exception as e:
                     sumas_ad_por_bloque.append(0.0)
@@ -222,7 +222,7 @@ def Pasar_referencia(celda_origen):
     #                   f"2. 'IR diario ' entre comillas simples\n"
     #                   f"3. ! antes de AD\n"
     #                   f"4. Número válido")
-    return None, referencia
+    return referencia
 
 def extraer_bloques(txt):
     lineas = [l.strip() for l in txt.strip().split("\n") if l.strip()]
