@@ -403,28 +403,70 @@ def escribir_valor_bloque(hoja, col_dia, torno, valor, tipo_bloque):
     celda.value = valor_final
     celda.number_format = '0'
 
+# def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque, tipos_bloque):
+#     """Escribe las referencias de Excel directamente sin calcular valores."""
+#     escribir_log("Inicio de escribir_valores_resumen_bloques")
+#     for i, (tipo_bloque, referencia) in enumerate(zip(tipos_bloque, valores_ae_por_bloque)):
+#         try:
+#             tipo_bloque = tipo_bloque.strip().upper()
+#             # Determinar fila destino
+#             if tipo_bloque == "PODADO":
+#                 fila_valor = 13 if torno == 1 else 14
+#             elif tipo_bloque == "REGULAR":
+#                 fila_valor = 18 if torno == 1 else 19
+#             else:
+#                 continue  # Saltar tipos no reconocidos
+#             # Escribir la referencia
+#             celda = hoja.cell(row=fila_valor, column=col_dia)
+#             celda.value = referencia  # Ej: ='IR diario '!AD123
+#             celda.alignment = ALIGN_R  # Alineación derecha (opcional)
+#             escribir_log(f"Bloque {i} ({tipo_bloque}) | Torno {torno} | Fila {fila_valor}")
+#             escribir_log(f"Referencia escrita: {referencia}")
+#         except Exception as e:
+#             escribir_log(f"Error en bloque {i}: {str(e)}")
+#             continue  # Continuar con el siguiente bloque
+
+
 def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque, tipos_bloque):
-    """Escribe las referencias de Excel directamente sin calcular valores."""
+    """Escribe referencias y fórmulas en las celdas correspondientes"""
     escribir_log("Inicio de escribir_valores_resumen_bloques")
-    for i, (tipo_bloque, referencia) in enumerate(zip(tipos_bloque, valores_ae_por_bloque)):
-        try:
+    
+    letra = openpyxl.utils.get_column_letter(col_dia)
+    
+    try:
+        # 1. Escribir fórmulas para IR%
+        celda38 = hoja.cell(row=38, column=col_dia, value=f"=IFERROR({letra}32/{letra}23, 0)")
+        celda38.font = Font(color='000000')
+        
+        celda39 = hoja.cell(row=39, column=col_dia, value=f"=IFERROR({letra}33/{letra}24, 0)")
+        celda39.font = Font(color='000000')
+        
+        celda40 = hoja.cell(row=40, column=col_dia, value=f"=IFERROR({letra}34/{letra}28, 0)")
+        celda40.number_format = '0.00%'
+        celda40.font = Font(color='000000')
+        
+        # 2. Escribir referencias de bloques
+        for i, (tipo_bloque, referencia) in enumerate(zip(tipos_bloque, valores_ae_por_bloque)):
             tipo_bloque = tipo_bloque.strip().upper()
-            # Determinar fila destino
+            
             if tipo_bloque == "PODADO":
                 fila_valor = 13 if torno == 1 else 14
             elif tipo_bloque == "REGULAR":
                 fila_valor = 18 if torno == 1 else 19
             else:
-                continue  # Saltar tipos no reconocidos
-            # Escribir la referencia
+                continue
+                
             celda = hoja.cell(row=fila_valor, column=col_dia)
-            celda.value = referencia  # Ej: ='IR diario '!AD123
-            celda.alignment = ALIGN_R  # Alineación derecha (opcional)
+            celda.value = referencia
+            celda.alignment = ALIGN_R
+            
             escribir_log(f"Bloque {i} ({tipo_bloque}) | Torno {torno} | Fila {fila_valor}")
             escribir_log(f"Referencia escrita: {referencia}")
-        except Exception as e:
-            escribir_log(f"Error en bloque {i}: {str(e)}")
-            continue  # Continuar con el siguiente bloque
+            
+    except Exception as e:
+        escribir_log(f"Error en escribir_valores_resumen_bloques: {str(e)}", nivel="error")
+        raise
+
 
 def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, incrementar_barra):
     escribir_log("Inicio de fecha")
@@ -579,14 +621,14 @@ def preparar_hoja_mes(mes, dia, anio):
                 hoja.cell(row=fila, column=col, value=fecha)
         for col in range(2, 2 + dias_mes):
             letra = openpyxl.utils.get_column_letter(col)
-            hoja.cell(row=40, column=col, value=f"=IFERROR({letra}34/{letra}28, 0)").number_format = '0.00%'= Font(color='000000')
+            # hoja.cell(row=40, column=col, value=f"=IFERROR({letra}34/{letra}28, 0)").number_format = '0.00%'
             # hoja.cell(row=40, column=col).font = Font(color='000000')
             hoja.cell(row=34, column=col, value=f"=IFERROR(AVERAGE({letra}32:{letra}33), 0)").number_format = '0.00%'
             hoja.cell(row=23, column=col, value=f"=IFERROR(({letra}3*{letra}13+{letra}8*{letra}18)/({letra}3+{letra}8), 0)")
             hoja.cell(row=24, column=col, value=f"=IFERROR(({letra}4*{letra}14+{letra}9*{letra}19)/({letra}4+{letra}9), 0)")
             hoja.cell(row=28, column=col, value=f"=IFERROR(({letra}23*({letra}3+{letra}8)+{letra}24*({letra}4+{letra}9))/({letra}3+{letra}4+{letra}8+{letra}9), 0)")
-            hoja.cell(row=38, column=col, value=f"=IFERROR({letra}32/{letra}23, 0)").font = Font(color='000000')
-            hoja.cell(row=39, column=col, value=f"=IFERROR({letra}33/{letra}24, 0)").font = Font(color='000000')
+            # hoja.cell(row=38, column=col, value=f"=IFERROR({letra}32/{letra}23, 0)").font = Font(color='000000')
+            # hoja.cell(row=39, column=col, value=f"=IFERROR({letra}33/{letra}24, 0)").font = Font(color='000000')
         hoja.cell(row=32, column=34, value="R%").font = Font(bold=True)
         hoja.cell(row=38, column=34, value="IR%").font = Font(bold=True)
         hoja.cell(row=32, column=34).alignment = hoja.cell(row=38, column=34).alignment = Alignment(horizontal='center', vertical='center')
