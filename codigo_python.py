@@ -579,8 +579,8 @@ def preparar_hoja_mes(mes, dia, anio):
                 hoja.cell(row=fila, column=col, value=fecha)
         for col in range(2, 2 + dias_mes):
             letra = openpyxl.utils.get_column_letter(col)
-            hoja.cell(row=40, column=col, value=f"=IFERROR({letra}34/{letra}28, 0)").number_format = '0.00%'
-            hoja.cell(row=40, column=col).font = Font(color='000000')
+            hoja.cell(row=40, column=col, value=f"=IFERROR({letra}34/{letra}28, 0)").number_format = '0.00%'= Font(color='000000')
+            # hoja.cell(row=40, column=col).font = Font(color='000000')
             hoja.cell(row=34, column=col, value=f"=IFERROR(AVERAGE({letra}32:{letra}33), 0)").number_format = '0.00%'
             hoja.cell(row=23, column=col, value=f"=IFERROR(({letra}3*{letra}13+{letra}8*{letra}18)/({letra}3+{letra}8), 0)")
             hoja.cell(row=24, column=col, value=f"=IFERROR(({letra}4*{letra}14+{letra}9*{letra}19)/({letra}4+{letra}9), 0)")
