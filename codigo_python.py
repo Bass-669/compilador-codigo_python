@@ -485,13 +485,15 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, increm
             "1. El archivo no esté abierto en Excel\n"
             "2. Tenga permisos de escritura\n"
             "3. La hoja exista en el archivo"
-        )
-        escribir_log(f"Error", 
-            f"No se pudo escribir en hoja:\n{str(e)}\n\n"
-            "Verifique que:\n"
-            "1. El archivo no esté abierto en Excel\n"
-            "2. Tenga permisos de escritura\n"
-            "3. La hoja exista en el archivo")
+                )
+        error_msg = (
+            f"No se pudo escribir en hoja: {str(e)}. "
+            "Verifique que: "
+            "1) El archivo no esté abierto en Excel, "
+            "2) Tenga permisos de escritura, "
+            "3) La hoja exista en el archivo"
+                )
+        escribir_log(error_msg, "error")
         return False
     finally:
         # 6. Cerrar el workbook si está abierto
