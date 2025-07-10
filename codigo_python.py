@@ -403,46 +403,6 @@ def escribir_valor_bloque(hoja, col_dia, torno, valor, tipo_bloque):
     celda.value = valor_final
     celda.number_format = '0'
 
-# def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque, tipos_bloque):
-#     """Escribe referencias y fórmulas en las celdas correspondientes"""
-#     escribir_log("Inicio de escribir_valores_resumen_bloques")
-    
-#     letra = openpyxl.utils.get_column_letter(col_dia)
-    
-#     try:
-#         # 1. Escribir fórmulas para IR%
-#         celda38 = hoja.cell(row=38, column=col_dia, value=f"=IFERROR({letra}32/{letra}23, 0)")
-#         celda38.font = Font(color='000000')
-#         celda39 = hoja.cell(row=39, column=col_dia, value=f"=IFERROR({letra}33/{letra}24, 0)")
-#         celda39.font = Font(color='000000')
-#         celda40 = hoja.cell(row=40, column=col_dia, value=f"=IFERROR({letra}34/{letra}28, 0)")
-#         celda40.number_format = '0.00%'
-#         celda40.font = Font(color='000000')
-#         hoja.cell(row=34, column=col_dia, value=f"=IFERROR(AVERAGE({letra}32:{letra}33), 0)").number_format = '0.00%'
-        
-#         # 2. Escribir referencias de bloques
-#         for i, (tipo_bloque, referencia) in enumerate(zip(tipos_bloque, valores_ae_por_bloque)):
-#             tipo_bloque = tipo_bloque.strip().upper()
-            
-#             if tipo_bloque == "PODADO":
-#                 fila_valor = 13 if torno == 1 else 14
-#             elif tipo_bloque == "REGULAR":
-#                 fila_valor = 18 if torno == 1 else 19
-#             else:
-#                 continue
-                
-#             celda = hoja.cell(row=fila_valor, column=col_dia)
-#             celda.value = referencia
-#             celda.alignment = ALIGN_R
-            
-#             escribir_log(f"Bloque {i} ({tipo_bloque}) | Torno {torno} | Fila {fila_valor}")
-#             escribir_log(f"Referencia escrita: {referencia}")
-            
-#     except Exception as e:
-#         escribir_log(f"Error en escribir_valores_resumen_bloques: {str(e)}", nivel="error")
-#         raise
-
-
 def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque, tipos_bloque):
     """Escribe referencias y fórmulas en las celdas correspondientes"""
     escribir_log("Inicio de escribir_valores_resumen_bloques")
@@ -451,19 +411,15 @@ def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque
     
     try:
         # 1. Escribir fórmulas para los cálculos
-        # Fila 34: Promedio de los valores de las filas 32 y 33 en la MISMA columna
         hoja.cell(row=34, column=col_dia, 
                  value=f"=IFERROR(AVERAGE({letra_actual}32:{letra_actual}33), 0)").number_format = '0.00%'
         
-        # Fila 38: División entre valor en fila 32 y fila 23 (misma columna)
         hoja.cell(row=38, column=col_dia, 
                  value=f"=IFERROR({letra_actual}32/{letra_actual}23, 0)").font = Font(color='000000')
         
-        # Fila 39: División entre valor en fila 33 y fila 24 (misma columna)
         hoja.cell(row=39, column=col_dia, 
                  value=f"=IFERROR({letra_actual}33/{letra_actual}24, 0)").font = Font(color='000000')
         
-        # Fila 40: División entre valor en fila 34 y fila 28 (misma columna)
         hoja.cell(row=40, column=col_dia, 
                  value=f"=IFERROR({letra_actual}34/{letra_actual}28, 0)").number_format = '0.00%'
         hoja.cell(row=40, column=col_dia).font = Font(color='000000')
