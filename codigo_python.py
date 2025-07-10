@@ -42,7 +42,6 @@ def configurar_logging():
     for ruta in posibles_rutas:
         try:
             os.makedirs(os.path.dirname(ruta), exist_ok=True)
-            # Handler con rotación (5MB por archivo, 3 backups)
             handler = RotatingFileHandler(
                 ruta,
                 maxBytes=5*1024*1024,
@@ -51,7 +50,6 @@ def configurar_logging():
             )
             handler.setFormatter(formatter)
             logger.addHandler(handler)
-            # logger.info(f"Logger configurado en: {ruta}")
             return logger
         except Exception as e:
             escribir_log(f" \n No se pudo configurar log en {ruta}: {e}", file=sys.stderr)
@@ -93,7 +91,6 @@ def pedir_torno(callback):
             num_torno = int(val)
             if num_torno not in [1, 2]:
                 messagebox.showwarning("Valor incorrecto", "El número de torno debe ser 1 o 2.")
-                # Limpiar el campo y mantener la ventana abierta
                 ent.delete(0, tk.END)
                 ent.focus_set()
                 return
@@ -106,17 +103,16 @@ def pedir_torno(callback):
             ent.focus_set()
     ventana = tk.Toplevel()
     ventana.title("Número de torno")
-    ventana.geometry("300x150")  # Aumenté un poco el tamaño para mejor visualización
+    ventana.geometry("300x150")
     ventana.resizable(False, False)
     tk.Label(ventana, 
-             text="Número de torno (1 o 2):",  # Especificamos los valores válidos
+             text="Número de torno (1 o 2):",
              font=("Arial", 12)).pack(pady=10)
     ent = tk.Entry(ventana, font=("Arial", 12))
     ent.pack(pady=5)
     tk.Button(ventana, 
               text="Aceptar", 
               command=confirmar).pack(pady=5)
-    # Enfocar el campo de entrada al abrir la ventana
     ent.focus_set()
     ventana.grab_set()
 
@@ -174,12 +170,10 @@ def ejecutar(txt, torno, mes, dia, anio):
         # Paso 2: Procesar datos (25-75%)
         incrementar_barra(50)
         bloques, porcentajes = procesar_datos(txt, torno, mes, dia, anio)
-
         # Si hay error de permisos, terminamos
         if bloques is None or porcentajes is None:
             incrementar_barra(100)
             return False
-
         # Paso intermedio (50-75%)
         incrementar_barra(75)
         # Paso 3: Escribir en hoja mensual (75-100%)
@@ -258,7 +252,6 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                     )
                     col_nums = [val for l in datos for val in l.strip().split()]
                     fila_vals = col_txt + col_nums
-                    
                     # Escribir valores en las celdas (columnas 1-24)
                     for col, val in enumerate(fila_vals[:24], 1):
                         try:
@@ -266,7 +259,6 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                             escribir(hoja, fila, col, n, isinstance(n, float))
                         except:
                             escribir(hoja, fila, col, val)
-                    
                     # Escribir metadatos (columnas 25-28)
                     for col, val in zip(range(25, 29), [torno, mes, dia, anio]):
                         hoja.cell(row=fila, column=col, value=val).alignment = ALIGN_R
@@ -278,7 +270,6 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                 if len(subs) > 1:
                     for f in range(f_ini, f_fin):
                         hoja.cell(row=f, column=30, value=f"=IFERROR(AC{f}*D{f}/D{f_fin}, 0)")
-                
                 # Configurar celda de autosuma
                 for col in range(25, 30):
                     hoja.cell(row=f_fin, column=col, value="")
@@ -314,7 +305,7 @@ def procesar_datos(entrada, torno, mes, dia, anio):
             except Exception as e:
                 escribir_log(f"Error procesando bloque: {str(e)}", nivel="error")
                 continue
-        # Copia de seguridad final
+        # Copia de seguridad
         try:
             backup_path = os.path.join(BASE_DIR, CARPETA, "Reporte IR Tornos copia_de_seguridad.xlsx")
             shutil.copy(RUTA_ENTRADA, backup_path)
@@ -410,7 +401,7 @@ def escribir_valor_bloque(hoja, col_dia, torno, valor, tipo_bloque):
         valor_final = 0.0
     celda = hoja.cell(row=fila_valor, column=col_dia) # Escribir el valor en la celda
     celda.value = valor_final
-    celda.number_format = '0' # cambio de 0.00 a 0
+    celda.number_format = '0'
 
 def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque, tipos_bloque):
     """Escribe las referencias de Excel directamente sin calcular valores."""
@@ -429,7 +420,6 @@ def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque
             celda = hoja.cell(row=fila_valor, column=col_dia)
             celda.value = referencia  # Ej: ='IR diario '!AD123
             celda.alignment = ALIGN_R  # Alineación derecha (opcional)
-            # DEBUG (opcional)
             escribir_log(f"Bloque {i} ({tipo_bloque}) | Torno {torno} | Fila {fila_valor}")
             escribir_log(f"Referencia escrita: {referencia}")
         except Exception as e:
@@ -481,11 +471,10 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, increm
     except Exception as e:
         messagebox.showerror("Error", 
             f"No se pudo escribir en hoja:\n{str(e)}\n\n"
-            "Verifique que:\n"
-            "El archivo no esté abierto\n"
+            "Verifique que el archivo no esté abierto\n"
                 )
         error_msg = (
-            f"No se pudo actualizar el archivo cierre el documento e intentelo nuevamente \n"
+            f"El documento esta abierto cierrelo e intentelo nuevamente \n"
                 )
         escribir_log(error_msg, "error")
         return False
