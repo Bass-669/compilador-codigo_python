@@ -4,9 +4,60 @@ import pandas as pd
 import os
 from pathlib import Path
 
+def configurar_logging():
+    """Configura un sistema de logging robusto con rotación de archivos"""
+    posibles_rutas = [
+        os.path.join(BASE_DIR, CARPETA, "log_tornos.log"),
+        os.path.join(tempfile.gettempdir(), "log_tornos.log")
+    ]
+    # Configuración básica del logger
+    logger = logging.getLogger('TornosLogger')
+    logger.setLevel(logging.INFO)
+    # Formato del log
+    formatter = logging.Formatter(
+        '%(asctime)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    # Probar distintas ubicaciones
+    for ruta in posibles_rutas:
+        try:
+            os.makedirs(os.path.dirname(ruta), exist_ok=True)
+            handler = RotatingFileHandler(
+                ruta,
+                maxBytes=5*1024*1024,
+                backupCount=3,
+                encoding='utf-8'
+            )
+            handler.setFormatter(formatter)
+            logger.addHandler(handler)
+            return logger
+        except Exception as e:
+            escribir_log(f" \n No se pudo configurar log en {ruta}: {e}", file=sys.stderr)
+    # Si fallan todas las rutas, crear logger de consola
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+    logger.warning("No se pudo crear archivo de log. Usando consola.")
+    return logger
+logger = configurar_logging()
+
+def escribir_log(mensaje, nivel="info"):
+    """Función para escribir en el log de manera segura"""
+    try:
+        if nivel.lower() == "info":
+            logger.info(mensaje)
+        elif nivel.lower() == "warning":
+            logger.warning(mensaje)
+        elif nivel.lower() == "error":
+            logger.error(mensaje)
+        else:
+            logger.debug(mensaje)
+    except Exception as e:
+        escribir_log(f"Error al escribir en log: {e}", file=sys.stderr)
+        
 def exportar_desde_odc():
     try:
-        print("Iniciando proceso de extracción de datos...")
+        escribir_log("Iniciando proceso de extracción de datos...")
         
         # Obtener la ruta del directorio actual
         script_dir = Path(__file__).parent
@@ -17,15 +68,15 @@ def exportar_desde_odc():
         if not odc_path.exists():
             raise FileNotFoundError(f"No se encontró el archivo {odc_file} en la misma carpeta que el script")
         
-        print(f"Archivo .odc encontrado: {odc_path}")
+        escribir_log(f"Archivo .odc encontrado: {odc_path}")
 
         # Iniciar Excel
-        print("Abriendo Excel...")
+        escribir_log("Abriendo Excel...")
         excel = win32com.client.Dispatch("Excel.Application")
         excel.Visible = True  # Cambiar a False después de probar
         
         # Abrir el archivo .odc
-        print(f"Abriendo el archivo {odc_file}...")
+        escribir_log(f"Abriendo el archivo {odc_file}...")
         workbook = excel.Workbooks.Open(str(odc_path))
         
         # Esperar a que cargue (ajusta este tiempo según necesites)
@@ -34,25 +85,25 @@ def exportar_desde_odc():
         
         # Guardar como Excel normal
         output_path = script_dir / "datos_actualizados.xlsx"
-        print(f"Guardando datos en {output_path}...")
+        escribir_log(f"Guardando datos en {output_path}...")
         workbook.SaveAs(str(output_path), FileFormat=51)  # 51 = xlsx
         workbook.Close()
         excel.Quit()
         
         # Leer los datos del Excel guardado
-        print("Leyendo los datos exportados...")
+        escribir_log("Leyendo los datos exportados...")
         datos = pd.read_excel(output_path)
         
         # Mostrar información básica de los datos
-        print("\n¡Proceso completado con éxito!")
-        print(f"\nResumen de datos obtenidos ({len(datos)} filas):")
-        print(datos.head(5))  # Muestra las primeras 5 filas
-        print("\nColumnas disponibles:", list(datos.columns))
+        escribir_log("\n¡Proceso completado con éxito!")
+        escribir_log(f"\nResumen de datos obtenidos ({len(datos)} filas):")
+        escribir_log(datos.head(5))  # Muestra las primeras 5 filas
+        escribir_log("\nColumnas disponibles:", list(datos.columns))
         
         return datos
     
     except Exception as e:
-        print(f"\nError durante el proceso: {str(e)}")
+        escribir_log(f"\nError durante el proceso: {str(e)}")
         # Asegurarse de cerrar Excel si hay error
         if 'excel' in locals():
             excel.Quit()
