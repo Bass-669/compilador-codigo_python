@@ -27,9 +27,10 @@ jobs:
         pip install tkcalendar
         pip install xlwings
         pip install pywin32
+        
         pip install pandas
         pip install numpy
-        pip install numpy pandas pywin32 openpyxl logging-logrotating
+        pip install numpy pandas pywin32 openpyxl
         
     - name: Crear carpeta reportes
       run: mkdir reportes
