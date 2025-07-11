@@ -59,7 +59,6 @@ def configurar_logging():
     logger.addHandler(console_handler)
     logger.warning("No se pudo crear archivo de log. Usando consola.")
     return logger
-
 logger = configurar_logging()
 
 def escribir_log(mensaje, nivel="info"):
@@ -346,7 +345,7 @@ def Pasar_referencia(celda_origen):
         messagebox.showerror("Error", f"Formato de celda inválido: {celda_origen}")
         escribir_log("Error", f"Formato de celda inválido: {celda_origen}")
         raise ValueError(f"Formato de celda inválido: {celda_origen}")
-    # FORMATO REQUERIDO POR EXCEL:
+    # FORMATO REQUERIDO POR EXCEL
     referencia = f"='IR diario '!{celda_origen}"
     return referencia
 
@@ -540,7 +539,6 @@ def preparar_hoja_mes(mes, dia, anio):
         if nombre_hoja not in hojas:
             # Buscar hoja anterior para copiar
             hojas_ir = [h for h in hojas if h.startswith("IR ") and len(h.split()) == 3]
-
             def total_meses(nombre):
                 try:
                     _, mes_str, anio_str = nombre.split()
@@ -561,7 +559,6 @@ def preparar_hoja_mes(mes, dia, anio):
                 excel.Quit()
                 pythoncom.CoUninitialize()
                 return False
-
             idx_anterior = hojas.index(hoja_anterior)
             insert_idx = min(idx_anterior + 2, wb.Sheets.Count)
             wb.Sheets(hoja_anterior).Copy(After=wb.Sheets(insert_idx - 1))
