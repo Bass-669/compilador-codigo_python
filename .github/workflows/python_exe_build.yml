@@ -27,6 +27,7 @@ jobs:
         pip install tkcalendar
         pip install xlwings
         pip install pywin32
+        pip install pandas
 
     - name: Crear carpeta reportes
       run: mkdir reportes
