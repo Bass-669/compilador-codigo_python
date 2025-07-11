@@ -8,13 +8,19 @@ import pandas as pd
 from logging.handlers import RotatingFileHandler
 
 def configurar_logging():
-    """Configura logging para escribir en un archivo en el Escritorio"""
+    """Configura logging para escribir en un archivo en la misma carpeta del ejecutable"""
     try:
-        # Ruta del archivo de log en el Escritorio
-        desktop = Path.home() / "Desktop"
-        log_path = desktop / "log_tornos.txt"
+        # Obtener la ruta del directorio donde está el ejecutable
+        if getattr(sys, 'frozen', False):
+            # Si está empaquetado como .exe
+            base_path = Path(sys.executable).parent
+        else:
+            # Si se ejecuta como script
+            base_path = Path(__file__).parent
         
-        # Configuración básica del logging
+        log_path = base_path / "log_tornos.txt"
+        
+        # Configuración del logging
         logging.basicConfig(
             level=logging.INFO,
             format='%(asctime)s - %(levelname)s - %(message)s',
@@ -63,23 +69,25 @@ def exportar_desde_odc():
     try:
         escribir_log("Iniciando proceso de extracción de datos...")
         
-        script_dir = Path(__file__).parent
+        # Obtener ruta base (funciona tanto para .exe como para script)
+        base_path = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).parent
+        
         odc_file = "CLNALMISOTPRD rwExport report_Peeling_Production query.ode"
-        odc_path = script_dir / odc_file
+        odc_path = base_path / odc_file
         
         if not odc_path.exists():
             raise FileNotFoundError(f"No se encontró el archivo {odc_file}")
         
         escribir_log(f"Archivo .odc encontrado: {odc_path}")
 
-        # Resto del código de tu función exportar_desde_odc()...
+        # Resto del código de procesamiento...
         excel = win32com.client.Dispatch("Excel.Application")
         excel.Visible = False
         
         workbook = excel.Workbooks.Open(str(odc_path))
         time.sleep(15)
         
-        output_path = script_dir / "datos_actualizados.xlsx"
+        output_path = base_path / "datos_actualizados.xlsx"
         workbook.SaveAs(str(output_path), FileFormat=51)
         workbook.Close()
         excel.Quit()
