@@ -1,24 +1,31 @@
+import logging
+from logging.handlers import RotatingFileHandler
+import tempfile
+import sys
 import win32com.client
 import time
 import pandas as pd
 import os
 from pathlib import Path
 
+# Configura el directorio base
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CARPETA = "logs"  # Carpeta para guardar logs
+
 def configurar_logging():
-    """Configura un sistema de logging robusto con rotación de archivos"""
+    """Configura un sistema de logging robusto"""
     posibles_rutas = [
         os.path.join(BASE_DIR, CARPETA, "log_tornos.log"),
         os.path.join(tempfile.gettempdir(), "log_tornos.log")
     ]
-    # Configuración básica del logger
+    
     logger = logging.getLogger('TornosLogger')
     logger.setLevel(logging.INFO)
-    # Formato del log
     formatter = logging.Formatter(
         '%(asctime)s - %(levelname)s - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
-    # Probar distintas ubicaciones
+    
     for ruta in posibles_rutas:
         try:
             os.makedirs(os.path.dirname(ruta), exist_ok=True)
@@ -32,17 +39,18 @@ def configurar_logging():
             logger.addHandler(handler)
             return logger
         except Exception as e:
-            escribir_log(f" \n No se pudo configurar log en {ruta}: {e}", file=sys.stderr)
-    # Si fallan todas las rutas, crear logger de consola
+            print(f"No se pudo configurar log en {ruta}: {e}", file=sys.stderr)
+    
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
     logger.warning("No se pudo crear archivo de log. Usando consola.")
     return logger
+
 logger = configurar_logging()
 
 def escribir_log(mensaje, nivel="info"):
-    """Función para escribir en el log de manera segura"""
+    """Escribe en el log de manera segura"""
     try:
         if nivel.lower() == "info":
             logger.info(mensaje)
@@ -53,7 +61,9 @@ def escribir_log(mensaje, nivel="info"):
         else:
             logger.debug(mensaje)
     except Exception as e:
-        escribir_log(f"Error al escribir en log: {e}", file=sys.stderr)
+        print(f"Error al escribir en log: {e}", file=sys.stderr)
+
+# El resto de tu código permanece igual...
         
 def exportar_desde_odc():
     try:
