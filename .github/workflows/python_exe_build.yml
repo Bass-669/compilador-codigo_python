@@ -29,7 +29,7 @@ jobs:
         pip install pywin32
         
         pip install pandas
-        pip install numpy
+        pip install --upgrade numpy pandas pyinstaller
         pip install numpy pandas pywin32 openpyxl
         
     - name: Crear carpeta reportes
