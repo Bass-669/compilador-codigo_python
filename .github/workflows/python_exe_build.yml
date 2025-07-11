@@ -28,8 +28,8 @@ jobs:
         pip install xlwings
         pip install pywin32
         pip install pandas
-        pip install pandas pywin32
         pip install numpy
+        pip install numpy pandas pywin32 openpyxl logging-logrotating
         
     - name: Crear carpeta reportes
       run: mkdir reportes
