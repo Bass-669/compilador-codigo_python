@@ -12,20 +12,36 @@ from pathlib import Path
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CARPETA = "logs"  # Carpeta para guardar logs
 
+# Variable global para controlar si el log está configurado
+LOG_CONFIGURADO = False
+
 def configurar_logging():
     """Configura un sistema de logging robusto"""
+    global LOG_CONFIGURADO
+    
+    # Evitar configurar múltiples veces
+    if LOG_CONFIGURADO:
+        return logging.getLogger('TornosLogger')
+    
     posibles_rutas = [
         os.path.join(BASE_DIR, CARPETA, "log_tornos.log"),
         os.path.join(tempfile.gettempdir(), "log_tornos.log"),
-        os.path.join(os.path.expanduser("~"), "log_tornos.log")  # Nueva opción en carpeta de usuario
+        os.path.join(os.path.expanduser("~"), "log_tornos.log")
     ]
     
     logger = logging.getLogger('TornosLogger')
+    
+    # Limpia handlers existentes para evitar duplicados
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+    
     logger.setLevel(logging.INFO)
     formatter = logging.Formatter(
         '%(asctime)s - %(levelname)s - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
+    
+    log_exitoso = False
     
     for ruta in posibles_rutas:
         try:
@@ -34,6 +50,7 @@ def configurar_logging():
             
             # Verificar permisos de escritura
             if not os.access(os.path.dirname(ruta), os.W_OK):
+                print(f"Sin permisos de escritura en: {ruta}", file=sys.stderr)
                 continue
                 
             handler = RotatingFileHandler(
@@ -45,17 +62,27 @@ def configurar_logging():
             handler.setFormatter(formatter)
             logger.addHandler(handler)
             
-            # Verificar que realmente se puede escribir
-            logger.info(f"Iniciando logging en: {ruta}")
-            return logger
+            # Probar escritura real
+            try:
+                with open(ruta, 'a', encoding='utf-8') as f:
+                    f.write("Iniciando log...\n")
+                log_exitoso = True
+                print(f"Log configurado correctamente en: {ruta}")
+                break
+            except Exception as e:
+                print(f"No se pudo escribir en {ruta}: {str(e)}", file=sys.stderr)
+                logger.removeHandler(handler)
+                
         except Exception as e:
-            print(f"No se pudo configurar log en {ruta}: {str(e)}", file=sys.stderr)
+            print(f"Error al configurar log en {ruta}: {str(e)}", file=sys.stderr)
     
-    # Si fallan todas las rutas, crear logger de consola
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
-    logger.warning("No se pudo crear archivo de log en ninguna ubicación. Usando consola.")
+    if not log_exitoso:
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
+        logger.warning("No se pudo crear archivo de log. Usando consola.")
+    
+    LOG_CONFIGURADO = True
     return logger
 
 logger = configurar_logging()
@@ -63,6 +90,10 @@ logger = configurar_logging()
 def escribir_log(mensaje, nivel="info"):
     """Escribe en el log de manera segura"""
     try:
+        # Convertir objetos a string
+        if not isinstance(mensaje, str):
+            mensaje = str(mensaje)
+            
         if nivel.lower() == "info":
             logger.info(mensaje)
         elif nivel.lower() == "warning":
@@ -73,8 +104,6 @@ def escribir_log(mensaje, nivel="info"):
             logger.debug(mensaje)
     except Exception as e:
         print(f"Error al escribir en log: {e}", file=sys.stderr)
-
-# El resto de tu código permanece igual...
         
 def exportar_desde_odc():
     try:
