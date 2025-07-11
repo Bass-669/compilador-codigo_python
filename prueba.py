@@ -40,16 +40,16 @@ def configurar_logging():
 
 logger = configurar_logging()
 
-def encontrar_archivo_ode():
+def encontrar_archivo_odc():
     """Busca el archivo ODC con flexibilidad en el nombre"""
     base_path = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).parent
     
     # Posibles variantes del nombre del archivo
     posibles_patrones = [
-        "*CLNALMISOTPRD*Peeling*Production*.ode",
-        "*rwExport*Peeling*Production*.ode",
-        "*Peeling*Production*.ode",
-        "*.ode"  # Último recurso: cualquier archivo ODE
+        "*CLNALMISOTPRD*Peeling*Production*.odc",
+        "*rwExport*Peeling*Production*.odc",
+        "*Peeling*Production*.odc",
+        "*.odc"  # Último recurso: cualquier archivo ODC
     ]
     
     for patron in posibles_patrones:
@@ -58,7 +58,7 @@ def encontrar_archivo_ode():
             logger.info(f"Archivo encontrado con patrón '{patron}': {archivos[0]}")
             return archivos[0]
     
-    logger.error(f"No se encontró archivo ODE. Directorio: {base_path}")
+    logger.error(f"No se encontró archivo ODC. Directorio: {base_path}")
     logger.error(f"Archivos presentes: {[f.name for f in base_path.iterdir()]}")
     return None
 
@@ -67,7 +67,7 @@ def exportar_desde_odc():
         logger.info("Iniciando proceso de extracción de datos...")
         
         # Buscar el archivo ODC
-        odc_path = encontrar_archivo_ode()
+        odc_path = encontrar_archivo_odc()
         if not odc_path:
             raise FileNotFoundError("No se pudo encontrar el archivo ODC")
         
