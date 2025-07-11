@@ -406,46 +406,35 @@ def escribir_valor_bloque(hoja, col_dia, torno, valor, tipo_bloque):
 def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque, tipos_bloque):
     """Escribe referencias y fórmulas en las celdas correspondientes"""
     escribir_log("Inicio de escribir_valores_resumen_bloques")
-    
     letra_actual = openpyxl.utils.get_column_letter(col_dia)
-    
     try:
         # 1. Escribir fórmulas para los cálculos
         hoja.cell(row=34, column=col_dia, 
                  value=f"=IFERROR(AVERAGE({letra_actual}32:{letra_actual}33), 0)").number_format = '0.00%'
-        
         hoja.cell(row=38, column=col_dia, 
                  value=f"=IFERROR({letra_actual}32/{letra_actual}23, 0)").font = Font(color='000000')
-        
         hoja.cell(row=39, column=col_dia, 
                  value=f"=IFERROR({letra_actual}33/{letra_actual}24, 0)").font = Font(color='000000')
-        
         hoja.cell(row=40, column=col_dia, 
                  value=f"=IFERROR({letra_actual}34/{letra_actual}28, 0)").number_format = '0.00%'
         hoja.cell(row=40, column=col_dia).font = Font(color='000000')
-        
         # 2. Escribir referencias de bloques
         for i, (tipo_bloque, referencia) in enumerate(zip(tipos_bloque, valores_ae_por_bloque)):
             tipo_bloque = tipo_bloque.strip().upper()
-            
             if tipo_bloque == "PODADO":
                 fila_valor = 13 if torno == 1 else 14
             elif tipo_bloque == "REGULAR":
                 fila_valor = 18 if torno == 1 else 19
             else:
                 continue
-                
             celda = hoja.cell(row=fila_valor, column=col_dia)
             celda.value = referencia
             celda.alignment = ALIGN_R
-            
             escribir_log(f"Bloque {i} ({tipo_bloque}) | Torno {torno} | Fila {fila_valor}")
             escribir_log(f"Referencia escrita: {referencia}")
-            
     except Exception as e:
         escribir_log(f"Error en escribir_valores_resumen_bloques: {str(e)}", nivel="error")
         raise
-
 
 def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, incrementar_barra):
     escribir_log("Inicio de fecha")
@@ -512,7 +501,7 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, increm
         # 8. Mostrar mensaje de éxito solo si todo salió bien
         if exito:
             messagebox.showinfo("Éxito", "✅ Valores actualizados correctamente.")
-            escribir_log(f"Éxito", "✅ Valores actualizados correctamente")
+            escribir_log(f"Éxito ✅ Valores actualizados correctamente")
             escribir_log(f"Fin de la ejecucucion \n")
 
 def preparar_hoja_mes(mes, dia, anio):
