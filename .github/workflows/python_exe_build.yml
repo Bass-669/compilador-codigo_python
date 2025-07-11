@@ -28,7 +28,9 @@ jobs:
         pip install xlwings
         pip install pywin32
         pip install pandas
-
+        pip install pandas pywin32
+        pip install numpy
+        
     - name: Crear carpeta reportes
       run: mkdir reportes
 
