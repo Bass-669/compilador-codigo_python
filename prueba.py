@@ -16,7 +16,8 @@ def configurar_logging():
     """Configura un sistema de logging robusto"""
     posibles_rutas = [
         os.path.join(BASE_DIR, CARPETA, "log_tornos.log"),
-        os.path.join(tempfile.gettempdir(), "log_tornos.log")
+        os.path.join(tempfile.gettempdir(), "log_tornos.log"),
+        os.path.join(os.path.expanduser("~"), "log_tornos.log")  # Nueva opción en carpeta de usuario
     ]
     
     logger = logging.getLogger('TornosLogger')
@@ -28,23 +29,33 @@ def configurar_logging():
     
     for ruta in posibles_rutas:
         try:
+            # Crear directorio si no existe
             os.makedirs(os.path.dirname(ruta), exist_ok=True)
+            
+            # Verificar permisos de escritura
+            if not os.access(os.path.dirname(ruta), os.W_OK):
+                continue
+                
             handler = RotatingFileHandler(
                 ruta,
-                maxBytes=5*1024*1024,
+                maxBytes=5*1024*1024,  # 5 MB
                 backupCount=3,
                 encoding='utf-8'
             )
             handler.setFormatter(formatter)
             logger.addHandler(handler)
+            
+            # Verificar que realmente se puede escribir
+            logger.info(f"Iniciando logging en: {ruta}")
             return logger
         except Exception as e:
-            print(f"No se pudo configurar log en {ruta}: {e}", file=sys.stderr)
+            print(f"No se pudo configurar log en {ruta}: {str(e)}", file=sys.stderr)
     
+    # Si fallan todas las rutas, crear logger de consola
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
-    logger.warning("No se pudo crear archivo de log. Usando consola.")
+    logger.warning("No se pudo crear archivo de log en ninguna ubicación. Usando consola.")
     return logger
 
 logger = configurar_logging()
