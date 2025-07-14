@@ -316,8 +316,7 @@ def procesar_archivo_odc():
         datos = pd.read_excel(output_path)
         
         if not datos.empty:
-            logger.info("=== RESUMEN DE DATOS ===")
-            logger.info("")  # Línea en blanco
+            logger.info("=== RESUMEN DE DATOS ===\n")
             
             try:
                 datos['Fecha'] = pd.to_datetime(datos['Fecha'])
@@ -332,24 +331,20 @@ def procesar_archivo_odc():
                     if not torno1.empty:
                         logger.info(
                             f"Torno 1: Rendimiento: {torno1.iloc[0].get('Rendimiento', 0):.2f} | "
-                            f"Acumulado: {torno1.iloc[0].get('Rendimiento_Acumulado', 0):.2f}"
+                            f"Acumulado: {torno1.iloc[0].get('Rendimiento_Acumulado', 0):.2f}\n"
                         )
                     else:
-                        logger.info("Torno 1: Sin datos")
+                        logger.info("Torno 1: Sin datos\n")
                     
                     # Torno 2
                     torno2 = datos_fecha[datos_fecha['WorkId'] == 3012]
                     if not torno2.empty:
                         logger.info(
                             f"Torno 2: Rendimiento: {torno2.iloc[0].get('Rendimiento', 0):.2f} | "
-                            f"Acumulado: {torno2.iloc[0].get('Rendimiento_Acumulado', 0):.2f}"
+                            f"Acumulado: {torno2.iloc[0].get('Rendimiento_Acumulado', 0):.2f\n}"
                         )
                     else:
-                        logger.info("Torno 2: Sin datos")
-                    
-                    # Línea en blanco entre fechas
-                    if fecha != ultimas_5_fechas[-1]:
-                        logger.info("")
+                        logger.info("Torno 2: Sin datos\n")
                         
             except Exception as e:
                 logger.error(f"Error procesando fechas: {str(e)}")
@@ -378,8 +373,6 @@ if __name__ == "__main__":
     logger.info("=== INICIO DEL PROCESO ===")
     
     if procesar_archivo_odc():
-        logger.info("Proceso completado con ÉXITO")
+        logger.info("=== FIN DEL PROCESO ===\n")
     else:
         logger.error("Proceso completado con ERRORES")
-    
-    logger.info("=== FIN DEL PROCESO ===\n")
