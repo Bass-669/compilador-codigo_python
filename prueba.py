@@ -248,7 +248,6 @@ def configurar_log_completo():
             datefmt='%Y-%m-%d %H:%M:%S'
         ))
         logger.addHandler(file_handler)
-        logger.info(f"Log configurado en: {log_path}")
     except Exception as e:
         logger.error(f"No se pudo configurar archivo de log: {str(e)}")
 
@@ -289,9 +288,7 @@ def procesar_archivo_odc():
         odc_path = encontrar_archivo_odc_especifico()
         if not odc_path:
             raise FileNotFoundError("Archivo ODC no encontrado")
-        
-        logger.info(f"Procesando archivo")
-        
+
         # 2. CONFIGURAR EXCEL
         pythoncom.CoInitialize()
         excel = win32com.client.DispatchEx("Excel.Application")
@@ -308,7 +305,6 @@ def procesar_archivo_odc():
         )
         
         # 4. ESPERA CON CONTROL
-        logger.info("Cargando datos...")
         start_time = time.time()
         while (time.time() - start_time) < 15:
             try:
@@ -337,7 +333,7 @@ def procesar_archivo_odc():
         datos = pd.read_excel(output_path)
         
         if not datos.empty:
-            logger.info("=== RESUMEN DE DATOS ===\n \n")
+            logger.info("=== RESUMEN DE DATOS ===\n")
             if 'Fecha' in datos.columns:
                 try:
                     datos['Fecha'] = pd.to_datetime(datos['Fecha'])
@@ -351,7 +347,7 @@ def procesar_archivo_odc():
                                 logger.info(
                                     f"Torno {workid-3010}: "
                                     f"Rendimiento: {row.get('Rendimiento', 0):.2f} | "
-                                    f"Acumulado: {row.get('Rendimiento_Acumulado', 0):.2f}\n"
+                                    f"Acumulado: {row.get('Rendimiento_Acumulado', 0):.2f}"
                                 )
                 except Exception as e:
                     logger.error(f"Error procesando fechas: {str(e)}")
