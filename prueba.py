@@ -144,7 +144,7 @@ def exportar_desde_odc():
                 torno2 = datos_fecha[datos_fecha['WorkId'] == 3012]
                 
                 # Formatear mensaje
-                mensaje = f"\n \n"
+                mensaje = f"\n"
                 
                 if not torno1.empty:
                     mensaje += (
@@ -157,10 +157,10 @@ def exportar_desde_odc():
                 if not torno2.empty:
                     mensaje += (
                         f" Fecha: {fecha.strftime('%Y-%m-%d')} TORNO 2 - Rendimiento: {torno2.iloc[0].get('Rendimiento', 'N/A')} | "
-                        f"Rendimiento Acumulado: {torno2.iloc[0].get('Rendimiento_Acumulado', 'N/A')}"
+                        f"Rendimiento Acumulado: {torno2.iloc[0].get('Rendimiento_Acumulado', 'N/A')}\n"
                     )
                 else:
-                    mensaje += "  TORNO 2 - Sin datos"
+                    mensaje += "  TORNO 2 - Sin datos\n"
                 
                 logger.info(mensaje)
         except Exception as e:
