@@ -264,10 +264,14 @@ def procesar_archivo_odc():
     
     try:
         # 1. LOCALIZAR ARCHIVO
-        odc_path = encontrar_archivo_odc_especifico()
-        if not odc_path:
-            raise FileNotFoundError("Archivo ODC no encontrado")
-
+        base_path = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).parent
+        nombre_archivo = "CLNALMISOTPRD rwExport report_Peeling_Production query.odc"
+        odc_path = base_path / nombre_archivo
+        
+        if not odc_path.exists():
+            raise FileNotFoundError(f"No se encontró el archivo ODC en {base_path}: {nombre_archivo}")
+        
+        logger.info(f"Archivo ODC encontrado: {odc_path}")
         # 2. CONFIGURAR EXCEL
         pythoncom.CoInitialize()
         excel = win32com.client.DispatchEx("Excel.Application")
