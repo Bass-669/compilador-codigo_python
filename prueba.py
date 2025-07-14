@@ -14,7 +14,7 @@ def configurar_logging():
     """Configura el sistema de logging"""
     try:
         base_path = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).parent
-        log_path = base_path / "tornos.log"
+        log_path = base_path / "log.log"
         
         logging.basicConfig(
             level=logging.INFO,
@@ -32,7 +32,6 @@ def configurar_logging():
         )
         
         logger = logging.getLogger('TornosLogger')
-        logger.info(f"Log configurado en: {log_path}")
         return logger
         
     except Exception as e:
@@ -78,7 +77,7 @@ def encontrar_archivo_odc():
     return None
 
 def exportar_desde_odc():
-    """Exporta datos desde archivo ODC a Excel"""
+    """Exporta datos desde archivo ODC a Excel y registra últimos 5 días en log"""
     excel = None
     workbook = None
     try:
@@ -119,8 +118,34 @@ def exportar_desde_odc():
         workbook.Close(False)
         excel.Quit()
         
+        # Leer datos con pandas
         datos = pd.read_excel(output_path)
-        logger.info(f"Datos obtenidos. Filas: {len(datos)}. Columnas: {list(datos.columns)}")
+        
+        # Procesar y registrar últimos 5 días
+        try:
+            # Convertir columna Fecha a datetime si no lo está
+            datos['Fecha'] = pd.to_datetime(datos['Fecha'])
+            
+            # Ordenar por fecha descendente
+            datos = datos.sort_values('Fecha', ascending=False)
+            
+            # Tomar los últimos 5 días únicos
+            ultimos_5_dias = datos.drop_duplicates('Fecha').head(5)
+            
+            # Registrar en log
+            logger.info("=== ÚLTIMOS 5 DÍAS ===")
+            for _, fila in ultimos_5_dias.iterrows():
+                logger.info(
+                    f"Fecha: {fila['Fecha'].strftime('%Y-%m-%d')} | "
+                    f"Rendimiento: {fila.get('Rendimiento', 'N/A')} | "
+                    f"Rendimiento Acumulado: {fila.get('Rendimiento_Acumulado', 'N/A')}"
+                )
+            logger.info("======================")
+            
+            logger.info(f"Datos obtenidos. Filas: {len(datos)}. Columnas: {list(datos.columns)}")
+        except Exception as e:
+            logger.error(f"Error al procesar últimos 5 días: {str(e)}")
+        
         return datos
     
     except Exception as e:
@@ -147,4 +172,4 @@ logger = configurar_logging()
 if __name__ == "__main__":
     logger.info("=== INICIO DE EJECUCIÓN ===")
     datos = exportar_desde_odc()
-    logger.info("=== FIN DE EJECUCIÓN ===")
+    logger.info("=== FIN DE EJECUCIÓN === \n")
