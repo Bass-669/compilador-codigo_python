@@ -11,49 +11,56 @@ from datetime import datetime
 import shutil
 
 def configurar_logging():
-    """Configura el sistema de logging en la carpeta del ejecutable"""
+    """Configura el sistema de logging de manera robusta"""
     try:
+        # Determinar el directorio base
         base_path = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).parent
-        log_path = base_path / "log_tornos.txt"
-        # Posibles ubicaciones para el log (similar al código original)
+        # Posibles ubicaciones para el log (ordenadas por prioridad)
         posibles_rutas = [
-            base_path / "log_tornos.log",
-            Path(tempfile.gettempdir()) / "log_tornos.log"
+            base_path / "log.log",  # Primero intentar en el directorio de la app
+            Path.home() / "log.log",  # Luego en el home del usuario
+            Path(tempfile.gettempdir()) / "log.log"  # Finalmente en temp
         ]
         logger = logging.getLogger('TornosLogger')
         logger.setLevel(logging.INFO)
+        # Limpiar handlers existentes para evitar duplicados
+        if logger.hasHandlers():
+            logger.handlers.clear()
+        
         formatter = logging.Formatter(
             '%(asctime)s - %(levelname)s - %(message)s',
             datefmt='%Y-%m-%d %H:%M:%S'
         )
-        # Probar distintas ubicaciones (como en el código original)
+        handler_exitoso = False
+        # Probar distintas ubicaciones
         for ruta in posibles_rutas:
             try:
-                ruta.parent.mkdir(exist_ok=True)
+                ruta.parent.mkdir(parents=True, exist_ok=True)
                 handler = RotatingFileHandler(
-                    ruta,
-                    maxBytes=5*1024*1024,
+                    str(ruta),  # Convertir Path a string
+                    maxBytes=5*1024*1024,  # 5MB
                     backupCount=3,
                     encoding='utf-8'
                 )
                 handler.setFormatter(formatter)
                 logger.addHandler(handler)
-                logger.info(f"Log configurado en: {ruta}")
-                logger.info(f"Directorio base: {base_path}")
-                logger.info(f"Archivos en el directorio: {[f.name for f in base_path.glob('*') if f.is_file()]}")
-                return logger
+                logger.info(f"Log configurado exitosamente en: {ruta}")
+                handler_exitoso = True
+                break  # Salir al encontrar la primera ubicación válida
             except Exception as e:
                 continue
-        # Si fallan todas las rutas, usar consola
-        console_handler = logging.StreamHandler()
-        console_handler.setFormatter(formatter)
-        logger.addHandler(console_handler)
-        logger.warning("No se pudo crear archivo de log. Usando consola.")
+        # Si no se pudo crear archivo de log, usar consola
+        if not handler_exitoso:
+            console_handler = logging.StreamHandler()
+            console_handler.setFormatter(formatter)
+            logger.addHandler(console_handler)
+            logger.warning("No se pudo crear archivo de log. Usando consola.")
         return logger
     except Exception as e:
+        # Fallback básico si todo falla
         logging.basicConfig(level=logging.INFO)
         logger = logging.getLogger('TornosLogger')
-        logger.error(f"Error configurando log: {str(e)}")
+        logger.error(f"Error crítico configurando log: {str(e)}")
         return logger
 
 logger = configurar_logging()
