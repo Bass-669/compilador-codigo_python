@@ -272,7 +272,6 @@ def encontrar_archivo_odc_especifico():
     for patron in patrones_exactos:
         try:
             for archivo in base_path.glob(patron):
-                logger.info(f"Archivo encontrado: {archivo.name}")
                 return archivo
         except Exception as e:
             logger.warning(f"Error buscando {patron}: {str(e)}")
@@ -291,7 +290,7 @@ def procesar_archivo_odc():
         if not odc_path:
             raise FileNotFoundError("Archivo ODC no encontrado")
         
-        logger.info(f"Procesando archivo: {odc_path.name}")
+        logger.info(f"Procesando archivo")
         
         # 2. CONFIGURAR EXCEL
         pythoncom.CoInitialize()
@@ -303,7 +302,7 @@ def procesar_archivo_odc():
         # 3. ABRIR ARCHIVO (VERSIÓN CORREGIDA)
         logger.info("Abriendo archivo ODC...")
         workbook = excel.Workbooks.Open(
-            str(odc_path.absolute()),  # CORRECCIÓN: Sin parámetro FileName
+            str(odc_path.absolute()),
             UpdateLinks=0,
             ReadOnly=True
         )
@@ -328,27 +327,23 @@ def procesar_archivo_odc():
             logger.warning("El archivo de salida ya existe, se sobrescribirá")
         
         workbook.SaveAs(
-            str(output_path),  # CORRECCIÓN: Sin parámetro FileName
+            str(output_path),
             FileFormat=51,
             ConflictResolution=2
         )
-        logger.info(f"Datos exportados a: {output_path.name}")
+        logger.info(f"Datos exportados")
         
         # 6. GENERAR REPORTE
         datos = pd.read_excel(output_path)
         
         if not datos.empty:
-            logger.info("\n=== RESUMEN DE DATOS ===")
-            logger.info(f"Total registros: {len(datos)}")
-            
+            logger.info("=== RESUMEN DE DATOS ===\n \n")
             if 'Fecha' in datos.columns:
                 try:
                     datos['Fecha'] = pd.to_datetime(datos['Fecha'])
                     datos.sort_values('Fecha', ascending=False, inplace=True)
                     
                     for fecha in datos['Fecha'].unique()[:5]:
-                        logger.info(f"\nFecha: {fecha.strftime('%Y-%m-%d')}")
-                        
                         for workid in [3011, 3012]:
                             filtro = (datos['Fecha'] == fecha) & (datos['WorkId'] == workid)
                             if any(filtro):
@@ -356,12 +351,10 @@ def procesar_archivo_odc():
                                 logger.info(
                                     f"Torno {workid-3010}: "
                                     f"Rendimiento: {row.get('Rendimiento', 0):.2f} | "
-                                    f"Acumulado: {row.get('Rendimiento_Acumulado', 0):.2f}"
+                                    f"Acumulado: {row.get('Rendimiento_Acumulado', 0):.2f}\n"
                                 )
                 except Exception as e:
                     logger.error(f"Error procesando fechas: {str(e)}")
-            
-            logger.info("\n" + "="*40)
         
         return True
         
@@ -387,8 +380,5 @@ if __name__ == "__main__":
         logger.info("Proceso completado con ÉXITO")
     else:
         logger.error("Proceso completado con ERRORES")
-    
-    if not getattr(sys, 'frozen', False):
-        input("\nPresione Enter para salir...")
     
     logger.info("=== FIN DEL PROCESO ===\n")
