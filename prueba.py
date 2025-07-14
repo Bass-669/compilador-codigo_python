@@ -341,7 +341,7 @@ def procesar_archivo_odc():
                     if not torno2.empty:
                         logger.info(
                             f"Torno 2: Rendimiento: {torno2.iloc[0].get('Rendimiento', 0):.2f} | "
-                            f"Acumulado: {torno2.iloc[0].get('Rendimiento_Acumulado', 0):.2f\n}"
+                            f"Acumulado: {torno2.iloc[0].get('Rendimiento_Acumulado', 0):.2f}\n"
                         )
                     else:
                         logger.info("Torno 2: Sin datos\n")
