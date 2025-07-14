@@ -3,31 +3,29 @@ import os
 import sys
 import time
 import win32com.client
-import pythoncom  # Importación añadida para manejo COM
+import pythoncom
 import pandas as pd
 from pathlib import Path
 from logging.handlers import RotatingFileHandler
+from datetime import datetime
+import shutil
 
 def configurar_logging():
     """Configura el sistema de logging en la carpeta del ejecutable"""
     try:
         base_path = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).parent
         log_path = base_path / "log_tornos.txt"
-        
         # Posibles ubicaciones para el log (similar al código original)
         posibles_rutas = [
             base_path / "log_tornos.log",
             Path(tempfile.gettempdir()) / "log_tornos.log"
         ]
-        
         logger = logging.getLogger('TornosLogger')
         logger.setLevel(logging.INFO)
-        
         formatter = logging.Formatter(
             '%(asctime)s - %(levelname)s - %(message)s',
             datefmt='%Y-%m-%d %H:%M:%S'
         )
-        
         # Probar distintas ubicaciones (como en el código original)
         for ruta in posibles_rutas:
             try:
@@ -46,14 +44,12 @@ def configurar_logging():
                 return logger
             except Exception as e:
                 continue
-        
         # Si fallan todas las rutas, usar consola
         console_handler = logging.StreamHandler()
         console_handler.setFormatter(formatter)
         logger.addHandler(console_handler)
         logger.warning("No se pudo crear archivo de log. Usando consola.")
         return logger
-        
     except Exception as e:
         logging.basicConfig(level=logging.INFO)
         logger = logging.getLogger('TornosLogger')
@@ -78,14 +74,12 @@ def verificar_archivo_no_bloqueado(ruta_archivo):
 def encontrar_archivo_odc():
     """Busca el archivo ODC con flexibilidad en el nombre"""
     base_path = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).parent
-    
     posibles_patrones = [
         "*CLNALMISOTPRD*Peeling*Production*.odc",
         "*rwExport*Peeling*Production*.odc",
         "*Peeling*Production*.odc",
         "*.odc"
     ]
-    
     for patron in posibles_patrones:
         archivos = list(base_path.glob(patron))
         if archivos:
@@ -95,7 +89,7 @@ def encontrar_archivo_odc():
                 return archivo
             else:
                 logger.error(f"Archivo encontrado pero bloqueado: {archivo}")
-    
+
     logger.error(f"No se encontró archivo ODC accesible. Directorio: {base_path}")
     logger.error(f"Archivos presentes: {[f.name for f in base_path.iterdir()]}")
     return None
@@ -104,10 +98,8 @@ def exportar_desde_odc():
     """Exporta datos desde archivo ODC a Excel con manejo robusto"""
     excel = None
     workbook = None
-    
     try:
         logger.info("=== INICIANDO EXPORTACIÓN DESDE ODC ===")
-        
         # Buscar y verificar archivo ODC
         odc_path = encontrar_archivo_odc()
         if not odc_path:
@@ -115,24 +107,20 @@ def exportar_desde_odc():
         
         ruta_absoluta = str(odc_path.absolute())
         logger.info(f"Ruta absoluta del archivo: {ruta_absoluta}")
-
-        # Inicializar COM (como en el código original)
+        # Inicializar COM
         pythoncom.CoInitialize()
-        
-        # Configurar Excel (usando DispatchEx como en el código original)
+        # Configurar Excel
         logger.info("Iniciando Excel...")
         excel = win32com.client.DispatchEx("Excel.Application")
         excel.Visible = False
-        excel.DisplayAlerts = False  # Similar al código original
-        
+        excel.DisplayAlerts = False
         # Abrir archivo ODC
         logger.info("Abriendo archivo ODC...")
         workbook = excel.Workbooks.Open(ruta_absoluta, UpdateLinks=0)
-        
-        # Esperar a que cargue (con verificación mejorada)
+        # Esperar a que cargue
         logger.info("Esperando carga de datos...")
         tiempo_inicio = time.time()
-        while (time.time() - tiempo_inicio) < 30:  # Máximo 30 segundos de espera
+        while (time.time() - tiempo_inicio) < 30:
             try:
                 if workbook.ReadOnly:
                     time.sleep(2)
@@ -144,39 +132,30 @@ def exportar_desde_odc():
                 time.sleep(2)
         else:
             raise TimeoutError("Tiempo de espera agotado para carga de datos")
-
-        # Guardar como Excel (con copia de seguridad como en el código original)
+        # Guardar como Excel (sin preguntar al usuario)
         output_path = odc_path.parent / "datos_actualizados.xlsx"
-
-
-    if output_path.exists():
-        respuesta = input(f"El archivo {output_path} existe. ¿Sobrescribir? (s/n): ")
-        if respuesta.lower() != 's':
-            return None
-
         # Crear copia de seguridad si el archivo ya existe
         if output_path.exists():
-            backup_path = output_path.parent / f"backup_{int(time.time())}_{output_path.name}"
-            shutil.copy(output_path, backup_path)
-            logger.info(f"Copia de seguridad creada: {backup_path}")
-        
+            # Nombre de backup con timestamp para evitar conflictos
+            backup_path = output_path.parent / f"backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{output_path.name}"
+            try:
+                shutil.copy(output_path, backup_path)
+                logger.info(f"Copia de seguridad creada: {backup_path}")
+            except Exception as backup_error:
+                logger.error(f"No se pudo crear copia de seguridad: {backup_error}")
+                # Continuar de todos modos
         logger.info(f"Guardando como: {output_path}")
         workbook.SaveAs(str(output_path.absolute()), FileFormat=51)
-        
-        # Cerrar recursos correctamente
+        # Cerrar recursos
         workbook.Close(False)
         excel.Quit()
-        
         # Leer datos con pandas
         logger.info("Leyendo datos exportados...")
         datos = pd.read_excel(output_path)
         logger.info(f"Datos obtenidos. Filas: {len(datos)}. Columnas: {list(datos.columns)}")
-        
         return datos
-    
     except Exception as e:
         logger.error(f"Error en exportar_desde_odc: {str(e)}", exc_info=True)
-        # Liberar recursos como en el código original
         if workbook is not None:
             try:
                 workbook.Close(False)
@@ -189,7 +168,6 @@ def exportar_desde_odc():
                 pass
         return None
     finally:
-        # Siempre liberar COM (como en el código original)
         pythoncom.CoUninitialize()
         logger.info("=== FINALIZADO MANEJO DE EXCEL ===")
 
