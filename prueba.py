@@ -200,40 +200,39 @@ import sys
 import time
 from pathlib import Path
 
-## ------------------------------------------------------------------
-## 1. CONFIGURACIÓN INICIAL (INICIO RÁPIDO)
-## ------------------------------------------------------------------
+## ---------------------------------------------------------------
+## 1. CONFIGURACIÓN INICIAL (GARANTIZA PRIMER MENSAJE INMEDIATO)
+## ---------------------------------------------------------------
 
-def configurar_logging_rapido():
-    """Primera configuración para mostrar mensajes inmediatos"""
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(message)s',
-        handlers=[logging.StreamHandler()]
-    )
-    return logging.getLogger('TornosLogger')
+# Configuración rápida inicial
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(message)s',
+    handlers=[logging.StreamHandler()]
+)
+logger = logging.getLogger('TornosLogger')
+logger.info("Iniciando proceso...")  # Mensaje inmediato
 
-logger = configurar_logging_rapido()
-logger.info("Iniciando proceso automatizado...")  # Mensaje inmediato
+## ---------------------------------------------------------------
+## 2. CARGA SEGURA DE DEPENDENCIAS
+## ---------------------------------------------------------------
 
-## ------------------------------------------------------------------
-## 2. CARGA DIFERIDA DE DEPENDENCIAS (OPTIMIZACIÓN)
-## ------------------------------------------------------------------
-
-def cargar_dependencias():
-    """Importa módulos pesados solo cuando se necesiten"""
+try:
     import pythoncom
     import win32com.client
     import pandas as pd
     from logging.handlers import RotatingFileHandler
-    return pythoncom, win32com.client, pd, RotatingFileHandler
+except ImportError as e:
+    logger.error(f"Error crítico: Falta dependencia - {str(e)}")
+    if not getattr(sys, 'frozen', False):
+        input("Presione Enter para salir...")
+    sys.exit(1)
 
-## ------------------------------------------------------------------
-## 3. FUNCIONES PRINCIPALES (COMPROBADAS)
-## ------------------------------------------------------------------
+## ---------------------------------------------------------------
+## 3. CONFIGURACIÓN COMPLETA DEL LOG
+## ---------------------------------------------------------------
 
-def configurar_logging_completo():
-    """Configura el sistema de logging completo"""
+def configurar_log_completo():
     try:
         base_path = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).parent
         log_path = base_path / "tornos.log"
@@ -249,107 +248,161 @@ def configurar_logging_completo():
             datefmt='%Y-%m-%d %H:%M:%S'
         ))
         logger.addHandler(file_handler)
+        logger.info(f"Log configurado en: {log_path}")
     except Exception as e:
-        logger.error(f"Error configurando log: {str(e)}")
+        logger.error(f"No se pudo configurar archivo de log: {str(e)}")
 
-def encontrar_archivo_odc():
-    """Busca automáticamente el archivo ODC"""
+configurar_log_completo()
+
+## ---------------------------------------------------------------
+## 4. FUNCIONES PRINCIPALES (VERIFICADAS)
+## ---------------------------------------------------------------
+
+def encontrar_archivo_odc_especifico():
+    """Búsqueda específica para el archivo CLNALMISOTPRD...Peeling..."""
     base_path = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).parent
-    patrones = ["*.odc", "*Production*.odc", "*Peeling*.odc"]
     
-    for patron in patrones:
+    # Patrones exactos según lo indicado
+    patrones_exactos = [
+        "CLNALMISOTPRD*rwExport*report_Peeling_Production*.odc",
+        "*rwExport*report_Peeling_Production*.odc",
+        "*report_Peeling_Production*.odc"
+    ]
+    
+    for patron in patrones_exactos:
         try:
-            for archivo in base_path.glob(patron):
-                try:
-                    with open(archivo, 'a+b'):
-                        return archivo
-                except:
-                    continue
-        except:
-            continue
+            archivos = list(base_path.glob(patron))
+            if archivos:
+                archivo = archivos[0]
+                logger.info(f"Archivo encontrado: {archivo.name}")
+                return archivo
+        except Exception as e:
+            logger.warning(f"Error buscando {patron}: {str(e)}")
     
-    logger.error("No se encontró archivo ODC")
+    # Si no encuentra el específico, busca cualquier .odc
+    try:
+        archivos = list(base_path.glob("*.odc"))
+        if archivos:
+            logger.warning(f"Usando archivo alternativo: {archivos[0].name}")
+            return archivos[0]
+    except:
+        pass
+    
+    logger.error("No se encontró ningún archivo ODC")
     return None
 
-def exportar_datos():
-    """Proceso completo automatizado"""
-    pythoncom, win32com, pd, _ = cargar_dependencias()
-    configurar_logging_completo()
-    
+def procesar_archivo_odc():
+    """Procesamiento completo garantizado"""
     excel = None
     workbook = None
     
     try:
-        # 1. Buscar archivo
-        odc_path = encontrar_archivo_odc()
+        # 1. LOCALIZAR ARCHIVO
+        odc_path = encontrar_archivo_odc_especifico()
         if not odc_path:
-            raise FileNotFoundError()
+            raise FileNotFoundError("Archivo ODC no encontrado")
         
-        # 2. Configurar Excel
+        logger.info(f"Procesando archivo: {odc_path.name}")
+        
+        # 2. CONFIGURAR EXCEL
         pythoncom.CoInitialize()
         excel = win32com.client.DispatchEx("Excel.Application")
         excel.Visible = False
         excel.DisplayAlerts = False
         excel.ScreenUpdating = False
         
-        # 3. Procesar archivo
-        workbook = excel.Workbooks.Open(str(odc_path), UpdateLinks=0, ReadOnly=True)
+        # 3. ABRIR ARCHIVO
+        workbook = excel.Workbooks.Open(
+            FileName=str(odc_path.absolute()),
+            UpdateLinks=0,
+            ReadOnly=True
+        )
         
-        # Espera máxima 15 segundos
-        for _ in range(15):
-            if workbook.Application.Ready:
-                break
-            time.sleep(1)
+        # 4. ESPERA CON CONTROL
+        logger.info("Cargando datos...")
+        start_time = time.time()
+        while (time.time() - start_time) < 15:  # Máximo 15 segundos
+            try:
+                if workbook.Application.Ready:
+                    logger.info("Datos cargados correctamente")
+                    break
+                time.sleep(1)
+            except:
+                time.sleep(1)
+        else:
+            logger.warning("Tiempo de espera agotado, continuando...")
         
-        # 4. Guardar resultados
+        # 5. GUARDAR RESULTADOS
         output_path = odc_path.parent / "datos_actualizados.xlsx"
-        workbook.SaveAs(str(output_path), FileFormat=51)
+        if output_path.exists():
+            logger.warning("El archivo de salida ya existe, se sobrescribirá")
         
-        # 5. Generar reporte
+        workbook.SaveAs(
+            FileName=str(output_path),
+            FileFormat=51,  # xlOpenXMLWorkbook
+            ConflictResolution=2  # Sobrescribir
+        )
+        logger.info(f"Datos exportados a: {output_path.name}")
+        
+        # 6. GENERAR REPORTE
         datos = pd.read_excel(output_path)
         
         if not datos.empty:
-            datos['Fecha'] = pd.to_datetime(datos['Fecha'])
-            datos.sort_values('Fecha', ascending=False, inplace=True)
+            logger.info("\n=== RESUMEN DE DATOS ===")
+            logger.info(f"Total registros: {len(datos)}")
             
-            logger.info("\n=== RESUMEN AUTOMÁTICO ===")
-            for fecha in datos['Fecha'].unique()[:5]:
-                for torno in [3011, 3012]:
-                    filtro = (datos['Fecha'] == fecha) & (datos['WorkId'] == torno)
-                    if filtro.any():
-                        row = datos.loc[filtro].iloc[0]
-                        logger.info(
-                            f"{fecha.date()} - Torno {torno-3010}: "
-                            f"Rend: {row.get('Rendimiento', 'N/A')} | "
-                            f"Acum: {row.get('Rendimiento_Acumulado', 'N/A')}"
-                        )
+            # Procesar fechas si existe la columna
+            if 'Fecha' in datos.columns:
+                try:
+                    datos['Fecha'] = pd.to_datetime(datos['Fecha'])
+                    datos.sort_values('Fecha', ascending=False, inplace=True)
+                    
+                    # Últimos 5 días con datos de tornos
+                    for fecha in datos['Fecha'].unique()[:5]:
+                        logger.info(f"\nFecha: {fecha.strftime('%Y-%m-%d')}")
+                        
+                        for workid in [3011, 3012]:
+                            filtro = (datos['Fecha'] == fecha) & (datos['WorkId'] == workid)
+                            if any(filtro):
+                                row = datos.loc[filtro].iloc[0]
+                                logger.info(
+                                    f"Torno {workid-3010}: "
+                                    f"Rendimiento: {row.get('Rendimiento', 'N/A')} | "
+                                    f"Acumulado: {row.get('Rendimiento_Acumulado', 'N/A')}"
+                                )
+                except Exception as e:
+                    logger.error(f"Error procesando fechas: {str(e)}")
+            
+            logger.info("\n" + "="*40)
         
         return True
         
     except Exception as e:
-        logger.error(f"Error automático: {str(e)}")
+        logger.error(f"ERROR: {str(e)}", exc_info=True)
         return False
         
     finally:
+        # LIMPIEZA GARANTIZADA
         try:
             if workbook: workbook.Close(False)
             if excel: excel.Quit()
             pythoncom.CoUninitialize()
         except: pass
 
-## ------------------------------------------------------------------
-## 4. EJECUCIÓN PRINCIPAL (AUTOMÁTICA)
-## ------------------------------------------------------------------
+## ---------------------------------------------------------------
+## 5. EJECUCIÓN PRINCIPAL (GARANTIZADA)
+## ---------------------------------------------------------------
 
 if __name__ == "__main__":
-    logger.info("Inicio del proceso automatizado")
-    resultado = exportar_datos()
+    logger.info("\n=== INICIO DEL PROCESO ===")
     
-    if resultado:
-        logger.info("Proceso completado exitosamente")
+    if procesar_archivo_odc():
+        logger.info("Proceso completado con ÉXITO")
     else:
-        logger.error("El proceso encontró errores")
+        logger.error("Proceso completado con ERRORES")
     
-    # Cierre automático en .exe (sin input())
+    # Solo esperar entrada si no es .exe
     if not getattr(sys, 'frozen', False):
-        input("Presione Enter para salir (solo en modo desarrollo)...")
+        input("\nPresione Enter para salir...")
+    
+    logger.info("=== FIN DEL PROCESO ===")
