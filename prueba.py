@@ -110,7 +110,6 @@ def exportar_desde_odc():
             raise TimeoutError("Tiempo de espera agotado para carga de datos")
         
         output_path = odc_path.parent / "datos_actualizados.xlsx"
-        logger.info(f"Guardando como: {output_path}")
         workbook.SaveAs(str(output_path.absolute()), FileFormat=51)
         
         workbook.Close(False)
@@ -145,7 +144,7 @@ def exportar_desde_odc():
                 torno2 = datos_fecha[datos_fecha['WorkId'] == 3012]
                 
                 # Formatear mensaje
-                mensaje = f"\n"
+                mensaje = f"\n \n"
                 
                 if not torno1.empty:
                     mensaje += (
