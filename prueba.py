@@ -135,34 +135,34 @@
 #             # Registrar en log
 #             logger.info("=== ÚLTIMOS 5 DÍAS - RENDIMIENTO POR TORNO ===")
             
-#             for fecha in ultimas_5_fechas:
-#                 # Filtrar datos para esta fecha
-#                 datos_fecha = datos_recientes[datos_recientes['Fecha'] == fecha]
+            # for fecha in ultimas_5_fechas:
+            #     # Filtrar datos para esta fecha
+            #     datos_fecha = datos_recientes[datos_recientes['Fecha'] == fecha]
                 
-#                 # Obtener datos para cada torno
-#                 torno1 = datos_fecha[datos_fecha['WorkId'] == 3011]
-#                 torno2 = datos_fecha[datos_fecha['WorkId'] == 3012]
+            #     # Obtener datos para cada torno
+            #     torno1 = datos_fecha[datos_fecha['WorkId'] == 3011]
+            #     torno2 = datos_fecha[datos_fecha['WorkId'] == 3012]
                 
-#                 # Formatear mensaje
-#                 mensaje = f"\n"
+            #     # Formatear mensaje
+            #     mensaje = f"\n"
                 
-#                 if not torno1.empty:
-#                     mensaje += (
-#                         f" Fecha: {fecha.strftime('%Y-%m-%d')} TORNO 1 - Rendimiento: {torno1.iloc[0].get('Rendimiento', 'N/A')} | "
-#                         f"Rendimiento Acumulado: {torno1.iloc[0].get('Rendimiento_Acumulado', 'N/A')}\n"
-#                     )
-#                 else:
-#                     mensaje += "  TORNO 1 - Sin datos\n"
+            #     if not torno1.empty:
+            #         mensaje += (
+            #             f" Fecha: {fecha.strftime('%Y-%m-%d')} TORNO 1 - Rendimiento: {torno1.iloc[0].get('Rendimiento', 'N/A')} | "
+            #             f"Rendimiento Acumulado: {torno1.iloc[0].get('Rendimiento_Acumulado', 'N/A')}\n"
+            #         )
+            #     else:
+            #         mensaje += "  TORNO 1 - Sin datos\n"
                 
-#                 if not torno2.empty:
-#                     mensaje += (
-#                         f" Fecha: {fecha.strftime('%Y-%m-%d')} TORNO 2 - Rendimiento: {torno2.iloc[0].get('Rendimiento', 'N/A')} | "
-#                         f"Rendimiento Acumulado: {torno2.iloc[0].get('Rendimiento_Acumulado', 'N/A')}\n"
-#                     )
-#                 else:
-#                     mensaje += "  TORNO 2 - Sin datos\n"
+            #     if not torno2.empty:
+            #         mensaje += (
+            #             f" Fecha: {fecha.strftime('%Y-%m-%d')} TORNO 2 - Rendimiento: {torno2.iloc[0].get('Rendimiento', 'N/A')} | "
+            #             f"Rendimiento Acumulado: {torno2.iloc[0].get('Rendimiento_Acumulado', 'N/A')}\n"
+            #         )
+            #     else:
+            #         mensaje += "  TORNO 2 - Sin datos\n"
                 
-#                 logger.info(mensaje)
+            #     logger.info(mensaje)
 #         except Exception as e:
 #             logger.error(f"Error al procesar últimos 5 días: {str(e)}")
         
@@ -335,39 +335,34 @@ def procesar_archivo_odc():
         if not datos.empty:
             logger.info("=== RESUMEN DE DATOS ==\n")
             
-            try:
-                if 'Fecha' in datos.columns:
-                    datos['Fecha'] = pd.to_datetime(datos['Fecha'])
-                    datos.sort_values('Fecha', ascending=False, inplace=True)
-                    
-                    # Obtener las 5 fechas más recientes
-                    ultimas_fechas = datos['Fecha'].unique()[:5]
-                    
-                    for fecha in ultimas_fechas:
-                        datos_fecha = datos[datos['Fecha'] == fecha]
-                        
-                        # Mostrar datos de Torno 1 y Torno 2 para cada fecha
-                        for workid in [3011, 3012]:
-                            filtro = datos_fecha['WorkId'] == workid
-                            if any(filtro):
-                                row = datos_fecha.loc[filtro].iloc[0]
-                                logger.info(
-                                    f"\n"
-                                    f"Torno {workid-3010}: "
-                                    f"Rendimiento: {row.get('Rendimiento', 0):.2f} | "
-                                    f"Acumulado: {row.get('Rendimiento_Acumulado', 0):.2f}"
-                                )
-            
-            except Exception as e:
-                logger.error(f"Error generando resumen: {str(e)}")
-        
-        return True
-
-    except Exception as e:
-        logger.error(f"ERROR: {str(e)}", exc_info=True)
-        return False
-
-    finally:
+            for fecha in ultimas_5_fechas:
+                # Filtrar datos para esta fecha
+                datos_fecha = datos_recientes[datos_recientes['Fecha'] == fecha]
+                
+                # Obtener datos para cada torno
+                torno1 = datos_fecha[datos_fecha['WorkId'] == 3011]
+                torno2 = datos_fecha[datos_fecha['WorkId'] == 3012]
+                
+                # Formatear mensaje
+                mensaje = f"\n"
+                
+                if not torno1.empty:
+                    mensaje += (
+                        f" Fecha: {fecha.strftime('%Y-%m-%d')} TORNO 1 - Rendimiento: {torno1.iloc[0].get('Rendimiento', 'N/A')} | "
+                        f"Rendimiento Acumulado: {torno1.iloc[0].get('Rendimiento_Acumulado', 'N/A')}\n"
+                    )
+                else:
+                    mensaje += "  TORNO 1 - Sin datos\n"
+                
+                if not torno2.empty:
+                    mensaje += (
+                        f" Fecha: {fecha.strftime('%Y-%m-%d')} TORNO 2 - Rendimiento: {torno2.iloc[0].get('Rendimiento', 'N/A')} | "
+                        f"Rendimiento Acumulado: {torno2.iloc[0].get('Rendimiento_Acumulado', 'N/A')}\n"
+                    )
+                else:
+                    mensaje += "  TORNO 2 - Sin datos\n"
+                
+                logger.info(mensaje)
         try:
             if workbook: workbook.Close(False)
             if excel: excel.Quit()
