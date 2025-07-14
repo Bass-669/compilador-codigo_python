@@ -330,7 +330,7 @@ def procesar_archivo_odc():
                     torno1 = datos_fecha[datos_fecha['WorkId'] == 3011]
                     if not torno1.empty:
                         logger.info(
-                            f"Torno 1: Rendimiento: {torno1.iloc[0].get('Rendimiento', 0):.2f} | "
+                            f"Fecha: {fecha.strftime('%Y-%m-%d')} Torno 1: Rendimiento: {torno1.iloc[0].get('Rendimiento', 0):.2f} | "
                             f"Acumulado: {torno1.iloc[0].get('Rendimiento_Acumulado', 0):.2f}"
                         )
                     else:
@@ -340,7 +340,7 @@ def procesar_archivo_odc():
                     torno2 = datos_fecha[datos_fecha['WorkId'] == 3012]
                     if not torno2.empty:
                         logger.info(
-                            f"Torno 2: Rendimiento: {torno2.iloc[0].get('Rendimiento', 0):.2f} | "
+                            f"Fecha: {fecha.strftime('%Y-%m-%d')} Torno 2: Rendimiento: {torno2.iloc[0].get('Rendimiento', 0):.2f} | "
                             f"Acumulado: {torno2.iloc[0].get('Rendimiento_Acumulado', 0):.2f}\n"
                         )
                     else:
