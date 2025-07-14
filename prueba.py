@@ -134,7 +134,7 @@ def exportar_desde_odc():
             datos_recientes = datos[datos['Fecha'].isin(ultimas_5_fechas)]
             
             # Registrar en log
-            logger.info("\n=== ÚLTIMOS 5 DÍAS - RENDIMIENTO POR TORNO ===")
+            logger.info("=== ÚLTIMOS 5 DÍAS - RENDIMIENTO POR TORNO ===")
             
             for fecha in ultimas_5_fechas:
                 # Filtrar datos para esta fecha
@@ -149,7 +149,7 @@ def exportar_desde_odc():
                 
                 if not torno1.empty:
                     mensaje += (
-                        f"  TORNO 1 - Rendimiento: {torno1.iloc[0].get('Rendimiento', 'N/A')} | "
+                        f" Fecha: {fecha.strftime('%Y-%m-%d')} TORNO 1 - Rendimiento: {torno1.iloc[0].get('Rendimiento', 'N/A')} | "
                         f"Rendimiento Acumulado: {torno1.iloc[0].get('Rendimiento_Acumulado', 'N/A')}\n"
                     )
                 else:
@@ -157,7 +157,7 @@ def exportar_desde_odc():
                 
                 if not torno2.empty:
                     mensaje += (
-                        f"  TORNO 2 - Rendimiento: {torno2.iloc[0].get('Rendimiento', 'N/A')} | "
+                        f" Fecha: {fecha.strftime('%Y-%m-%d')} TORNO 2 - Rendimiento: {torno2.iloc[0].get('Rendimiento', 'N/A')} | "
                         f"Rendimiento Acumulado: {torno2.iloc[0].get('Rendimiento_Acumulado', 'N/A')}"
                     )
                 else:
