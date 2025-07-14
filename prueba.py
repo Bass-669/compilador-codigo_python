@@ -131,7 +131,7 @@ def exportar_desde_odc():
             ultimos_5_dias = datos.drop_duplicates('Fecha').head(5)
             
             # Registrar en log
-            logger.info("=== ÚLTIMOS 5 DÍAS === \n")
+            logger.info("=== ÚLTIMOS 5 DÍAS ===")
             for _, fila in ultimos_5_dias.iterrows():
                 logger.info(
                     f"Fecha: {fila['Fecha'].strftime('%Y-%m-%d')} | "
@@ -158,13 +158,12 @@ def exportar_desde_odc():
         return None
     finally:
         pythoncom.CoUninitialize()
-        logger.info("\n === FINALIZADO MANEJO DE EXCEL ===")
+        logger.info("=== FINALIZADO MANEJO DE EXCEL ===")
 
 # Configuración inicial
 logger = configurar_logging()
 
 # Punto de entrada principal
 if __name__ == "__main__":
-    logger.info("=== INICIO DE EJECUCIÓN ===")
     datos = exportar_desde_odc()
     logger.info("=== FIN DE EJECUCIÓN === \n")
