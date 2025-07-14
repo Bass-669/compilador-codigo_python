@@ -201,17 +201,17 @@ import time
 from pathlib import Path
 
 ## ---------------------------------------------------------------
-## 1. CONFIGURACIÓN INICIAL (GARANTIZA PRIMER MENSAJE INMEDIATO)
+## 1. CONFIGURACIÓN INICIAL
 ## ---------------------------------------------------------------
 
 # Configuración rápida inicial
 logging.basicConfig(
     level=logging.INFO,
-    format='%(message)s',
+    format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[logging.StreamHandler()]
 )
 logger = logging.getLogger('TornosLogger')
-logger.info("Iniciando proceso...")  # Mensaje inmediato
+logger.info("Iniciando proceso...")
 
 ## ---------------------------------------------------------------
 ## 2. CARGA SEGURA DE DEPENDENCIAS
@@ -255,44 +255,33 @@ def configurar_log_completo():
 configurar_log_completo()
 
 ## ---------------------------------------------------------------
-## 4. FUNCIONES PRINCIPALES (VERIFICADAS)
+## 4. FUNCIONES PRINCIPALES (CORREGIDAS)
 ## ---------------------------------------------------------------
 
 def encontrar_archivo_odc_especifico():
-    """Búsqueda específica para el archivo CLNALMISOTPRD...Peeling..."""
+    """Búsqueda específica para el archivo ODC"""
     base_path = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).parent
     
-    # Patrones exactos según lo indicado
     patrones_exactos = [
-        "CLNALMISOTPRD*rwExport*report_Peeling_Production*.odc",
-        "*rwExport*report_Peeling_Production*.odc",
-        "*report_Peeling_Production*.odc"
+        "CLNALMISOTPRD rwExport report_Peeling_Production query.odc",
+        "CLNALMISOTPRD*.odc",
+        "*report_Peeling_Production*.odc",
+        "*.odc"
     ]
     
     for patron in patrones_exactos:
         try:
-            archivos = list(base_path.glob(patron))
-            if archivos:
-                archivo = archivos[0]
+            for archivo in base_path.glob(patron):
                 logger.info(f"Archivo encontrado: {archivo.name}")
                 return archivo
         except Exception as e:
             logger.warning(f"Error buscando {patron}: {str(e)}")
     
-    # Si no encuentra el específico, busca cualquier .odc
-    try:
-        archivos = list(base_path.glob("*.odc"))
-        if archivos:
-            logger.warning(f"Usando archivo alternativo: {archivos[0].name}")
-            return archivos[0]
-    except:
-        pass
-    
     logger.error("No se encontró ningún archivo ODC")
     return None
 
 def procesar_archivo_odc():
-    """Procesamiento completo garantizado"""
+    """Procesamiento completo corregido"""
     excel = None
     workbook = None
     
@@ -311,9 +300,10 @@ def procesar_archivo_odc():
         excel.DisplayAlerts = False
         excel.ScreenUpdating = False
         
-        # 3. ABRIR ARCHIVO
+        # 3. ABRIR ARCHIVO (VERSIÓN CORREGIDA)
+        logger.info("Abriendo archivo ODC...")
         workbook = excel.Workbooks.Open(
-            FileName=str(odc_path.absolute()),
+            str(odc_path.absolute()),  # CORRECCIÓN: Sin parámetro FileName
             UpdateLinks=0,
             ReadOnly=True
         )
@@ -321,7 +311,7 @@ def procesar_archivo_odc():
         # 4. ESPERA CON CONTROL
         logger.info("Cargando datos...")
         start_time = time.time()
-        while (time.time() - start_time) < 15:  # Máximo 15 segundos
+        while (time.time() - start_time) < 15:
             try:
                 if workbook.Application.Ready:
                     logger.info("Datos cargados correctamente")
@@ -338,9 +328,9 @@ def procesar_archivo_odc():
             logger.warning("El archivo de salida ya existe, se sobrescribirá")
         
         workbook.SaveAs(
-            FileName=str(output_path),
-            FileFormat=51,  # xlOpenXMLWorkbook
-            ConflictResolution=2  # Sobrescribir
+            str(output_path),  # CORRECCIÓN: Sin parámetro FileName
+            FileFormat=51,
+            ConflictResolution=2
         )
         logger.info(f"Datos exportados a: {output_path.name}")
         
@@ -351,13 +341,11 @@ def procesar_archivo_odc():
             logger.info("\n=== RESUMEN DE DATOS ===")
             logger.info(f"Total registros: {len(datos)}")
             
-            # Procesar fechas si existe la columna
             if 'Fecha' in datos.columns:
                 try:
                     datos['Fecha'] = pd.to_datetime(datos['Fecha'])
                     datos.sort_values('Fecha', ascending=False, inplace=True)
                     
-                    # Últimos 5 días con datos de tornos
                     for fecha in datos['Fecha'].unique()[:5]:
                         logger.info(f"\nFecha: {fecha.strftime('%Y-%m-%d')}")
                         
@@ -367,8 +355,8 @@ def procesar_archivo_odc():
                                 row = datos.loc[filtro].iloc[0]
                                 logger.info(
                                     f"Torno {workid-3010}: "
-                                    f"Rendimiento: {row.get('Rendimiento', 'N/A')} | "
-                                    f"Acumulado: {row.get('Rendimiento_Acumulado', 'N/A')}"
+                                    f"Rendimiento: {row.get('Rendimiento', 0):.2f} | "
+                                    f"Acumulado: {row.get('Rendimiento_Acumulado', 0):.2f}"
                                 )
                 except Exception as e:
                     logger.error(f"Error procesando fechas: {str(e)}")
@@ -382,7 +370,6 @@ def procesar_archivo_odc():
         return False
         
     finally:
-        # LIMPIEZA GARANTIZADA
         try:
             if workbook: workbook.Close(False)
             if excel: excel.Quit()
@@ -390,19 +377,18 @@ def procesar_archivo_odc():
         except: pass
 
 ## ---------------------------------------------------------------
-## 5. EJECUCIÓN PRINCIPAL (GARANTIZADA)
+## 5. EJECUCIÓN PRINCIPAL
 ## ---------------------------------------------------------------
 
 if __name__ == "__main__":
-    logger.info("\n=== INICIO DEL PROCESO ===")
+    logger.info("=== INICIO DEL PROCESO ===")
     
     if procesar_archivo_odc():
         logger.info("Proceso completado con ÉXITO")
     else:
         logger.error("Proceso completado con ERRORES")
     
-    # Solo esperar entrada si no es .exe
     if not getattr(sys, 'frozen', False):
         input("\nPresione Enter para salir...")
     
-    logger.info("=== FIN DEL PROCESO ===")
+    logger.info("=== FIN DEL PROCESO ===\n")
