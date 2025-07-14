@@ -328,47 +328,57 @@ def procesar_archivo_odc():
             ConflictResolution=2
         )
         logger.info(f"Datos exportados a: {output_path.name}")
-        
+                
         # 6. GENERAR REPORTE
         datos = pd.read_excel(output_path)
         
         if not datos.empty:
-            logger.info("=== RESUMEN DE DATOS ==\n")
+            logger.info("=== RESUMEN DE DATOS ===")
+            logger.info("")  # Línea en blanco sin prefijo
             
-            for fecha in ultimas_5_fechas:
-                # Filtrar datos para esta fecha
-                datos_fecha = datos_recientes[datos_recientes['Fecha'] == fecha]
+            try:
+                # Convertir y ordenar por fecha
+                datos['Fecha'] = pd.to_datetime(datos['Fecha'])
+                datos = datos.sort_values('Fecha', ascending=False)
                 
-                # Obtener datos para cada torno
-                torno1 = datos_fecha[datos_fecha['WorkId'] == 3011]
-                torno2 = datos_fecha[datos_fecha['WorkId'] == 3012]
+                # Obtener las 5 fechas más recientes
+                ultimas_fechas = datos['Fecha'].unique()[:5]
                 
-                # Formatear mensaje
-                mensaje = f"\n"
-                
-                if not torno1.empty:
-                    mensaje += (
-                        f" Fecha: {fecha.strftime('%Y-%m-%d')} TORNO 1 - Rendimiento: {torno1.iloc[0].get('Rendimiento', 'N/A')} | "
-                        f"Rendimiento Acumulado: {torno1.iloc[0].get('Rendimiento_Acumulado', 'N/A')}\n"
-                    )
-                else:
-                    mensaje += "  TORNO 1 - Sin datos\n"
-                
-                if not torno2.empty:
-                    mensaje += (
-                        f" Fecha: {fecha.strftime('%Y-%m-%d')} TORNO 2 - Rendimiento: {torno2.iloc[0].get('Rendimiento', 'N/A')} | "
-                        f"Rendimiento Acumulado: {torno2.iloc[0].get('Rendimiento_Acumulado', 'N/A')}\n"
-                    )
-                else:
-                    mensaje += "  TORNO 2 - Sin datos\n"
-                
-                logger.info(mensaje)
+                for fecha in ultimas_fechas:
+                    datos_fecha = datos[datos['Fecha'] == fecha]
+                    
+                    # Procesar Torno 1 (WorkId 3011)
+                    torno1 = datos_fecha[datos_fecha['WorkId'] == 3011]
+                    if not torno1.empty:
+                        rend1 = torno1.iloc[0].get('Rendimiento', 0)
+                        acum1 = torno1.iloc[0].get('Rendimiento_Acumulado', 0)
+                        logger.info(f"Torno 1: Rendimiento: {rend1:.2f} | Acumulado: {acum1:.2f}")
+                    else:
+                        logger.info("Torno 1: Sin datos")
+                    
+                    # Procesar Torno 2 (WorkId 3012)
+                    torno2 = datos_fecha[datos_fecha['WorkId'] == 3012]
+                    if not torno2.empty:
+                        rend2 = torno2.iloc[0].get('Rendimiento', 0)
+                        acum2 = torno2.iloc[0].get('Rendimiento_Acumulado', 0)
+                        logger.info(f"Torno 2: Rendimiento: {rend2:.2f} | Acumulado: {acum2:.2f}")
+                    else:
+                        logger.info("Torno 2: Sin datos")
+                    
+                    # Línea en blanco entre fechas (excepto después de la última)
+                    if fecha != ultimas_fechas[-1]:
+                        logger.info("")
+                        
+            except Exception as e:
+                logger.error(f"Error generando resumen: {str(e)}")
+        
+        # Limpieza de recursos
         try:
             if workbook: workbook.Close(False)
             if excel: excel.Quit()
             pythoncom.CoUninitialize()
-        except: pass
-
+        except Exception as e:
+            logger.warning(f"Error al cerrar recursos: {str(e)}")
 ## ---------------------------------------------------------------
 ## 5. EJECUCIÓN PRINCIPAL
 ## ---------------------------------------------------------------
