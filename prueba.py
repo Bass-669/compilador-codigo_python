@@ -328,36 +328,39 @@ def procesar_archivo_odc():
             ConflictResolution=2
         )
         logger.info(f"Datos exportados")
-        
         # 6. GENERAR REPORTE
         datos = pd.read_excel(output_path)
-        
         if not datos.empty:
-            logger.info("=== RESUMEN DE DATOS ===\n")
+                logger.info("=== RESUMEN DE DATOS ===\n")
+                logger.info("")  # Línea en blanco                
             if 'Fecha' in datos.columns:
                 try:
                     datos['Fecha'] = pd.to_datetime(datos['Fecha'])
                     datos.sort_values('Fecha', ascending=False, inplace=True)
-                    
-                    for fecha in datos['Fecha'].unique()[:5]:
-                        for workid in [3011, 3012]:
-                            filtro = (datos['Fecha'] == fecha) & (datos['WorkId'] == workid)
-                            if any(filtro):
-                                row = datos.loc[filtro].iloc[0]
-                                logger.info(
-                                    f"Torno {workid-3010}: "
-                                    f"Rendimiento: {row.get('Rendimiento', 0):.2f} | "
-                                    f"Acumulado: {row.get('Rendimiento_Acumulado', 0):.2f}"
-                                )
-                except Exception as e:
-                    logger.error(f"Error procesando fechas: {str(e)}")
-        
+                # Obtener las 5 fechas más recientes
+                ultimas_fechas = datos['Fecha'].unique()[:5]
+                for fecha in ultimas_fechas:
+                    datos_fecha = datos[datos['Fecha'] == fecha]
+                    # Mostrar datos de Torno 1 y Torno 2 para cada fecha
+                    for workid in [3011, 3012]:
+                        filtro = datos_fecha['WorkId'] == workid
+                        if any(filtro):
+                            row = datos_fecha.loc[filtro].iloc[0]
+                            logger.info(
+                                f"Torno {workid-3010}: "
+                                f"Rendimiento: {row.get('Rendimiento', 0):.2f} | "
+                                f"Acumulado: {row.get('Rendimiento_Acumulado', 0):.2f}"
+                            )
+                    if fecha != ultimas_fechas[-1]:
+                        logger.info("")                
+    except Exception as e:
+        logger.error(f"Error procesando fechas: {str(e)}")
         return True
-        
+
     except Exception as e:
         logger.error(f"ERROR: {str(e)}", exc_info=True)
         return False
-        
+
     finally:
         try:
             if workbook: workbook.Close(False)
