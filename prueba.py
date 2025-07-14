@@ -327,34 +327,44 @@ def procesar_archivo_odc():
             FileFormat=51,
             ConflictResolution=2
         )
-        logger.info(f"Datos exportados")
+        logger.info(f"Datos exportados a: {output_path.name}")
+        
         # 6. GENERAR REPORTE
         datos = pd.read_excel(output_path)
+        
         if not datos.empty:
-                logger.info("=== RESUMEN DE DATOS ===\n")
-                logger.info("")  # Línea en blanco                
-            if 'Fecha' in datos.columns:
-                try:
+            logger.info("=== RESUMEN DE DATOS ===")
+            logger.info("")  # Línea en blanco
+            
+            try:
+                if 'Fecha' in datos.columns:
                     datos['Fecha'] = pd.to_datetime(datos['Fecha'])
                     datos.sort_values('Fecha', ascending=False, inplace=True)
-                # Obtener las 5 fechas más recientes
-                ultimas_fechas = datos['Fecha'].unique()[:5]
-                for fecha in ultimas_fechas:
-                    datos_fecha = datos[datos['Fecha'] == fecha]
-                    # Mostrar datos de Torno 1 y Torno 2 para cada fecha
-                    for workid in [3011, 3012]:
-                        filtro = datos_fecha['WorkId'] == workid
-                        if any(filtro):
-                            row = datos_fecha.loc[filtro].iloc[0]
-                            logger.info(
-                                f"Torno {workid-3010}: "
-                                f"Rendimiento: {row.get('Rendimiento', 0):.2f} | "
-                                f"Acumulado: {row.get('Rendimiento_Acumulado', 0):.2f}"
-                            )
-                    if fecha != ultimas_fechas[-1]:
-                        logger.info("")                
-    except Exception as e:
-        logger.error(f"Error procesando fechas: {str(e)}")
+                    
+                    # Obtener las 5 fechas más recientes
+                    ultimas_fechas = datos['Fecha'].unique()[:5]
+                    
+                    for fecha in ultimas_fechas:
+                        datos_fecha = datos[datos['Fecha'] == fecha]
+                        
+                        # Mostrar datos de Torno 1 y Torno 2 para cada fecha
+                        for workid in [3011, 3012]:
+                            filtro = datos_fecha['WorkId'] == workid
+                            if any(filtro):
+                                row = datos_fecha.loc[filtro].iloc[0]
+                                logger.info(
+                                    f"Torno {workid-3010}: "
+                                    f"Rendimiento: {row.get('Rendimiento', 0):.2f} | "
+                                    f"Acumulado: {row.get('Rendimiento_Acumulado', 0):.2f}"
+                                )
+                        
+                        # Línea en blanco entre fechas (excepto después de la última)
+                        if fecha != ultimas_fechas[-1]:
+                            logger.info("")
+            
+            except Exception as e:
+                logger.error(f"Error generando resumen: {str(e)}")
+        
         return True
 
     except Exception as e:
