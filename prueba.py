@@ -333,8 +333,7 @@ def procesar_archivo_odc():
         datos = pd.read_excel(output_path)
         
         if not datos.empty:
-            logger.info("=== RESUMEN DE DATOS ===")
-            logger.info("")  # Línea en blanco
+            logger.info("=== RESUMEN DE DATOS ==\n")
             
             try:
                 if 'Fecha' in datos.columns:
@@ -354,13 +353,9 @@ def procesar_archivo_odc():
                                 row = datos_fecha.loc[filtro].iloc[0]
                                 logger.info(
                                     f"Torno {workid-3010}: "
-                                    f"Rendimiento: {row.get('Rendimiento', 0):.2f} | "
-                                    f"Acumulado: {row.get('Rendimiento_Acumulado', 0):.2f}"
+                                    f"Rendimiento: {row.get('Rendimiento', 0):.2f}"
+                                    f"Acumulado: {row.get('Rendimiento_Acumulado', 0):.2f}\n"
                                 )
-                        
-                        # Línea en blanco entre fechas (excepto después de la última)
-                        if fecha != ultimas_fechas[-1]:
-                            logger.info("")
             
             except Exception as e:
                 logger.error(f"Error generando resumen: {str(e)}")
