@@ -352,9 +352,10 @@ def procesar_archivo_odc():
                             if any(filtro):
                                 row = datos_fecha.loc[filtro].iloc[0]
                                 logger.info(
+                                    f"\n"
                                     f"Torno {workid-3010}: "
-                                    f"Rendimiento: {row.get('Rendimiento', 0):.2f}"
-                                    f"Acumulado: {row.get('Rendimiento_Acumulado', 0):.2f}\n"
+                                    f"Rendimiento: {row.get('Rendimiento', 0):.2f} | "
+                                    f"Acumulado: {row.get('Rendimiento_Acumulado', 0):.2f}"
                                 )
             
             except Exception as e:
