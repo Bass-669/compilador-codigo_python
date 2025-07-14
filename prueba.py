@@ -67,7 +67,7 @@ def encontrar_archivo_odc():
         if archivos:
             archivo = archivos[0]
             if verificar_archivo_no_bloqueado(archivo):
-                logger.info(f"Archivo encontrado y accesible: {archivo}")
+                logger.info(f"Archivo encontrado y accesible")
                 return archivo
             else:
                 logger.error(f"Archivo encontrado pero bloqueado: {archivo}")
@@ -87,8 +87,6 @@ def exportar_desde_odc():
             raise FileNotFoundError("No se pudo encontrar el archivo ODC accesible")
         
         ruta_absoluta = str(odc_path.absolute())
-        logger.info(f"Ruta absoluta del archivo: {ruta_absoluta}")
-        
         pythoncom.CoInitialize()
         excel = win32com.client.DispatchEx("Excel.Application")
         excel.Visible = False
@@ -133,16 +131,13 @@ def exportar_desde_odc():
             ultimos_5_dias = datos.drop_duplicates('Fecha').head(5)
             
             # Registrar en log
-            logger.info("=== ÚLTIMOS 5 DÍAS ===")
+            logger.info("=== ÚLTIMOS 5 DÍAS === \n")
             for _, fila in ultimos_5_dias.iterrows():
                 logger.info(
                     f"Fecha: {fila['Fecha'].strftime('%Y-%m-%d')} | "
                     f"Rendimiento: {fila.get('Rendimiento', 'N/A')} | "
                     f"Rendimiento Acumulado: {fila.get('Rendimiento_Acumulado', 'N/A')}"
                 )
-            logger.info("======================")
-            
-            logger.info(f"Datos obtenidos. Filas: {len(datos)}. Columnas: {list(datos.columns)}")
         except Exception as e:
             logger.error(f"Error al procesar últimos 5 días: {str(e)}")
         
@@ -163,7 +158,7 @@ def exportar_desde_odc():
         return None
     finally:
         pythoncom.CoUninitialize()
-        logger.info("=== FINALIZADO MANEJO DE EXCEL ===")
+        logger.info("\n === FINALIZADO MANEJO DE EXCEL ===")
 
 # Configuración inicial
 logger = configurar_logging()
