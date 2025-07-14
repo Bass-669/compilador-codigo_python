@@ -334,51 +334,48 @@ def procesar_archivo_odc():
         
         if not datos.empty:
             logger.info("=== RESUMEN DE DATOS ===")
-            logger.info("")  # Línea en blanco sin prefijo
+            logger.info("")  # Línea en blanco
             
             try:
-                # Convertir y ordenar por fecha
                 datos['Fecha'] = pd.to_datetime(datos['Fecha'])
                 datos = datos.sort_values('Fecha', ascending=False)
+                ultimas_5_fechas = datos['Fecha'].unique()[:5]
                 
-                # Obtener las 5 fechas más recientes
-                ultimas_fechas = datos['Fecha'].unique()[:5]
-                
-                for fecha in ultimas_fechas:
+                for fecha in ultimas_5_fechas:
                     datos_fecha = datos[datos['Fecha'] == fecha]
                     
-                    # Procesar Torno 1 (WorkId 3011)
+                    # Torno 1
                     torno1 = datos_fecha[datos_fecha['WorkId'] == 3011]
                     if not torno1.empty:
-                        rend1 = torno1.iloc[0].get('Rendimiento', 0)
-                        acum1 = torno1.iloc[0].get('Rendimiento_Acumulado', 0)
-                        logger.info(f"Torno 1: Rendimiento: {rend1:.2f} | Acumulado: {acum1:.2f}")
+                        logger.info(
+                            f"Torno 1: Rendimiento: {torno1.iloc[0].get('Rendimiento', 0):.2f} | "
+                            f"Acumulado: {torno1.iloc[0].get('Rendimiento_Acumulado', 0):.2f}"
+                        )
                     else:
                         logger.info("Torno 1: Sin datos")
                     
-                    # Procesar Torno 2 (WorkId 3012)
+                    # Torno 2
                     torno2 = datos_fecha[datos_fecha['WorkId'] == 3012]
                     if not torno2.empty:
-                        rend2 = torno2.iloc[0].get('Rendimiento', 0)
-                        acum2 = torno2.iloc[0].get('Rendimiento_Acumulado', 0)
-                        logger.info(f"Torno 2: Rendimiento: {rend2:.2f} | Acumulado: {acum2:.2f}")
+                        logger.info(
+                            f"Torno 2: Rendimiento: {torno2.iloc[0].get('Rendimiento', 0):.2f} | "
+                            f"Acumulado: {torno2.iloc[0].get('Rendimiento_Acumulado', 0):.2f}"
+                        )
                     else:
                         logger.info("Torno 2: Sin datos")
                     
-                    # Línea en blanco entre fechas (excepto después de la última)
-                    if fecha != ultimas_fechas[-1]:
+                    # Línea en blanco entre fechas
+                    if fecha != ultimas_5_fechas[-1]:
                         logger.info("")
                         
             except Exception as e:
-                logger.error(f"Error generando resumen: {str(e)}")
-        
-        # Limpieza de recursos
+                logger.error(f"Error procesando fechas: {str(e)}")
+
         try:
             if workbook: workbook.Close(False)
             if excel: excel.Quit()
             pythoncom.CoUninitialize()
-        except Exception as e:
-            logger.warning(f"Error al cerrar recursos: {str(e)}")
+        except: pass
 ## ---------------------------------------------------------------
 ## 5. EJECUCIÓN PRINCIPAL
 ## ---------------------------------------------------------------
