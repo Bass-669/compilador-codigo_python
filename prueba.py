@@ -81,7 +81,7 @@ def exportar_desde_odc():
     excel = None
     workbook = None
     try:
-        logger.info("=== INICIANDO EXPORTACIÓN DESDE ODC ===")
+        logger.info("=== INICIANDO EXPORTACIÓN DESDE ODC === \n")
         odc_path = encontrar_archivo_odc()
         if not odc_path:
             raise FileNotFoundError("No se pudo encontrar el archivo ODC accesible")
