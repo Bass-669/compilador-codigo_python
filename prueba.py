@@ -195,15 +195,15 @@
 
 
 # -*- coding: utf-8 -*-
-"""Script optimizado para inicio rápido del .exe"""
-
-# 1. Configuración inicial ultra rápida del logging
 import logging
 import sys
+import os
 from pathlib import Path
+import time
 
+# 1. Configuración INMEDIATA del logging (primer mensaje en <1 segundo)
 def configurar_logging_rapido():
-    """Configura logging básico inmediato para feedback rápido"""
+    """Configuración mínima inicial para feedback inmediato"""
     try:
         logging.basicConfig(
             level=logging.INFO,
@@ -211,36 +211,29 @@ def configurar_logging_rapido():
             handlers=[logging.StreamHandler()]
         )
         logger = logging.getLogger('TornosLogger')
-        logger.info("Iniciando aplicación...")  # Primer mensaje inmediato
+        logger.info("Iniciando aplicación...")  # Primer mensaje visible inmediatamente
         return logger
     except Exception:
+        logging.basicConfig(level=logging.INFO)
         return logging.getLogger('TornosLogger')
 
-# Primer mensaje en menos de 1 segundo
 logger = configurar_logging_rapido()
 
-# 2. Carga diferida de dependencias pesadas
+# 2. Carga DIFERIDA de módulos pesados
 def cargar_dependencias():
-    """Carga los módulos pesados cuando sean necesarios"""
-    import time
-    import win32com.client
+    """Importa los módulos pesados solo cuando se necesiten"""
     import pythoncom
+    import win32com.client
     import pandas as pd
     from logging.handlers import RotatingFileHandler
-    from datetime import datetime
     import shutil
-    return (
-        time, win32com.client, pythoncom, pd,
-        RotatingFileHandler, datetime, shutil
-    )
+    return pythoncom, win32com.client, pd, RotatingFileHandler, shutil
 
-# 3. Configuración completa del logging (se ejecuta después del inicio rápido)
-def configurar_logging_completo():
+# 3. Configuración COMPLETA del logging (se ejecuta después del inicio rápido)
+def configurar_logging_completo(base_path):
     """Configura el sistema de logging completo con rotación"""
     try:
-        base_path = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).parent
         log_path = base_path / "tornos.log"
-        
         file_handler = RotatingFileHandler(
             str(log_path),
             maxBytes=5*1024*1024,
@@ -252,117 +245,114 @@ def configurar_logging_completo():
             datefmt='%Y-%m-%d %H:%M:%S'
         ))
         logger.addHandler(file_handler)
-        logger.info("Logging completo configurado")
+        logger.info(f"Log completo configurado en: {log_path}")
     except Exception as e:
-        logger.error(f"Error configurando logging completo: {str(e)}")
+        logger.error(f"No se pudo configurar log completo: {str(e)}")
 
-# 4. Funciones principales con carga diferida
+# 4. Funciones principales
 def verificar_archivo_no_bloqueado(ruta_archivo):
-    """Verifica que el archivo no esté bloqueado"""
     try:
         with open(ruta_archivo, 'a+b'):
             pass
         return True
     except Exception as e:
-        logger.error(f"Error accediendo al archivo: {str(e)}")
+        logger.error(f"Archivo bloqueado/inaccesible: {ruta_archivo} - {str(e)}")
         return False
 
-def encontrar_archivo_odc():
-    """Busca el archivo ODC con flexibilidad en el nombre"""
-    base_path = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).parent
-    posibles_patrones = [
+def encontrar_archivo_odc(base_path):
+    patrones = [
         "*CLNALMISOTPRD*Peeling*Production*.odc",
         "*rwExport*Peeling*Production*.odc",
+        "*Peeling*Production*.odc",
         "*.odc"
     ]
     
-    for patron in posibles_patrones:
+    for patron in patrones:
         try:
-            archivos = list(base_path.glob(patron))
-            if archivos:
-                archivo = archivos[0]
+            for archivo in base_path.glob(patron):
                 if verificar_archivo_no_bloqueado(archivo):
-                    logger.info(f"Archivo encontrado: {archivo}")
                     return archivo
         except Exception as e:
-            logger.warning(f"Error buscando patrón {patron}: {str(e)}")
+            logger.warning(f"Error buscando {patron}: {str(e)}")
     
-    logger.error("No se encontró archivo ODC accesible")
+    logger.error(f"No se encontró archivo ODC. Directorio: {base_path}")
     return None
 
 def exportar_desde_odc():
-    """Exporta datos desde ODC a Excel optimizado"""
-    # Carga diferida de dependencias pesadas
-    (time, win32com, pythoncom, pd, 
-     _, datetime, shutil) = cargar_dependencias()
+    """Función principal optimizada"""
+    # Carga diferida de dependencias
+    pythoncom, win32com, pd, _, _ = cargar_dependencias()
+    
+    # Obtener ruta base
+    base_path = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).parent
+    
+    # Configurar logging completo
+    configurar_logging_completo(base_path)
     
     excel = None
     workbook = None
+    
     try:
-        logger.info("Buscando archivo ODC...")
-        odc_path = encontrar_archivo_odc()
+        # Buscar archivo ODC
+        odc_path = encontrar_archivo_odc(base_path)
         if not odc_path:
             raise FileNotFoundError("Archivo ODC no encontrado")
         
-        # Configuración optimizada de Excel
+        # Iniciar Excel optimizado
         pythoncom.CoInitialize()
         excel = win32com.client.DispatchEx("Excel.Application")
         excel.Visible = False
         excel.DisplayAlerts = False
         excel.ScreenUpdating = False
         
-        logger.info("Abriendo archivo ODC...")
+        # Abrir archivo
         workbook = excel.Workbooks.Open(
             str(odc_path.absolute()),
             UpdateLinks=0,
             ReadOnly=True
         )
         
-        # Espera optimizada
-        start_time = time.time()
-        while (time.time() - start_time) < 15:  # Timeout reducido
-            if workbook.Application.Ready:
-                break
-            time.sleep(1)
+        # Espera optimizada (15 segundos máximo)
+        timeout = time.time() + 15
+        while time.time() < timeout:
+            try:
+                if workbook.Application.Ready:
+                    break
+                time.sleep(1)
+            except:
+                time.sleep(1)
         
-        # Guardado rápido
-        output_path = odc_path.parent / "datos_actualizados.xlsx"
-        logger.info(f"Guardando datos en: {output_path}")
+        # Guardar como Excel
+        output_path = base_path / "datos_actualizados.xlsx"
         workbook.SaveAs(str(output_path), FileFormat=51)
         
         # Procesar datos
         datos = pd.read_excel(output_path)
         
-        # Registrar últimos 5 días por torno
-        try:
+        # Generar reporte de rendimiento
+        if not datos.empty:
             datos['Fecha'] = pd.to_datetime(datos['Fecha'])
             datos = datos.sort_values('Fecha', ascending=False)
             
-            logger.info("\n=== RESUMEN DE RENDIMIENTOS ===")
+            logger.info("\n=== RESUMEN DE RENDIMIENTO ===")
             for fecha in datos['Fecha'].unique()[:5]:  # Últimos 5 días
-                daily = datos[datos['Fecha'] == fecha]
-                logger.info(f"\nFecha: {fecha.strftime('%Y-%m-%d')}")
-                
-                for workid in [3011, 3012]:  # Tornos 1 y 2
-                    tornos = daily[daily['WorkId'] == workid]
-                    if not tornos.empty:
-                        row = tornos.iloc[0]
+                for torno in [3011, 3012]:
+                    filtro = (datos['Fecha'] == fecha) & (datos['WorkId'] == torno)
+                    if any(filtro):
+                        rend = datos.loc[filtro, 'Rendimiento'].values[0]
+                        acum = datos.loc[filtro, 'Rendimiento_Acumulado'].values[0]
                         logger.info(
-                            f"Torno {workid-3010}: "
-                            f"Rendimiento: {row.get('Rendimiento', 'N/A')} | "
-                            f"Acumulado: {row.get('Rendimiento_Acumulado', 'N/A')}"
+                            f"{fecha.strftime('%Y-%m-%d')} - Torno {torno-3010}: "
+                            f"Rendimiento: {rend:.2f} | Acumulado: {acum:.2f}"
                         )
-            
-            logger.info("\n" + "="*40 + "\n")
-            
-        except Exception as e:
-            logger.error(f"Error generando resumen: {str(e)}")
+            logger.info("="*40)
         
         return datos
         
     except Exception as e:
-        logger.error(f"Error durante exportación: {str(e)}", exc_info=True)
+        logger.error(f"ERROR: {str(e)}", exc_info=True)
         return None
+        
     finally:
         try:
             if workbook: workbook.Close(False)
@@ -370,19 +360,21 @@ def exportar_desde_odc():
             pythoncom.CoUninitialize()
         except: pass
 
-# 5. Punto de entrada principal
+# Punto de entrada principal
 if __name__ == "__main__":
-    # Configuración completa del logging
-    configurar_logging_completo()
-    
-    logger.info("=== INICIO DE PROCESO ===")
-    datos = exportar_desde_odc()
-    
-    if datos is not None:
-        logger.info(f"Proceso completado. Datos obtenidos: {len(datos)} registros")
-    else:
-        logger.error("El proceso no pudo completarse correctamente")
-    
-    if not getattr(sys, 'frozen', False):
-        input("Presione Enter para salir...")
-    logger.info("=== FIN DE EJECUCIÓN ===")
+    try:
+        logger.info("=== INICIANDO PROCESO ===")
+        datos = exportar_desde_odc()
+        
+        if datos is not None:
+            logger.info(f"Proceso completado. Registros procesados: {len(datos)}")
+        else:
+            logger.error("El proceso no se completó correctamente")
+            
+    except Exception as e:
+        logger.critical(f"Error crítico: {str(e)}", exc_info=True)
+        
+    finally:
+        if not getattr(sys, 'frozen', False):
+            input("Presione Enter para salir...")
+        logger.info("=== FINALIZADO ===")
