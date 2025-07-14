@@ -96,7 +96,7 @@ def exportar_desde_odc():
         
         logger.info("Esperando carga de datos...")
         tiempo_inicio = time.time()
-        while (time.time() - tiempo_inicio) < 30:
+        while (time.time() - tiempo_inicio) < 10:
             try:
                 if workbook.ReadOnly:
                     time.sleep(2)
