@@ -127,17 +127,43 @@ def exportar_desde_odc():
             # Ordenar por fecha descendente
             datos = datos.sort_values('Fecha', ascending=False)
             
-            # Tomar los últimos 5 días únicos
-            ultimos_5_dias = datos.drop_duplicates('Fecha').head(5)
+            # Obtener las 5 fechas más recientes (únicas)
+            ultimas_5_fechas = datos['Fecha'].drop_duplicates().head(5)
+            
+            # Filtrar solo los datos de esas fechas
+            datos_recientes = datos[datos['Fecha'].isin(ultimas_5_fechas)]
             
             # Registrar en log
-            logger.info("=== ÚLTIMOS 5 DÍAS ===")
-            for _, fila in ultimos_5_dias.iterrows():
-                logger.info(
-                    f"Fecha: {fila['Fecha'].strftime('%Y-%m-%d')} | "
-                    f"Rendimiento: {fila.get('Rendimiento', 'N/A')} | "
-                    f"Rendimiento Acumulado: {fila.get('Rendimiento_Acumulado', 'N/A')}"
-                )
+            logger.info("\n=== ÚLTIMOS 5 DÍAS - RENDIMIENTO POR TORNO ===")
+            
+            for fecha in ultimas_5_fechas:
+                # Filtrar datos para esta fecha
+                datos_fecha = datos_recientes[datos_recientes['Fecha'] == fecha]
+                
+                # Obtener datos para cada torno
+                torno1 = datos_fecha[datos_fecha['WorkId'] == 3011]
+                torno2 = datos_fecha[datos_fecha['WorkId'] == 3012]
+                
+                # Formatear mensaje
+                mensaje = f"Fecha: {fecha.strftime('%Y-%m-%d')}\n"
+                
+                if not torno1.empty:
+                    mensaje += (
+                        f"  TORNO 1 - Rendimiento: {torno1.iloc[0].get('Rendimiento', 'N/A')} | "
+                        f"Rendimiento Acumulado: {torno1.iloc[0].get('Rendimiento_Acumulado', 'N/A')}\n"
+                    )
+                else:
+                    mensaje += "  TORNO 1 - Sin datos\n"
+                
+                if not torno2.empty:
+                    mensaje += (
+                        f"  TORNO 2 - Rendimiento: {torno2.iloc[0].get('Rendimiento', 'N/A')} | "
+                        f"Rendimiento Acumulado: {torno2.iloc[0].get('Rendimiento_Acumulado', 'N/A')}"
+                    )
+                else:
+                    mensaje += "  TORNO 2 - Sin datos"
+                
+                logger.info(mensaje)
         except Exception as e:
             logger.error(f"Error al procesar últimos 5 días: {str(e)}")
         
