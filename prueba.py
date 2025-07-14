@@ -257,29 +257,8 @@ configurar_log_completo()
 ## 4. FUNCIONES PRINCIPALES (CORREGIDAS)
 ## ---------------------------------------------------------------
 
-def encontrar_archivo_odc_especifico():
-    """Búsqueda específica para el archivo ODC"""
-    base_path = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).parent
-    
-    patrones_exactos = [
-        "CLNALMISOTPRD rwExport report_Peeling_Production query.odc",
-        "CLNALMISOTPRD*.odc",
-        "*report_Peeling_Production*.odc",
-        "*.odc"
-    ]
-    
-    for patron in patrones_exactos:
-        try:
-            for archivo in base_path.glob(patron):
-                return archivo
-        except Exception as e:
-            logger.warning(f"Error buscando {patron}: {str(e)}")
-    
-    logger.error("No se encontró ningún archivo ODC")
-    return None
-
 def procesar_archivo_odc():
-    """Procesamiento completo corregido"""
+    """Procesamiento completo corregido con manejo adecuado de excepciones"""
     excel = None
     workbook = None
     
@@ -296,7 +275,7 @@ def procesar_archivo_odc():
         excel.DisplayAlerts = False
         excel.ScreenUpdating = False
         
-        # 3. ABRIR ARCHIVO (VERSIÓN CORREGIDA)
+        # 3. ABRIR ARCHIVO
         logger.info("Abriendo archivo ODC...")
         workbook = excel.Workbooks.Open(
             str(odc_path.absolute()),
@@ -328,7 +307,7 @@ def procesar_archivo_odc():
             ConflictResolution=2
         )
         logger.info(f"Datos exportados a: {output_path.name}")
-                
+        
         # 6. GENERAR REPORTE
         datos = pd.read_excel(output_path)
         
@@ -370,12 +349,23 @@ def procesar_archivo_odc():
                         
             except Exception as e:
                 logger.error(f"Error procesando fechas: {str(e)}")
-
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error en procesar_archivo_odc: {str(e)}", exc_info=True)
+        return False
+        
+    finally:
+        # LIMPIEZA DE RECURSOS
         try:
-            if workbook: workbook.Close(False)
-            if excel: excel.Quit()
+            if workbook: 
+                workbook.Close(False)
+            if excel: 
+                excel.Quit()
             pythoncom.CoUninitialize()
-        except: pass
+        except Exception as e:
+            logger.warning(f"Error al limpiar recursos: {str(e)}")
 ## ---------------------------------------------------------------
 ## 5. EJECUCIÓN PRINCIPAL
 ## ---------------------------------------------------------------
