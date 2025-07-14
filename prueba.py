@@ -145,7 +145,7 @@ def exportar_desde_odc():
                 torno2 = datos_fecha[datos_fecha['WorkId'] == 3012]
                 
                 # Formatear mensaje
-                mensaje = f"Fecha: {fecha.strftime('%Y-%m-%d')}\n"
+                mensaje = f"\n"
                 
                 if not torno1.empty:
                     mensaje += (
@@ -184,7 +184,6 @@ def exportar_desde_odc():
         return None
     finally:
         pythoncom.CoUninitialize()
-        logger.info("=== FINALIZADO MANEJO DE EXCEL ===")
 
 # Configuración inicial
 logger = configurar_logging()
