@@ -315,11 +315,7 @@ def procesar_ambos_tornos(datos_torno1, datos_torno2, mes, dia, anio):
         ventana.destroy()  # Cierra la ventana principal de entrada de datos
         
         if exito:
-            messagebox.showinfo(
-                "Proceso Completado", 
-                "✅ Los datos de ambos tornos se han actualizado correctamente\n"
-                f"Fecha: {dia}/{mes}/{anio}"
-            )
+            messagebox.showinfo("Éxito", "✅ Valores actualizados correctamente.")
         else:
             messagebox.showerror(
                 "Error", 
@@ -700,7 +696,6 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, increm
         incrementar_barra(100)
         # 8. Mostrar mensaje de éxito solo si todo salió bien
         if exito:
-            messagebox.showinfo("Éxito", "✅ Valores actualizados correctamente.")
             escribir_log(f"Éxito ✅ Valores actualizados correctamente")
             escribir_log(f"Fin de la ejecucucion \n")
 
