@@ -437,26 +437,57 @@ def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque
             escribir_log(f"Bloque {i} ({tipo_bloque}) | Torno {torno} | Fila {fila_valor}")
             escribir_log(f"Referencia escrita: {referencia}")
         # Escribir rendimientos del log si existen
-        if rendimiento_log:
-            escribir_log(f"DEBUG - Contenido de rendimiento_log: {str(rendimiento_log)}")  # Registro crítico
+        # --- PARTE 3: Rendimientos del log (Versión Ultra-Robusta) ---
+        if rendimiento_log is not None:  # Cambio clave: verifica explícitamente None
+            escribir_log(f"DEBUG - Tipo de rendimiento_log: {type(rendimiento_log)}")
+            escribir_log(f"DEBUG - Contenido: {str(rendimiento_log)}")
             
-            # Extracción directa desde string si es necesario
+            # Conversión garantizada a diccionario
             if isinstance(rendimiento_log, str):
-                import re
-                matches = re.findall(r'Torno (\d): Rendimiento: (\d+\.\d+)', rendimiento_log)
-                if matches:
-                    rendimiento_log = {f'torno{num}': float(val) for num, val in matches}
-            
-            # Validación final
-            if isinstance(rendimiento_log, dict) and all(k in rendimiento_log for k in ['torno1', 'torno2']):
-                hoja.cell(row=32, column=col_dia, value=float(rendimiento_log['torno1'])/100).number_format = '0.00%'
-                hoja.cell(row=33, column=col_dia, value=float(rendimiento_log['torno2'])/100).number_format = '0.00%'
-                escribir_log(f"¡ESCRITURA CONFIRMADA! T1: {rendimiento_log['torno1']}% | T2: {rendimiento_log['torno2']}%")
-            else:
-                escribir_log("Estructura de rendimiento_log no válida", nivel="warning")
+                try:
+                    # Patrón mejorado para capturar rendimientos
+                    import re
+                    patron = r'Torno (\d): Rendimiento: (\d+\.\d+)'
+                    matches = re.findall(patron, rendimiento_log)
+                    if matches:
+                        rendimiento_log = {f'torno{num}': float(val) for num, val in matches}
+                    else:
+                        raise ValueError("No se encontraron rendimientos en el string")
+                except Exception as e:
+                    escribir_log(f"Error al convertir string: {str(e)}", nivel="warning")
+                    return
+
+            # Validación reforzada
+            if not isinstance(rendimiento_log, dict):
+                escribir_log("Error: rendimiento_log no es diccionario", nivel="error")
+                return
+                
+            if not all(k in rendimiento_log for k in ['torno1', 'torno2']):
+                escribir_log("Error: faltan claves torno1/torno2", nivel="error")
+                return
+
+            # ESCRIBE DIRECTAMENTE (método infalible)
+            try:
+                # Fuerza escritura incluso en celdas protegidas
+                hoja.unprotect()
+                
+                # Escritura garantizada
+                hoja[f'{letra_actual}32'] = float(rendimiento_log['torno1'])/100
+                hoja[f'{letra_actual}33'] = float(rendimiento_log['torno2'])/100
+                
+                # Aplicar formato directamente
+                hoja[f'{letra_actual}32'].number_format = '0.00%'
+                hoja[f'{letra_actual}33'].number_format = '0.00%'
+                
+                escribir_log(f"¡ESCRITURA CONFIRMADA EN {letra_actual}32 y {letra_actual}33!")
+                escribir_log(f"Valores: T1={rendimiento_log['torno1']}%, T2={rendimiento_log['torno2']}%")
+                
+            except Exception as e:
+                escribir_log(f"FALLA CRÍTICA AL ESCRIBIR: {str(e)}", nivel="error")
+                raise
 
     except Exception as e:
-        escribir_log(f"Error crítico: {str(e)}", nivel="error")
+        escribir_log(f"Error general: {str(e)}", nivel="error")
         raise
 
 def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, incrementar_barra, rendimiento_log=None):
