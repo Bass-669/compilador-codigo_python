@@ -437,16 +437,30 @@ def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque
             escribir_log(f"Bloque {i} ({tipo_bloque}) | Torno {torno} | Fila {fila_valor}")
             escribir_log(f"Referencia escrita: {referencia}")
         # Escribir rendimientos del log si existen
-        if not rendimiento_log or 'torno1' not in rendimiento_log or 'torno2' not in rendimiento_log:
-            raise ValueError("Estructura de rendimiento_log inválida")
-        # Conversión numérica forzada
-        torno1 = float(rendimiento_log['torno1'])
-        torno2 = float(rendimiento_log['torno2'])
-        # Escritura directa (sin dependencias)
-        hoja.cell(row=32, column=col_dia, value=torno1/100).number_format = '0.00%'
-        hoja.cell(row=33, column=col_dia, value=torno2/100).number_format = '0.00%'
-        escribir_log(f"Rendimiento del Torno1 {torno1}")
-        escribir_log(f"Rendimiento del Torno2 {torno2}")
+        if rendimiento_log:
+            try:
+                # Validación exhaustiva
+                if not isinstance(rendimiento_log, dict):
+                    raise TypeError("rendimiento_log no es un diccionario")
+                
+                required_keys = ['torno1', 'torno2']
+                missing_keys = [k for k in required_keys if k not in rendimiento_log]
+                if missing_keys:
+                    raise KeyError(f"Faltan claves: {missing_keys}")
+
+                # Conversión segura
+                torno1 = float(rendimiento_log['torno1'])
+                torno2 = float(rendimiento_log['torno2'])
+
+                # Escritura garantizada
+                hoja.cell(row=32, column=col_dia, value=torno1/100).number_format = '0.00%'
+                hoja.cell(row=33, column=col_dia, value=torno2/100).number_format = '0.00%'
+                
+                escribir_log(f"Rendimientos escritos - T1: {torno1}%, T2: {torno2}%")
+
+            except Exception as e:
+                escribir_log(f"Error al procesar rendimiento_log: {str(e)}", nivel="warning")
+                
     except Exception as e:
         escribir_log(f"Error en escribir_valores_resumen_bloques: {str(e)}", nivel="error")
         raise
