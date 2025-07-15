@@ -322,6 +322,7 @@ def procesar_archivo_odc():
                 datos['Fecha'] = pd.to_datetime(datos['Fecha'])
                 datos = datos.sort_values('Fecha', ascending=False)
                 ultimas_5_fechas = datos['Fecha'].unique()[:5]
+                mensaje = ""
                 
                 for fecha in ultimas_5_fechas:
                     datos_fecha = datos[datos['Fecha'] == fecha]
