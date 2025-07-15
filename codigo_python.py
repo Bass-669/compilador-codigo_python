@@ -407,7 +407,7 @@ def escribir_valor_bloque(hoja, col_dia, torno, valor, tipo_bloque):
     celda.value = valor_final
     celda.number_format = '0'
 
-def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque, tipos_bloque):
+def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque, tipos_bloque, rendimiento_log):
     """Escribe referencias y fórmulas en las celdas correspondientes"""
     escribir_log("Inicio de escribir_valores_resumen_bloques")
     letra_actual = openpyxl.utils.get_column_letter(col_dia)
@@ -436,6 +436,19 @@ def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque
             celda.alignment = ALIGN_R
             escribir_log(f"Bloque {i} ({tipo_bloque}) | Torno {torno} | Fila {fila_valor}")
             escribir_log(f"Referencia escrita: {referencia}")
+         # Escribir rendimientos del log si existen
+        if rendimiento_log != None:
+            filas_rendimiento = {
+                1: 32,  # Torno 1 - fila de rendimiento
+                2: 33   # Torno 2 - fila de rendimiento
+            }
+            for torno_num, fila in filas_rendimiento.items():
+                hoja_existente.cell(
+                    row=fila, 
+                    column=col_dia, 
+                    value=rendimiento_log[f'torno{torno_num}']/100
+                ).number_format = '0.00%'
+                escribir_log(f"Rendimiento del Torno {torno_num} ({rendimiento_log[f'torno{torno_num}']}%) escrito en {fila},{col_dia}")
     except Exception as e:
         escribir_log(f"Error en escribir_valores_resumen_bloques: {str(e)}", nivel="error")
         raise
@@ -506,7 +519,7 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, increm
             escribir_log(f"Éxito ✅ Valores actualizados correctamente")
             escribir_log(f"Fin de la ejecucucion \n")
 
-def preparar_hoja_mes(mes, dia, anio, rendimiento_log=None):
+def preparar_hoja_mes(mes, dia, anio):
     """Crea la hoja del mes si no existe y la configura con fórmulas iniciales."""
     escribir_log("Inicio de preparar_hoja_mes")
     nombre_hoja = f"IR {mes} {anio}"
@@ -531,19 +544,6 @@ def preparar_hoja_mes(mes, dia, anio, rendimiento_log=None):
                 wb_check.close()
                 return True
         wb_check.close()
-        # Escribir rendimientos del log si existen
-        if rendimiento_log:
-            filas_rendimiento = {
-                1: 32,  # Torno 1 - fila de rendimiento
-                2: 33   # Torno 2 - fila de rendimiento
-            }
-            for torno_num, fila in filas_rendimiento.items():
-                hoja_existente.cell(
-                    row=fila, 
-                    column=col_dia, 
-                    value=rendimiento_log[f'torno{torno_num}']/100
-                ).number_format = '0.00%'
-                escribir_log(f"Rendimiento del Torno {torno_num} ({rendimiento_log[f'torno{torno_num}']}%) escrito en {fila},{col_dia}")
         # Paso 2: Crear hoja nueva si no existe
         import win32com.client as win32, pythoncom
         pythoncom.CoInitialize()
