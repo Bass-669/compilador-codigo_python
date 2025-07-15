@@ -330,9 +330,9 @@ def procesar_archivo_odc():
                     # Torno 1
                     torno1 = datos_fecha[datos_fecha['WorkId'] == 3011]
                     if not torno1.empty:
-                        mensaje += (
+                        mensaje += ("\n"
                             f"Fecha: {fecha.strftime('%Y-%m-%d')} Torno 1: Rendimiento: {torno1.iloc[0].get('Rendimiento', 0):.2f} | "
-                            f"Acumulado: {torno1.iloc[0].get('Rendimiento_Acumulado', 0):.2f}"
+                            f"Acumulado: {torno1.iloc[0].get('Rendimiento_Acumulado', 0):.2f}\n"
                         )
                         # logger.info(
                         #     f"Fecha: {fecha.strftime('%Y-%m-%d')} Torno 1: Rendimiento: {torno1.iloc[0].get('Rendimiento', 0):.2f} | "
@@ -357,7 +357,7 @@ def procesar_archivo_odc():
                         mensaje += ("Torno 2: Sin datos\n")
                         # logger.info("Torno 2: Sin datos\n")
 
-                    logger.info(mensaje)
+                logger.info(mensaje)
                 
             except Exception as e:
                 logger.error(f"Error procesando fechas: {str(e)}")
