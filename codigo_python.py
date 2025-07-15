@@ -250,25 +250,23 @@ def obtener_datos():
     btn_continuar = tk.Button(ventana_torno2, text="Continuar a Fecha", command=continuar_a_fecha)
     btn_continuar.pack(pady=10)
 
-def ejecutar(txt, torno, mes, dia, anio):
-    """Función de procesamiento con las mejoras solicitadas"""
+
+
+def ejecutar(txt, torno, mes, dia, anio, callback_final=None):
+    """Función de procesamiento modificada para mensaje único"""
     try:
         inicio_barra = 0 if torno == 1 else 50
         barra['value'] = inicio_barra
         ventana_carga.update_idletasks()
         
         def incrementar_barra(hasta, paso=1):
-            """Incrementa la barra de progreso y maneja el cierre final"""
+            """Incrementa la barra de progreso"""
             nonlocal inicio_barra
             valor_final = inicio_barra + hasta
             for i in range(barra['value'], valor_final + 1, paso):
                 barra['value'] = i
                 ventana_carga.update_idletasks()
                 time.sleep(0.01)
-                
-                # Cierre al 100% (solo para el segundo torno)
-                if i >= 100 and torno == 2:
-                    ventana.after(500, finalizar_proceso)
         
         # Paso 1: Obtener rendimientos (10%)
         incrementar_barra(10)
@@ -278,27 +276,69 @@ def ejecutar(txt, torno, mes, dia, anio):
         # Paso 2: Preparar hoja (30%)
         incrementar_barra(20)
         if not preparar_hoja_mes(mes, dia, anio):
+            if callback_final:
+                callback_final(False)
             return False
         
         # Paso 3: Procesar datos (70%)
         incrementar_barra(40)
         bloques, porcentajes = procesar_datos(txt, torno, mes, dia, anio)
         if bloques is None or porcentajes is None:
+            if callback_final:
+                callback_final(False)
             return False
         
         # Paso 4: Escribir en hoja (100%)
         incrementar_barra(30)
-        return fecha(mes, dia, anio, torno, bloques, porcentajes, 
-                   lambda h: incrementar_barra(h), 
-                   rendimiento_log if torno == 2 else None)  # Solo verificar en el último torno
+        resultado = fecha(mes, dia, anio, torno, bloques, porcentajes, 
+                         lambda h: incrementar_barra(h), 
+                         rendimiento_log)
+        
+        if callback_final and torno == 2:  # Solo llamar al callback en el último torno
+            callback_final(resultado)
+            
+        return resultado
         
     except Exception as e:
         escribir_log(f"Error en Torno {torno}: {str(e)}", nivel="error")
-        ventana.after(0, lambda: messagebox.showerror(
-            "Error", 
-            f"Error en Torno {torno}:\n{str(e)}"
-        ))
+        if callback_final and torno == 2:
+            callback_final(False)
         return False
+
+def procesar_ambos_tornos(datos_torno1, datos_torno2, mes, dia, anio):
+    """Función principal con mensaje único al final"""
+    mostrar_carga()
+    
+    def mostrar_resultado_final(exito):
+        """Muestra el mensaje final y cierra ventanas"""
+        ventana_carga.destroy()
+        ventana.destroy()  # Cierra la ventana principal de entrada de datos
+        
+        if exito:
+            messagebox.showinfo(
+                "Proceso Completado", 
+                "✅ Los datos de ambos tornos se han actualizado correctamente\n"
+                f"Fecha: {dia}/{mes}/{anio}"
+            )
+        else:
+            messagebox.showerror(
+                "Error", 
+                "❌ Ocurrió un error durante el procesamiento\n"
+                "Revise el archivo de log para más detalles"
+            )
+    
+    def tarea_principal():
+        # Procesar Torno 1 (0-50%)
+        if not ejecutar(datos_torno1, 1, mes, dia, anio):
+            ventana.after(0, lambda: mostrar_resultado_final(False))
+            return
+        
+        # Procesar Torno 2 (50-100%) con callback para el mensaje final
+        ejecutar(datos_torno2, 2, mes, dia, anio, 
+                lambda exito: ventana.after(0, lambda: mostrar_resultado_final(exito)))
+    
+    threading.Thread(target=tarea_principal, daemon=True).start()
+    
 
 def finalizar_proceso():
     """Cierra todas las ventanas y muestra el resultado final"""
@@ -318,29 +358,7 @@ def finalizar_proceso():
         f"Fecha: {dia}/{mes}/{anio}"
     )
 
-def procesar_ambos_tornos(datos_torno1, datos_torno2, mes, dia, anio):
-    """Función principal con las mejoras solicitadas"""
-    mostrar_carga()
-    
-    def tarea_principal():
-        try:
-            # Procesar Torno 1 (0-50%)
-            if not ejecutar(datos_torno1, 1, mes, dia, anio):
-                raise Exception("Error en Torno 1")
-            
-            # Procesar Torno 2 (50-100%)
-            if not ejecutar(datos_torno2, 2, mes, dia, anio):
-                raise Exception("Error en Torno 2")
-            
-        except Exception as e:
-            ventana.after(0, lambda: messagebox.showerror(
-                "Error", 
-                f"Error en el procesamiento:\n{str(e)}"
-            ))
-            ventana_carga.destroy()
-    
-    threading.Thread(target=tarea_principal, daemon=True).start()
-    
+
 
 def procesar_datos(entrada, torno, mes, dia, anio):
     """Procesa los datos y escribe en el archivo Excel con manejo de errores mejorado"""
