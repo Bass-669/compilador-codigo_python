@@ -117,7 +117,8 @@ def procesar_archivo_odc():
             try:
                 datos['Fecha'] = pd.to_datetime(datos['Fecha'])
                 datos = datos.sort_values('Fecha', ascending=False)
-                ultimas_5_fechas = datos['Fecha'].unique()[:15]
+                fechas_unicas = datos['Fecha'].unique()
+                ultimas_fechas = fechas_unicas[:15]
                 ultima_fecha = datos['Fecha'].max()
                 mensaje = "=== RESUMEN DE DATOS ===\n"
                 
