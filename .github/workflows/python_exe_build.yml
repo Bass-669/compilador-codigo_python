@@ -87,7 +87,7 @@ jobs:
     - name: Build EXE
       run: |
         pyinstaller --onefile --windowed `
-          --name=procesador_excel_gui `
+          --name=datos `
           --hidden-import=numpy `
           --hidden-import=pandas `
           --hidden-import=openpyxl `
@@ -102,11 +102,11 @@ jobs:
       run: echo "Este archivo fue generado automáticamente. Es seguro y no contiene malware." > dist\LEEME.txt
 
     - name: Comprimir EXE en ZIP
-      run: powershell Compress-Archive -Path dist\datos.exe,dist\LEEME.txt -DestinationPath dist\procesador_excel_gui.zip
+      run: powershell Compress-Archive -Path dist\datos.exe,dist\LEEME.txt -DestinationPath dist\datos.zip
 
     - name: Upload ZIP artifact
       uses: actions/upload-artifact@v4
       with:
-        name: procesador_excel_gui
-        path: dist/procesador_excel_gui.zip
+        name: datos
+        path: dist/datos.zip
         retention-days: 1
