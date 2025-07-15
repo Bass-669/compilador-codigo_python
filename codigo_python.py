@@ -75,45 +75,45 @@ def escribir_log(mensaje, nivel="info"):
     except Exception as e:
         escribir_log(f"Error al escribir en log: {e}", file=sys.stderr)
 
-def obtener_datos():
-    datos = entrada_texto.get("1.0", tk.END).strip()
-    if not datos: return messagebox.showwarning("Advertencia", "Ingresa los datos.")
-    pedir_torno(lambda t: pedir_fecha(lambda m,d,a: iniciar(datos, t, m, d, a)))
+# def obtener_datos():
+#     datos = entrada_texto.get("1.0", tk.END).strip()
+#     if not datos: return messagebox.showwarning("Advertencia", "Ingresa los datos.")
+#     pedir_torno(lambda t: pedir_fecha(lambda m,d,a: iniciar(datos, t, m, d, a)))
 
-def pedir_torno(callback):
-    def confirmar():
-        val = ent.get().strip()
-        if not val:
-            messagebox.showwarning("Advertencia", "Ingresa el número de torno.")
-            return
-        try:
-            num_torno = int(val)
-            if num_torno not in [1, 2]:
-                messagebox.showwarning("Valor incorrecto", "El número de torno debe ser 1 o 2.")
-                ent.delete(0, tk.END)
-                ent.focus_set()
-                return
-            callback(num_torno)
-            ventana.destroy()
-        except ValueError:
-            messagebox.showerror("Error", "Debe ingresar un número válido.")
-            # Limpiar el campo y mantener la ventana abierta
-            ent.delete(0, tk.END)
-            ent.focus_set()
-    ventana = tk.Toplevel()
-    ventana.title("Número de torno")
-    ventana.geometry("300x150")
-    ventana.resizable(False, False)
-    tk.Label(ventana, 
-             text="Número de torno (1 o 2):",
-             font=("Arial", 12)).pack(pady=10)
-    ent = tk.Entry(ventana, font=("Arial", 12))
-    ent.pack(pady=5)
-    tk.Button(ventana, 
-              text="Aceptar", 
-              command=confirmar).pack(pady=5)
-    ent.focus_set()
-    ventana.grab_set()
+# def pedir_torno(callback):
+#     def confirmar():
+#         val = ent.get().strip()
+#         if not val:
+#             messagebox.showwarning("Advertencia", "Ingresa el número de torno.")
+#             return
+#         try:
+#             num_torno = int(val)
+#             if num_torno not in [1, 2]:
+#                 messagebox.showwarning("Valor incorrecto", "El número de torno debe ser 1 o 2.")
+#                 ent.delete(0, tk.END)
+#                 ent.focus_set()
+#                 return
+#             callback(num_torno)
+#             ventana.destroy()
+#         except ValueError:
+#             messagebox.showerror("Error", "Debe ingresar un número válido.")
+#             # Limpiar el campo y mantener la ventana abierta
+#             ent.delete(0, tk.END)
+#             ent.focus_set()
+#     ventana = tk.Toplevel()
+#     ventana.title("Número de torno")
+#     ventana.geometry("300x150")
+#     ventana.resizable(False, False)
+#     tk.Label(ventana, 
+#              text="Número de torno (1 o 2):",
+#              font=("Arial", 12)).pack(pady=10)
+#     ent = tk.Entry(ventana, font=("Arial", 12))
+#     ent.pack(pady=5)
+#     tk.Button(ventana, 
+#               text="Aceptar", 
+#               command=confirmar).pack(pady=5)
+#     ent.focus_set()
+#     ventana.grab_set()
 
 def pedir_fecha(callback):
     ventana = tk.Toplevel()
@@ -148,7 +148,92 @@ def mostrar_carga():
 def cerrar_carga():
     if ventana_carga: ventana_carga.destroy()
 
-def ejecutar(txt, torno, mes, dia, anio):
+# def ejecutar(txt, torno, mes, dia, anio):
+#     escribir_log("Inicio de ejecutar")
+#     try:
+#         # Obtener rendimientos del log si existen
+#         fecha_actual = datetime(anio, MESES_NUM[mes], dia).date()
+#         rendimiento_log = obtener_rendimientos_de_log(fecha_actual)
+#         if rendimiento_log:
+#             escribir_log(f"Rendimientos encontrados en log: Torno 1: {rendimiento_log['torno1']}%, Torno 2: {rendimiento_log['torno2']}%")
+#         # Configuración inicial de la barra
+#         barra['value'] = 0
+#         ventana_carga.update_idletasks()
+#         # Función para incremento fluido de la barra
+#         def incrementar_barra(hasta, paso=1):
+#             actual = barra['value']
+#             for i in range(actual, hasta + 1, paso):
+#                 barra['value'] = i
+#                 ventana_carga.update_idletasks()
+#                 time.sleep(0.01)
+#         # Paso 1: Preparar hoja del mes (0-25%)
+#         incrementar_barra(25)
+#         if not preparar_hoja_mes(mes, dia, anio):
+#             incrementar_barra(100)
+#             return
+#         # Paso 2: Procesar datos (25-75%)
+#         incrementar_barra(50)
+#         bloques, porcentajes = procesar_datos(txt, torno, mes, dia, anio)
+#         # Si hay error de permisos, terminamos
+#         if bloques is None or porcentajes is None:
+#             incrementar_barra(100)
+#             return False
+#         # Paso intermedio (50-75%)
+#         incrementar_barra(75)
+#         # Paso 3: Escribir en hoja mensual (75-100%)
+#         if bloques is not None and porcentajes is not None:
+#             fecha(mes, dia, anio, torno, bloques, porcentajes, incrementar_barra, rendimiento_log)
+#     except Exception as e:
+#         messagebox.showerror("Error", f"Ocurrió un error en ejecutar():\n{e}")
+#         escribir_log("Error", f"Ocurrió un error en ejecutar():\n{e}")
+#     finally:
+#         cerrar_carga()
+#         ventana.destroy()
+
+def obtener_datos():
+    """Función principal que inicia el flujo de entrada de datos"""
+    datos_torno1 = entrada_texto.get("1.0", tk.END).strip()
+    if not datos_torno1:
+        return messagebox.showwarning("Advertencia", "Ingresa los datos del Torno 1.")
+    
+    # Crear ventana para datos del Torno 2
+    ventana_torno2 = tk.Toplevel()
+    ventana_torno2.title("Datos del Torno 2")
+    ventana_torno2.geometry("800x600")
+    
+    lbl_instruccion = tk.Label(ventana_torno2, text="Ingrese los datos del Torno 2:", font=("Arial", 12))
+    lbl_instruccion.pack(pady=10)
+    
+    texto_torno2 = tk.Text(ventana_torno2, width=100, height=30)
+    texto_torno2.pack(padx=10, pady=10)
+    
+    def continuar_a_fecha():
+        datos_torno2 = texto_torno2.get("1.0", tk.END).strip()
+        if not datos_torno2:
+            messagebox.showwarning("Advertencia", "Ingresa los datos del Torno 2.")
+            return
+        
+        ventana_torno2.destroy()
+        pedir_fecha(lambda m,d,a: procesar_ambos_tornos(datos_torno1, datos_torno2, m, d, a))
+    
+    btn_continuar = tk.Button(ventana_torno2, text="Continuar a Fecha", command=continuar_a_fecha)
+    btn_continuar.pack(pady=10)
+
+def procesar_ambos_tornos(datos_torno1, datos_torno2, mes, dia, anio):
+    """Procesa ambos tornos secuencialmente"""
+    mostrar_carga()
+    
+    def ejecutar_secuencial():
+        # Procesar Torno 1
+        ejecutar(datos_torno1, 1, mes, dia, anio, lambda: 
+            # Luego procesar Torno 2
+            ejecutar(datos_torno2, 2, mes, dia, anio, None)
+        )
+    
+    threading.Thread(target=ejecutar_secuencial, daemon=True).start()
+
+# Modificar la función ejecutar para mantener el callback como en la versión anterior
+def ejecutar(txt, torno, mes, dia, anio, callback=None):
     escribir_log("Inicio de ejecutar")
     try:
         # Obtener rendimientos del log si existen
@@ -156,39 +241,45 @@ def ejecutar(txt, torno, mes, dia, anio):
         rendimiento_log = obtener_rendimientos_de_log(fecha_actual)
         if rendimiento_log:
             escribir_log(f"Rendimientos encontrados en log: Torno 1: {rendimiento_log['torno1']}%, Torno 2: {rendimiento_log['torno2']}%")
-        # Configuración inicial de la barra
+        
         barra['value'] = 0
         ventana_carga.update_idletasks()
-        # Función para incremento fluido de la barra
+        
         def incrementar_barra(hasta, paso=1):
             actual = barra['value']
             for i in range(actual, hasta + 1, paso):
                 barra['value'] = i
                 ventana_carga.update_idletasks()
                 time.sleep(0.01)
-        # Paso 1: Preparar hoja del mes (0-25%)
+        
         incrementar_barra(25)
         if not preparar_hoja_mes(mes, dia, anio):
             incrementar_barra(100)
             return
-        # Paso 2: Procesar datos (25-75%)
+        
         incrementar_barra(50)
         bloques, porcentajes = procesar_datos(txt, torno, mes, dia, anio)
-        # Si hay error de permisos, terminamos
+        
         if bloques is None or porcentajes is None:
             incrementar_barra(100)
             return False
-        # Paso intermedio (50-75%)
+        
         incrementar_barra(75)
-        # Paso 3: Escribir en hoja mensual (75-100%)
+        
         if bloques is not None and porcentajes is not None:
             fecha(mes, dia, anio, torno, bloques, porcentajes, incrementar_barra, rendimiento_log)
+        
     except Exception as e:
         messagebox.showerror("Error", f"Ocurrió un error en ejecutar():\n{e}")
         escribir_log("Error", f"Ocurrió un error en ejecutar():\n{e}")
     finally:
         cerrar_carga()
-        ventana.destroy()
+        if callback:  # Ejecutar el callback si existe (para procesar el siguiente torno)
+            ventana.after(100, callback)
+        else:
+            ventana.destroy()
+
+
 
 def procesar_datos(entrada, torno, mes, dia, anio):
     """Procesa los datos y escribe en el archivo Excel con manejo de errores mejorado"""
@@ -693,9 +784,17 @@ def obtener_rendimientos_de_log(fecha_ingresada):
         escribir_log(f"Error al leer el archivo de log: {str(e)}", nivel="error")
         return None
 
+# ventana = tk.Tk()
+# ventana.title("Ingresar datos")
+# entrada_texto = tk.Text(ventana, width=100, height=30)
+# entrada_texto.pack(padx=10, pady=10)
+# tk.Button(ventana, text="Procesar", command=obtener_datos).pack(pady=10)
+# ventana.mainloop()
+
+# Cambiar el botón principal para usar la nueva función
 ventana = tk.Tk()
-ventana.title("Ingresar datos")
+ventana.title("Ingresar datos del Torno 1")
 entrada_texto = tk.Text(ventana, width=100, height=30)
 entrada_texto.pack(padx=10, pady=10)
-tk.Button(ventana, text="Procesar", command=obtener_datos).pack(pady=10)
+tk.Button(ventana, text="Continuar al Torno 2", command=obtener_datos).pack(pady=10)
 ventana.mainloop()
