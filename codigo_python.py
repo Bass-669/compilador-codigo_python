@@ -151,6 +151,11 @@ def cerrar_carga():
 def ejecutar(txt, torno, mes, dia, anio):
     escribir_log("Inicio de ejecutar")
     try:
+        # Obtener rendimientos del log si existen
+        fecha_actual = datetime(anio, MESES_NUM[mes], dia).date()
+        rendimiento_log = obtener_rendimientos_de_log(fecha_actual)
+        if rendimiento_log:
+            escribir_log(f"Rendimientos encontrados en log: Torno 1: {rendimiento_log['torno1']}%, Torno 2: {rendimiento_log['torno2']}%")
         # Configuración inicial de la barra
         barra['value'] = 0
         ventana_carga.update_idletasks()
@@ -435,7 +440,7 @@ def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque
         escribir_log(f"Error en escribir_valores_resumen_bloques: {str(e)}", nivel="error")
         raise
 
-def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, incrementar_barra):
+def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, incrementar_barra, rendimiento_log=None):
     escribir_log("Inicio de fecha")
     """Escribe los datos en la hoja del mes incluyendo las fechas"""
     nombre_hoja = f"IR {mes} {anio}"
@@ -443,15 +448,24 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, increm
     wb = None
     exito = False
     try:
-        # 1. Abrir el archivo principal
         wb = openpyxl.load_workbook(RUTA_ENTRADA)
-        # Verificar si la hoja existe
         if nombre_hoja not in wb.sheetnames:
             messagebox.showerror("Error", f"No se encontró la hoja '{nombre_hoja}'")
-            escribir_log("Error", f"No se encontró la hoja '{nombre_hoja}'")
+            escribir_log(f"Error - Hoja '{nombre_hoja}' no encontrada", nivel="error")
             return False
         hoja_mes = wb[nombre_hoja]
         nueva_fecha = f"{dia:02d}/{MESES_NUM[mes]:02d}/{anio}"
+        # 1. Escribir rendimientos del log si existen
+        if rendimiento_log:
+            # Definir las filas donde se escriben los rendimientos
+            filas_rendimiento = {
+                1: 32,  # Torno 1 - fila de rendimiento
+                2: 33   # Torno 2 - fila de rendimiento
+            }
+            fila = filas_rendimiento[torno]
+            hoja_mes.cell(row=fila, column=col_dia, value=rendimiento_log[f'torno{torno}']/100)
+            hoja_mes.cell(row=fila, column=col_dia).number_format = '0.00%'
+            escribir_log(f"Rendimiento del Torno {torno} ({rendimiento_log[f'torno{torno}']}%) escrito en {fila},{col_dia}")
         # 2. Escribir la fecha en las celdas correspondientes
         filas_fecha = [2, 7, 12, 17, 22, 27, 31, 37]
         for fila in filas_fecha:
@@ -631,6 +645,36 @@ def dias_en_mes(mes, anio):
         return 28
     meses_31_dias = ["Enero", "Marzo", "Mayo", "Julio", "Agosto", "Octubre", "Diciembre"]
     return 31 if mes in meses_31_dias else 30
+
+def obtener_rendimientos_de_log(fecha_ingresada):
+    escribir_log("Inicio de obtener_rendimientos_de_log")
+    log_path = os.path.join(BASE_DIR, "tornos.log")
+    fecha_str = fecha_ingresada.strftime("%Y-%m-%d")
+    rendimientos = {'torno1': None, 'torno2': None}
+    if not os.path.exists(log_path):
+        escribir_log(f"Archivo de log no encontrado: {log_path}", nivel="warning")
+        return None
+    try:
+        with open(log_path, 'r', encoding='utf-8') as f:
+            lineas = f.readlines()
+        # Buscar las líneas que contienen la fecha
+        patron = re.compile(
+            r"Fecha: " + re.escape(fecha_str) + 
+            r" Torno (\d): Rendimiento: (\d+\.\d+)"
+        )
+        for linea in reversed(lineas[-20:]):  # Buscar en las últimas 20 líneas
+            coincidencia = patron.search(linea)
+            if coincidencia:
+                torno = coincidencia.group(1)
+                rendimiento = float(coincidencia.group(2))
+                rendimientos[f'torno{torno}'] = rendimiento
+        # Verificar que tengamos ambos tornos
+        if None in rendimientos.values():
+            return None
+        return rendimientos
+    except Exception as e:
+        escribir_log(f"Error al leer el archivo de log: {str(e)}", nivel="error")
+        return None
 
 ventana = tk.Tk()
 ventana.title("Ingresar datos")
