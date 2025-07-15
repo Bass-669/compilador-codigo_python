@@ -437,7 +437,7 @@ def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque
             escribir_log(f"Bloque {i} ({tipo_bloque}) | Torno {torno} | Fila {fila_valor}")
             escribir_log(f"Referencia escrita: {referencia}")
         # Escribir rendimientos del log si existen
-         if rendimiento_log:
+        if rendimiento_log:
             escribir_log(f"DEBUG - Contenido de rendimiento_log: {str(rendimiento_log)}")  # Registro crítico
             
             # Extracción directa desde string si es necesario
