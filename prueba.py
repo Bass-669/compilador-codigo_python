@@ -40,13 +40,7 @@ def configurar_log_completo():
     try:
         base_path = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).parent
         log_path = base_path / "tornos.log"
-        
-        file_handler = RotatingFileHandler(
-            str(log_path),
-            maxBytes=5*1024*1024,
-            backupCount=3,
-            encoding='utf-8'
-        )
+        file_handler = logging.FileHandler(str(log_path), encoding='utf-8')  # Sin rotación
         file_handler.setFormatter(logging.Formatter(
             '%(asctime)s - %(levelname)s - %(message)s',
             datefmt='%Y-%m-%d %H:%M:%S'
