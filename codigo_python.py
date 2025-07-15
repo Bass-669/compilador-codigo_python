@@ -253,57 +253,118 @@ def obtener_datos():
 
 
 def ejecutar(txt, torno, mes, dia, anio, callback_final=None):
-    """Función de procesamiento modificada para mensaje único"""
+    """Función de procesamiento con registro completo de log"""
     try:
+        # Registro inicial en el log
+        escribir_log(f"Iniciando procesamiento para Torno {torno} - Fecha: {dia}/{mes}/{anio}")
+        
         inicio_barra = 0 if torno == 1 else 50
         barra['value'] = inicio_barra
         ventana_carga.update_idletasks()
         
         def incrementar_barra(hasta, paso=1):
-            """Incrementa la barra de progreso"""
+            """Función mejorada con registro de progreso"""
             nonlocal inicio_barra
             valor_final = inicio_barra + hasta
+            escribir_log(f"Progreso Torno {torno}: {barra['value']}% -> {valor_final}%")
             for i in range(barra['value'], valor_final + 1, paso):
                 barra['value'] = i
                 ventana_carga.update_idletasks()
                 time.sleep(0.01)
         
         # Paso 1: Obtener rendimientos (10%)
+        escribir_log("Obteniendo rendimientos del log...")
         incrementar_barra(10)
         fecha_actual = datetime(anio, MESES_NUM[mes], dia).date()
         rendimiento_log = obtener_rendimientos_de_log(fecha_actual)
         
+        if rendimiento_log:
+            escribir_log(f"Rendimientos obtenidos - Torno 1: {rendimiento_log.get('torno1', 'N/A')}%, "
+                       f"Torno 2: {rendimiento_log.get('torno2', 'N/A')}%")
+        
         # Paso 2: Preparar hoja (30%)
+        escribir_log("Preparando hoja del mes...")
         incrementar_barra(20)
         if not preparar_hoja_mes(mes, dia, anio):
+            escribir_log("Error al preparar hoja del mes", nivel="error")
             if callback_final:
                 callback_final(False)
             return False
         
         # Paso 3: Procesar datos (70%)
+        escribir_log(f"Procesando datos del Torno {torno}...")
         incrementar_barra(40)
         bloques, porcentajes = procesar_datos(txt, torno, mes, dia, anio)
         if bloques is None or porcentajes is None:
+            escribir_log("Error al procesar datos", nivel="error")
             if callback_final:
                 callback_final(False)
             return False
         
         # Paso 4: Escribir en hoja (100%)
+        escribir_log("Escribiendo datos en hoja mensual...")
         incrementar_barra(30)
         resultado = fecha(mes, dia, anio, torno, bloques, porcentajes, 
                          lambda h: incrementar_barra(h), 
-                         rendimiento_log)
+                         rendimiento_log if torno == 2 else None)
         
-        if callback_final and torno == 2:  # Solo llamar al callback en el último torno
+        if resultado:
+            escribir_log(f"Procesamiento del Torno {torno} completado con éxito")
+        else:
+            escribir_log(f"Error en el procesamiento del Torno {torno}", nivel="error")
+        
+        if callback_final and torno == 2:
             callback_final(resultado)
             
         return resultado
         
     except Exception as e:
-        escribir_log(f"Error en Torno {torno}: {str(e)}", nivel="error")
+        escribir_log(f"Error crítico en Torno {torno}: {str(e)}", nivel="error")
         if callback_final and torno == 2:
             callback_final(False)
         return False
+
+def obtener_rendimientos_de_log(fecha_ingresada):
+    """Función mejorada para registro de log"""
+    escribir_log(f"Buscando rendimientos para fecha: {fecha_ingresada}")
+    
+    log_path = os.path.join(BASE_DIR, "tornos.log")
+    fecha_str = fecha_ingresada.strftime("%Y-%m-%d")
+    rendimientos = {'torno1': None, 'torno2': None}
+    
+    if not os.path.exists(log_path):
+        escribir_log(f"Archivo de log no encontrado: {log_path}", nivel="warning")
+        return None
+    
+    try:
+        with open(log_path, 'r', encoding='utf-8') as f:
+            lineas = f.readlines()
+        
+        patron = re.compile(
+            r"Fecha: " + re.escape(fecha_str) + 
+            r" Torno (\d): Rendimiento: (\d+\.\d+)"
+        )
+        
+        for linea in reversed(lineas[-20:]):
+            coincidencia = patron.search(linea)
+            if coincidencia:
+                torno = coincidencia.group(1)
+                rendimiento = float(coincidencia.group(2))
+                rendimientos[f'torno{torno}'] = rendimiento
+                escribir_log(f"Encontrado rendimiento para Torno {torno}: {rendimiento}%")
+        
+        if None in rendimientos.values():
+            escribir_log("No se encontraron rendimientos para ambos tornos", nivel="warning")
+            return None
+        
+        escribir_log(f"Rendimientos completos encontrados: {rendimientos}")
+        return rendimientos
+        
+    except Exception as e:
+        escribir_log(f"Error al leer el archivo de log: {str(e)}", nivel="error")
+        return None
+
+
 
 def procesar_ambos_tornos(datos_torno1, datos_torno2, mes, dia, anio):
     """Función principal con mensaje único al final"""
@@ -828,35 +889,35 @@ def dias_en_mes(mes, anio):
     meses_31_dias = ["Enero", "Marzo", "Mayo", "Julio", "Agosto", "Octubre", "Diciembre"]
     return 31 if mes in meses_31_dias else 30
 
-def obtener_rendimientos_de_log(fecha_ingresada):
-    escribir_log("Inicio de obtener_rendimientos_de_log")
-    log_path = os.path.join(BASE_DIR, "tornos.log")
-    fecha_str = fecha_ingresada.strftime("%Y-%m-%d")
-    rendimientos = {'torno1': None, 'torno2': None}
-    if not os.path.exists(log_path):
-        escribir_log(f"Archivo de log no encontrado: {log_path}", nivel="warning")
-        return None
-    try:
-        with open(log_path, 'r', encoding='utf-8') as f:
-            lineas = f.readlines()
-        # Buscar las líneas que contienen la fecha
-        patron = re.compile(
-            r"Fecha: " + re.escape(fecha_str) + 
-            r" Torno (\d): Rendimiento: (\d+\.\d+)"
-        )
-        for linea in reversed(lineas[-20:]):  # Buscar en las últimas 20 líneas
-            coincidencia = patron.search(linea)
-            if coincidencia:
-                torno = coincidencia.group(1)
-                rendimiento = float(coincidencia.group(2))
-                rendimientos[f'torno{torno}'] = rendimiento
-        # Verificar que tengamos ambos tornos
-        if None in rendimientos.values():
-            return None
-        return rendimientos
-    except Exception as e:
-        escribir_log(f"Error al leer el archivo de log: {str(e)}", nivel="error")
-        return None
+# def obtener_rendimientos_de_log(fecha_ingresada):
+#     escribir_log("Inicio de obtener_rendimientos_de_log")
+#     log_path = os.path.join(BASE_DIR, "tornos.log")
+#     fecha_str = fecha_ingresada.strftime("%Y-%m-%d")
+#     rendimientos = {'torno1': None, 'torno2': None}
+#     if not os.path.exists(log_path):
+#         escribir_log(f"Archivo de log no encontrado: {log_path}", nivel="warning")
+#         return None
+#     try:
+#         with open(log_path, 'r', encoding='utf-8') as f:
+#             lineas = f.readlines()
+#         # Buscar las líneas que contienen la fecha
+#         patron = re.compile(
+#             r"Fecha: " + re.escape(fecha_str) + 
+#             r" Torno (\d): Rendimiento: (\d+\.\d+)"
+#         )
+#         for linea in reversed(lineas[-20:]):  # Buscar en las últimas 20 líneas
+#             coincidencia = patron.search(linea)
+#             if coincidencia:
+#                 torno = coincidencia.group(1)
+#                 rendimiento = float(coincidencia.group(2))
+#                 rendimientos[f'torno{torno}'] = rendimiento
+#         # Verificar que tengamos ambos tornos
+#         if None in rendimientos.values():
+#             return None
+#         return rendimientos
+#     except Exception as e:
+#         escribir_log(f"Error al leer el archivo de log: {str(e)}", nivel="error")
+#         return None
 
 # ventana = tk.Tk()
 # ventana.title("Ingresar datos")
