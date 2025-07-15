@@ -315,13 +315,12 @@ def procesar_archivo_odc():
         datos = pd.read_excel(output_path)
         
         if not datos.empty:
-            logger.info("=== RESUMEN DE DATOS ===\n")
             
             try:
                 datos['Fecha'] = pd.to_datetime(datos['Fecha'])
                 datos = datos.sort_values('Fecha', ascending=False)
                 ultimas_5_fechas = datos['Fecha'].unique()[:5]
-                mensaje = ""
+                mensaje = "=== RESUMEN DE DATOS ===\n"
                 
                 for fecha in ultimas_5_fechas:
                     datos_fecha = datos[datos['Fecha'] == fecha]
