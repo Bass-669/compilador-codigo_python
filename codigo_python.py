@@ -134,16 +134,31 @@ def iniciar(texto, torno, mes, dia, anio):
     mostrar_carga()
     threading.Thread(target=lambda: ejecutar(texto, torno, mes, dia, anio), daemon=True).start()
 
+# def mostrar_carga():
+#     global ventana_carga, barra
+#     ventana_carga = tk.Toplevel()
+#     ventana_carga.title("Procesando...")
+#     ventana_carga.geometry("300x100")
+#     ventana_carga.resizable(False, False)
+#     tk.Label(ventana_carga, text="Procesando...", font=("Arial", 12)).pack(pady=10)
+#     barra = ttk.Progressbar(ventana_carga, mode='determinate', maximum=100)
+#     barra.pack(fill='x', padx=20, pady=5)
+#     ventana_carga.grab_set()
+
 def mostrar_carga():
     global ventana_carga, barra
-    ventana_carga = tk.Toplevel()
-    ventana_carga.title("Procesando...")
-    ventana_carga.geometry("300x100")
-    ventana_carga.resizable(False, False)
-    tk.Label(ventana_carga, text="Procesando...", font=("Arial", 12)).pack(pady=10)
-    barra = ttk.Progressbar(ventana_carga, mode='determinate', maximum=100)
-    barra.pack(fill='x', padx=20, pady=5)
-    ventana_carga.grab_set()
+    if 'ventana_carga' not in globals() or not ventana_carga.winfo_exists():
+        ventana_carga = tk.Toplevel()
+        ventana_carga.title("Procesando...")
+        ventana_carga.geometry("300x100")
+        ventana_carga.resizable(False, False)
+        tk.Label(ventana_carga, text="Procesando...", font=("Arial", 12)).pack(pady=10)
+        barra = ttk.Progressbar(ventana_carga, mode='determinate', maximum=100)
+        barra.pack(fill='x', padx=20, pady=5)
+        ventana_carga.grab_set()
+    else:
+        barra['value'] = 0
+        ventana_carga.deiconify()
 
 def cerrar_carga():
     if ventana_carga: ventana_carga.destroy()
@@ -220,65 +235,71 @@ def obtener_datos():
     btn_continuar.pack(pady=10)
 
 def procesar_ambos_tornos(datos_torno1, datos_torno2, mes, dia, anio):
-    """Procesa ambos tornos secuencialmente"""
+    """Procesa ambos tornos secuencialmente manteniendo la ventana de carga"""
+    # Mostrar ventana de carga al inicio
     mostrar_carga()
     
     def ejecutar_secuencial():
-        # Procesar Torno 1
-        ejecutar(datos_torno1, 1, mes, dia, anio, lambda: 
-            # Luego procesar Torno 2
-            ejecutar(datos_torno2, 2, mes, dia, anio, None)
-        )
+        try:
+            # Procesar Torno 1
+            ejecutar_torno(datos_torno1, 1, mes, dia, anio)
+            
+            # Procesar Torno 2
+            ejecutar_torno(datos_torno2, 2, mes, dia, anio)
+            
+            # Mostrar mensaje final
+            ventana.after(100, lambda: messagebox.showinfo("Éxito", "✅ Ambos tornos procesados correctamente."))
+            
+        except Exception as e:
+            ventana.after(100, lambda: messagebox.showerror("Error", f"Error al procesar: {str(e)}"))
+        finally:
+            ventana.after(100, cerrar_carga)
     
+    # Ejecutar en un hilo separado
     threading.Thread(target=ejecutar_secuencial, daemon=True).start()
 
-# Modificar la función ejecutar para mantener el callback como en la versión anterior
-def ejecutar(txt, torno, mes, dia, anio, callback=None):
-    escribir_log("Inicio de ejecutar")
-    try:
-        # Obtener rendimientos del log si existen
-        fecha_actual = datetime(anio, MESES_NUM[mes], dia).date()
-        rendimiento_log = obtener_rendimientos_de_log(fecha_actual)
-        if rendimiento_log:
-            escribir_log(f"Rendimientos encontrados en log: Torno 1: {rendimiento_log['torno1']}%, Torno 2: {rendimiento_log['torno2']}%")
-        
-        barra['value'] = 0
-        ventana_carga.update_idletasks()
-        
-        def incrementar_barra(hasta, paso=1):
-            actual = barra['value']
-            for i in range(actual, hasta + 1, paso):
-                barra['value'] = i
-                ventana_carga.update_idletasks()
-                time.sleep(0.01)
-        
-        incrementar_barra(25)
-        if not preparar_hoja_mes(mes, dia, anio):
-            incrementar_barra(100)
-            return
-        
-        incrementar_barra(50)
-        bloques, porcentajes = procesar_datos(txt, torno, mes, dia, anio)
-        
-        if bloques is None or porcentajes is None:
-            incrementar_barra(100)
-            return False
-        
-        incrementar_barra(75)
-        
-        if bloques is not None and porcentajes is not None:
-            fecha(mes, dia, anio, torno, bloques, porcentajes, incrementar_barra, rendimiento_log)
-        
-    except Exception as e:
-        messagebox.showerror("Error", f"Ocurrió un error en ejecutar():\n{e}")
-        escribir_log("Error", f"Ocurrió un error en ejecutar():\n{e}")
-    finally:
-        cerrar_carga()
-        if callback:  # Ejecutar el callback si existe (para procesar el siguiente torno)
-            ventana.after(100, callback)
-        else:
-            ventana.destroy()
-
+def ejecutar(txt, torno, mes, dia, anio):
+    """Versión modificada de ejecutar para uso interno sin callbacks"""
+    escribir_log(f"Inicio de procesamiento para Torno {torno}")
+    
+    # Obtener rendimientos del log si existen
+    fecha_actual = datetime(anio, MESES_NUM[mes], dia).date()
+    rendimiento_log = obtener_rendimientos_de_log(fecha_actual)
+    
+    def incrementar_barra(hasta, paso=1):
+        actual = barra['value']
+        for i in range(actual, hasta + 1, paso):
+            barra['value'] = i
+            ventana_carga.update_idletasks()
+            time.sleep(0.01)
+    
+    # Reiniciar barra para cada torno (0-50% para torno1, 50-100% para torno2)
+    inicio_barra = 0 if torno == 1 else 50
+    barra['value'] = inicio_barra
+    
+    # Paso 1: Preparar hoja del mes
+    incrementar_barra(inicio_barra + 25)
+    if not preparar_hoja_mes(mes, dia, anio):
+        incrementar_barra(inicio_barra + 50)
+        return False
+    
+    # Paso 2: Procesar datos
+    incrementar_barra(inicio_barra + 35)
+    bloques, porcentajes = procesar_datos(txt, torno, mes, dia, anio)
+    
+    if bloques is None or porcentajes is None:
+        incrementar_barra(inicio_barra + 50)
+        return False
+    
+    # Paso 3: Escribir en hoja mensual
+    incrementar_barra(inicio_barra + 45)
+    if bloques is not None and porcentajes is not None:
+        fecha(mes, dia, anio, torno, bloques, porcentajes, 
+              lambda h: incrementar_barra(inicio_barra + h//2), 
+              rendimiento_log)
+    
+    incrementar_barra(inicio_barra + 50)
+    return True
 
 
 def procesar_datos(entrada, torno, mes, dia, anio):
