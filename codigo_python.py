@@ -443,7 +443,7 @@ def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque
                 2: 33   # Torno 2 - fila de rendimiento
             }
             for torno_num, fila in filas_rendimiento.items():
-                hoja_existente.cell(
+                hoja.cell(
                     row=fila, 
                     column=col_dia, 
                     value=rendimiento_log[f'torno{torno_num}']/100
