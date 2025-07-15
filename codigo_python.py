@@ -297,41 +297,55 @@ def ejecutar(txt, torno, mes, dia, anio):
     try:
         inicio_barra = 0 if torno == 1 else 50
         rango_torno = 50  # Cada torno usa 50% de la barra
+        barra['value'] = inicio_barra
+        ventana_carga.update_idletasks()
         
-        def actualizar_progreso(porcentaje):
-            """Actualiza la barra de progreso de manera segura"""
-            valor = inicio_barra + (porcentaje * rango_torno / 100)
-            ventana.after(0, lambda: barra.config(value=valor))
-            ventana_carga.update_idletasks()
+        def incrementar_barra(hasta, paso=1):
+            """Incrementa la barra de progreso de manera fluida"""
+            nonlocal inicio_barra
+            valor_final = inicio_barra + (hasta * rango_torno / 100)
+            valor_actual = barra['value']
+            
+            # Asegurarnos de no exceder los límites del torno actual
+            valor_final = min(valor_final, inicio_barra + rango_torno)
+            
+            for i in range(valor_actual, int(valor_final) + 1, paso):
+                ventana.after(0, lambda v=i: barra.config(value=v))
+                ventana_carga.update_idletasks()
+                time.sleep(0.01)
         
         # Paso 1: Obtener rendimientos (5%)
-        actualizar_progreso(5)
+        incrementar_barra(5)
         fecha_actual = datetime(anio, MESES_NUM[mes], dia).date()
         rendimiento_log = obtener_rendimientos_de_log(fecha_actual)
         
         # Paso 2: Preparar hoja (20%)
-        actualizar_progreso(20)
+        incrementar_barra(20)
         if not preparar_hoja_mes(mes, dia, anio):
-            actualizar_progreso(100)
+            incrementar_barra(100)
             return False
         
         # Paso 3: Procesar datos (50%)
-        actualizar_progreso(50)
+        incrementar_barra(50)
         bloques, porcentajes = procesar_datos(txt, torno, mes, dia, anio)
         if bloques is None or porcentajes is None:
-            actualizar_progreso(100)
+            incrementar_barra(100)
             return False
         
         # Paso 4: Escribir en hoja (100%)
-        actualizar_progreso(100)
+        incrementar_barra(100)
         fecha(mes, dia, anio, torno, bloques, porcentajes, 
-              lambda h: actualizar_progreso(h), 
+              lambda h: incrementar_barra(h), 
               rendimiento_log)
         
         return True
         
     except Exception as e:
         escribir_log(f"Error en Torno {torno}: {str(e)}", nivel="error")
+        ventana.after(0, lambda: messagebox.showerror(
+            "Error", 
+            f"Error en Torno {torno}:\n{str(e)}"
+        ))
         return False
 
 def procesar_datos(entrada, torno, mes, dia, anio):
