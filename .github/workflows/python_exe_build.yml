@@ -102,7 +102,7 @@ jobs:
       run: echo "Este archivo fue generado automáticamente. Es seguro y no contiene malware." > dist\LEEME.txt
 
     - name: Comprimir EXE en ZIP
-      run: powershell Compress-Archive -Path dist\procesador_excel_gui.exe,dist\LEEME.txt -DestinationPath dist\procesador_excel_gui.zip
+      run: powershell Compress-Archive -Path dist\datos.exe,dist\LEEME.txt -DestinationPath dist\procesador_excel_gui.zip
 
     - name: Upload ZIP artifact
       uses: actions/upload-artifact@v4
