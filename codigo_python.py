@@ -455,17 +455,6 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, increm
             return False
         hoja_mes = wb[nombre_hoja]
         nueva_fecha = f"{dia:02d}/{MESES_NUM[mes]:02d}/{anio}"
-        # 1. Escribir rendimientos del log si existen
-        if rendimiento_log:
-            # Definir las filas donde se escriben los rendimientos
-            filas_rendimiento = {
-                1: 32,  # Torno 1 - fila de rendimiento
-                2: 33   # Torno 2 - fila de rendimiento
-            }
-            fila = filas_rendimiento[torno]
-            hoja_mes.cell(row=fila, column=col_dia, value=rendimiento_log[f'torno{torno}']/100)
-            hoja_mes.cell(row=fila, column=col_dia).number_format = '0.00%'
-            escribir_log(f"Rendimiento del Torno {torno} ({rendimiento_log[f'torno{torno}']}%) escrito en {fila},{col_dia}")
         # 2. Escribir la fecha en las celdas correspondientes
         filas_fecha = [2, 7, 12, 17, 22, 27, 31, 37]
         for fila in filas_fecha:
@@ -517,7 +506,7 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, increm
             escribir_log(f"Éxito ✅ Valores actualizados correctamente")
             escribir_log(f"Fin de la ejecucucion \n")
 
-def preparar_hoja_mes(mes, dia, anio):
+def preparar_hoja_mes(mes, dia, anio, rendimiento_log=None):
     """Crea la hoja del mes si no existe y la configura con fórmulas iniciales."""
     escribir_log("Inicio de preparar_hoja_mes")
     nombre_hoja = f"IR {mes} {anio}"
@@ -542,6 +531,19 @@ def preparar_hoja_mes(mes, dia, anio):
                 wb_check.close()
                 return True
         wb_check.close()
+        # Escribir rendimientos del log si existen
+        if rendimiento_log:
+            filas_rendimiento = {
+                1: 32,  # Torno 1 - fila de rendimiento
+                2: 33   # Torno 2 - fila de rendimiento
+            }
+            for torno_num, fila in filas_rendimiento.items():
+                hoja_existente.cell(
+                    row=fila, 
+                    column=col_dia, 
+                    value=rendimiento_log[f'torno{torno_num}']/100
+                ).number_format = '0.00%'
+                escribir_log(f"Rendimiento del Torno {torno_num} ({rendimiento_log[f'torno{torno_num}']}%) escrito en {fila},{col_dia}")
         # Paso 2: Crear hoja nueva si no existe
         import win32com.client as win32, pythoncom
         pythoncom.CoInitialize()
