@@ -270,8 +270,7 @@ def procesar_archivo_odc():
         
         if not odc_path.exists():
             raise FileNotFoundError(f"No se encontró el archivo ODC en {base_path}: {nombre_archivo}")
-        
-        logger.info(f"Archivo ODC encontrado: {odc_path}")
+
         # 2. CONFIGURAR EXCEL
         pythoncom.CoInitialize()
         excel = win32com.client.DispatchEx("Excel.Application")
@@ -334,14 +333,10 @@ def procesar_archivo_odc():
                             f"Fecha: {fecha.strftime('%Y-%m-%d')} Torno 1: Rendimiento: {torno1.iloc[0].get('Rendimiento', 0):.2f} | "
                             f"Acumulado: {torno1.iloc[0].get('Rendimiento_Acumulado', 0):.2f}\n"
                         )
-                        # logger.info(
-                        #     f"Fecha: {fecha.strftime('%Y-%m-%d')} Torno 1: Rendimiento: {torno1.iloc[0].get('Rendimiento', 0):.2f} | "
-                        #     f"Acumulado: {torno1.iloc[0].get('Rendimiento_Acumulado', 0):.2f}"
-                        # )
+
                     else:
                         mensaje += ("Torno 1: Sin datos\n")
-                        # logger.info("Torno 1: Sin datos\n")
-                    
+
                     # Torno 2
                     torno2 = datos_fecha[datos_fecha['WorkId'] == 3012]
                     if not torno2.empty:
@@ -349,13 +344,9 @@ def procesar_archivo_odc():
                             f"Fecha: {fecha.strftime('%Y-%m-%d')} Torno 2: Rendimiento: {torno2.iloc[0].get('Rendimiento', 0):.2f} | "
                             f"Acumulado: {torno2.iloc[0].get('Rendimiento_Acumulado', 0):.2f}\n"
                         )
-                        # logger.info(
-                        #     f"Fecha: {fecha.strftime('%Y-%m-%d')} Torno 2: Rendimiento: {torno2.iloc[0].get('Rendimiento', 0):.2f} | "
-                        #     f"Acumulado: {torno2.iloc[0].get('Rendimiento_Acumulado', 0):.2f}\n"
-                        # )
+
                     else:
                         mensaje += ("Torno 2: Sin datos\n")
-                        # logger.info("Torno 2: Sin datos\n")
 
                 logger.info(mensaje)
                 
