@@ -146,19 +146,35 @@ def iniciar(texto, torno, mes, dia, anio):
 #     ventana_carga.grab_set()
 
 def mostrar_carga():
+    """Muestra la ventana de carga de manera persistente"""
     global ventana_carga, barra
+    
     if 'ventana_carga' not in globals() or not ventana_carga.winfo_exists():
         ventana_carga = tk.Toplevel()
-        ventana_carga.title("Procesando...")
-        ventana_carga.geometry("300x100")
+        ventana_carga.title("Procesando datos...")
+        ventana_carga.geometry("400x120")
         ventana_carga.resizable(False, False)
-        tk.Label(ventana_carga, text="Procesando...", font=("Arial", 12)).pack(pady=10)
+        
+        # Evitar que se cierre accidentalmente
+        ventana_carga.protocol("WM_DELETE_WINDOW", lambda: None)
+        
+        tk.Label(ventana_carga, 
+                text="Procesando datos, por favor espere...", 
+                font=("Arial", 12)).pack(pady=10)
+        
         barra = ttk.Progressbar(ventana_carga, mode='determinate', maximum=100)
         barra.pack(fill='x', padx=20, pady=5)
+        
+        # Etiqueta para mostrar el torno actual
+        global lbl_estado
+        lbl_estado = tk.Label(ventana_carga, text="", font=("Arial", 10))
+        lbl_estado.pack()
+        
         ventana_carga.grab_set()
-    else:
-        barra['value'] = 0
-        ventana_carga.deiconify()
+    
+    barra['value'] = 0
+    ventana_carga.deiconify()
+
 
 def cerrar_carga():
     if ventana_carga: ventana_carga.destroy()
@@ -235,72 +251,88 @@ def obtener_datos():
     btn_continuar.pack(pady=10)
 
 def procesar_ambos_tornos(datos_torno1, datos_torno2, mes, dia, anio):
-    """Procesa ambos tornos secuencialmente manteniendo la ventana de carga"""
-    # Mostrar ventana de carga al inicio
+    """Función principal con manejo mejorado de la ventana de carga"""
     mostrar_carga()
+    lbl_estado.config(text="Preparando...")
     
-    def ejecutar_secuencial():
+    def tarea_principal():
         try:
-            # Procesar Torno 1
-            ejecutar_torno(datos_torno1, 1, mes, dia, anio)
+            # Actualizar estado en la GUI desde el hilo principal
+            ventana.after(0, lambda: lbl_estado.config(text="Procesando Torno 1..."))
             
-            # Procesar Torno 2
-            ejecutar_torno(datos_torno2, 2, mes, dia, anio)
+            # Procesar Torno 1 (0-50%)
+            if not ejecutar(datos_torno1, 1, mes, dia, anio):
+                raise Exception("Error al procesar Torno 1")
             
-            # Mostrar mensaje final
-            ventana.after(100, lambda: messagebox.showinfo("Éxito", "✅ Ambos tornos procesados correctamente."))
+            # Actualizar estado
+            ventana.after(0, lambda: lbl_estado.config(text="Procesando Torno 2..."))
+            
+            # Procesar Torno 2 (50-100%)
+            if not ejecutar(datos_torno2, 2, mes, dia, anio):
+                raise Exception("Error al procesar Torno 2")
+            
+            # Mensaje final
+            ventana.after(0, lambda: messagebox.showinfo(
+                "Éxito", 
+                f"✅ Procesamiento completado\n"
+                f"Torno 1 y Torno 2 actualizados\n"
+                f"Fecha: {dia}/{mes}/{anio}"
+            ))
             
         except Exception as e:
-            ventana.after(100, lambda: messagebox.showerror("Error", f"Error al procesar: {str(e)}"))
+            ventana.after(0, lambda: messagebox.showerror(
+                "Error", 
+                f"Error durante el procesamiento:\n{str(e)}"
+            ))
+            escribir_log(f"Error en proceso completo: {str(e)}", nivel="error")
         finally:
-            ventana.after(100, cerrar_carga)
+            ventana.after(0, cerrar_carga)
+            escribir_log("="*50 + "\n")  # Separador en el log
     
     # Ejecutar en un hilo separado
-    threading.Thread(target=ejecutar_secuencial, daemon=True).start()
+    threading.Thread(target=tarea_principal, daemon=True).start()
 
 def ejecutar(txt, torno, mes, dia, anio):
-    """Versión modificada de ejecutar para uso interno sin callbacks"""
-    escribir_log(f"Inicio de procesamiento para Torno {torno}")
-    
-    # Obtener rendimientos del log si existen
-    fecha_actual = datetime(anio, MESES_NUM[mes], dia).date()
-    rendimiento_log = obtener_rendimientos_de_log(fecha_actual)
-    
-    def incrementar_barra(hasta, paso=1):
-        actual = barra['value']
-        for i in range(actual, hasta + 1, paso):
-            barra['value'] = i
+    """Función de procesamiento con manejo mejorado de la barra"""
+    try:
+        inicio_barra = 0 if torno == 1 else 50
+        rango_torno = 50  # Cada torno usa 50% de la barra
+        
+        def actualizar_progreso(porcentaje):
+            """Actualiza la barra de progreso de manera segura"""
+            valor = inicio_barra + (porcentaje * rango_torno / 100)
+            ventana.after(0, lambda: barra.config(value=valor))
             ventana_carga.update_idletasks()
-            time.sleep(0.01)
-    
-    # Reiniciar barra para cada torno (0-50% para torno1, 50-100% para torno2)
-    inicio_barra = 0 if torno == 1 else 50
-    barra['value'] = inicio_barra
-    
-    # Paso 1: Preparar hoja del mes
-    incrementar_barra(inicio_barra + 25)
-    if not preparar_hoja_mes(mes, dia, anio):
-        incrementar_barra(inicio_barra + 50)
-        return False
-    
-    # Paso 2: Procesar datos
-    incrementar_barra(inicio_barra + 35)
-    bloques, porcentajes = procesar_datos(txt, torno, mes, dia, anio)
-    
-    if bloques is None or porcentajes is None:
-        incrementar_barra(inicio_barra + 50)
-        return False
-    
-    # Paso 3: Escribir en hoja mensual
-    incrementar_barra(inicio_barra + 45)
-    if bloques is not None and porcentajes is not None:
+        
+        # Paso 1: Obtener rendimientos (5%)
+        actualizar_progreso(5)
+        fecha_actual = datetime(anio, MESES_NUM[mes], dia).date()
+        rendimiento_log = obtener_rendimientos_de_log(fecha_actual)
+        
+        # Paso 2: Preparar hoja (20%)
+        actualizar_progreso(20)
+        if not preparar_hoja_mes(mes, dia, anio):
+            actualizar_progreso(100)
+            return False
+        
+        # Paso 3: Procesar datos (50%)
+        actualizar_progreso(50)
+        bloques, porcentajes = procesar_datos(txt, torno, mes, dia, anio)
+        if bloques is None or porcentajes is None:
+            actualizar_progreso(100)
+            return False
+        
+        # Paso 4: Escribir en hoja (100%)
+        actualizar_progreso(100)
         fecha(mes, dia, anio, torno, bloques, porcentajes, 
-              lambda h: incrementar_barra(inicio_barra + h//2), 
+              lambda h: actualizar_progreso(h), 
               rendimiento_log)
-    
-    incrementar_barra(inicio_barra + 50)
-    return True
-
+        
+        return True
+        
+    except Exception as e:
+        escribir_log(f"Error en Torno {torno}: {str(e)}", nivel="error")
+        return False
 
 def procesar_datos(entrada, torno, mes, dia, anio):
     """Procesa los datos y escribe en el archivo Excel con manejo de errores mejorado"""
