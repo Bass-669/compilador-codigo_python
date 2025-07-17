@@ -143,8 +143,8 @@ def obtener_datos():
     # Etiqueta de instrucción
     lbl_instruccion = tk.Label(
         marco_principal, 
-        text="Ingrese los datos del Torno 2:", 
-        font=("Arial", 12)
+        # text="Ingrese los datos del Torno 2:", 
+        # font=("Arial", 12)
     )
     lbl_instruccion.pack(pady=pady)
     # Área de texto (mismo tamaño que la principal)
