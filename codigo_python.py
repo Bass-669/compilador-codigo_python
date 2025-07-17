@@ -130,11 +130,12 @@ def obtener_datos():
     # Crear ventana para Torno 2 (idéntica a la del Torno 1)
     ventana_torno2 = tk.Toplevel()
     ventana_torno2.title("Ingresar datos del Torno 2")
-    # Configuración idéntica a la ventana del Torno 1
-    #ventana_torno2.geometry("800x600")
     # Área de texto con misma configuración
     texto_torno2 = tk.Text(ventana_torno2, width=100, height=30)
     texto_torno2.pack(padx=10, pady=10)
+    # Marco para organizar los botones (ESTE ERA EL ELEMENTO FALTANTE)
+    marco_botones = tk.Frame(ventana_torno2)
+    marco_botones.pack(pady=10)
     # Botón con mismo estilo pero diferente texto
     btn_continuar = tk.Button(
         ventana_torno2, 
