@@ -126,44 +126,23 @@ def obtener_datos():
     datos_torno1 = entrada_texto.get("1.0", tk.END).strip()
     if not datos_torno1:
         return messagebox.showwarning("Advertencia", "Ingresa los datos del Torno 1.")
-    # Crear ventana para Torno 2 con diseño consistente
+
+    # Crear ventana para Torno 2 (idéntica a la del Torno 1)
     ventana_torno2 = tk.Toplevel()
     ventana_torno2.title("Ingresar datos del Torno 2")
     # Configuración idéntica a la ventana del Torno 1
     ventana_torno2.geometry("800x600")
     # Área de texto con misma configuración
-    texto_torno2 = tk.Text(
-        ventana_torno2, 
-        width=100, 
-        height=30,
-        font=("Consolas", 10) if sys.platform == "win32" else ("Monospace", 10),
-        wrap=tk.NONE  # Igual que en Torno 1
-    )
+    texto_torno2 = tk.Text(ventana_torno2, width=100, height=30)
     texto_torno2.pack(padx=10, pady=10)
     # Botón con mismo estilo pero diferente texto
     btn_continuar = tk.Button(
         ventana_torno2, 
-        text="Continuar a Fecha",  # Texto diferente al del Torno 1
+        text="Continuar a Fecha",  # Única diferencia en los botones
         command=lambda: continuar_a_fecha(ventana_torno2, texto_torno2, datos_torno1),
-        font=("Arial", 10),
-        width=20
     )
     btn_continuar.pack(pady=10)
-    # Botón adicional para regresar al Torno 1 (solo en esta ventana)
-    btn_regresar = tk.Button(
-        ventana_torno2,
-        text="Regresar al Torno 1",
-        command=ventana_torno2.destroy,
-        font=("Arial", 10),
-        width=20
-    )
-    # Centrado y foco (igual que en Torno 1)
-    ventana_torno2.update_idletasks()
-    width = ventana_torno2.winfo_width()
-    height = ventana_torno2.winfo_height()
-    x = (ventana_torno2.winfo_screenwidth() // 2) - (width // 2)
-    y = (ventana_torno2.winfo_screenheight() // 2) - (height // 2)
-    ventana_torno2.geometry(f'+{x}+{y}')
+    # Poner foco en el área de texto (igual que en Torno 1)
     texto_torno2.focus_set()
 
 def continuar_a_fecha(ventana, widget_texto, datos_torno1):
@@ -172,7 +151,7 @@ def continuar_a_fecha(ventana, widget_texto, datos_torno1):
     if not datos_torno2:
         messagebox.showwarning("Advertencia", "Ingresa los datos del Torno 2.")
         return
-    
+
     ventana.destroy()
     pedir_fecha(lambda m,d,a: procesar_ambos_tornos(datos_torno1, datos_torno2, m, d, a))
 
