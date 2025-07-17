@@ -282,6 +282,37 @@ def obtener_rendimientos_de_log(fecha_ingresada):
         escribir_log(f"Error al leer el archivo de log: {str(e)}", nivel="error")
         return None
 
+# def procesar_ambos_tornos(datos_torno1, datos_torno2, mes, dia, anio):
+#     """Función principal con mensaje único al final"""
+#     mostrar_carga()
+
+#     def mostrar_resultado_final(exito):
+#         """Muestra el mensaje final y cierra ventanas"""
+#         ventana_carga.destroy()
+#         ventana.destroy()  # Cierra la ventana principal de entrada de datos
+
+#         if exito:
+#             messagebox.showinfo("Éxito", "✅ Valores actualizados correctamente.")
+#         else:
+#             messagebox.showerror(
+#                 "Error", 
+#                 "❌ Ocurrió un error durante el procesamiento\n"
+#                 "Revise el archivo de log para más detalles"
+#             )
+
+#     def tarea_principal():
+#         # Procesar Torno 1 (0-50%)
+#         if not ejecutar(datos_torno1, 1, mes, dia, anio):
+#             ventana.after(0, lambda: mostrar_resultado_final(False))
+#             return
+
+#         # Procesar Torno 2 (50-100%) con callback para el mensaje final
+#         ejecutar(datos_torno2, 2, mes, dia, anio, 
+#                 lambda exito: ventana.after(0, lambda: mostrar_resultado_final(exito)))
+
+#     threading.Thread(target=tarea_principal, daemon=True).start()
+
+
 def procesar_ambos_tornos(datos_torno1, datos_torno2, mes, dia, anio):
     """Función principal con mensaje único al final"""
     mostrar_carga()
@@ -289,16 +320,37 @@ def procesar_ambos_tornos(datos_torno1, datos_torno2, mes, dia, anio):
     def mostrar_resultado_final(exito):
         """Muestra el mensaje final y cierra ventanas"""
         ventana_carga.destroy()
-        ventana.destroy()  # Cierra la ventana principal de entrada de datos
-
+        
+        # Asegurar que la ventana principal esté enfocada primero
+        ventana.lift()
+        ventana.focus_force()
+        
         if exito:
-            messagebox.showinfo("Éxito", "✅ Valores actualizados correctamente.")
+            # Crear messagebox personalizado para asegurar el foco
+            msg_box = tk.Toplevel(ventana)
+            msg_box.title("Éxito")
+            msg_box.transient(ventana)  # Asociar a la ventana principal
+            msg_box.grab_set()  # Modal
+            
+            tk.Label(msg_box, text="✅ Valores actualizados correctamente.", 
+                    font=("Arial", 11)).pack(padx=20, pady=10)
+            tk.Button(msg_box, text="Aceptar", command=msg_box.destroy,
+                     width=10).pack(pady=10)
+            
+            # Posicionar en el centro y asegurar foco
+            msg_box.geometry(f"+{ventana.winfo_rootx()+50}+{ventana.winfo_rooty()+50}")
+            msg_box.focus_force()
         else:
+            # Alternativa para errores
+            ventana.bell()  # Sonido de alerta
             messagebox.showerror(
                 "Error", 
                 "❌ Ocurrió un error durante el procesamiento\n"
-                "Revise el archivo de log para más detalles"
+                "Revise el archivo de log para más detalles",
+                parent=ventana  # Asegurar que pertenece a la ventana principal
             )
+        
+        ventana.destroy()  # Cierra la ventana principal
 
     def tarea_principal():
         # Procesar Torno 1 (0-50%)
@@ -311,6 +363,8 @@ def procesar_ambos_tornos(datos_torno1, datos_torno2, mes, dia, anio):
                 lambda exito: ventana.after(0, lambda: mostrar_resultado_final(exito)))
 
     threading.Thread(target=tarea_principal, daemon=True).start()
+
+
 
 def finalizar_proceso():
     """Cierra todas las ventanas y muestra el resultado final"""
