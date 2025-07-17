@@ -246,12 +246,23 @@ def obtener_rendimientos_de_log(fecha_ingresada):
         with open(log_path, 'r', encoding='utf-8') as f:
             lineas = f.readlines()
 
+        # Patrón más flexible que maneja:
+        # 1. Distintos formatos de fecha
+        # 2. Presencia/ausencia de acumulado
+        # 3. Saltos de línea
         patron = re.compile(
-            r"Fecha: " + re.escape(fecha_str) + 
-            r" Torno (\d): Rendimiento: (\d+\.\d+)"
+            r"(?:Fecha:\s*" + re.escape(fecha_str) + r".*?)?Torno\s*(\d).*?Rendimiento:\s*(\d+\.\d+)",
+            re.IGNORECASE | re.DOTALL
         )
 
-        for linea in reversed(lineas[-20:]):
+        # Buscar en las últimas 100 líneas (ajustable)
+        for linea in reversed(lineas[-100:]):
+            # Unir líneas consecutivas que no empiezan con Fecha:
+            if not linea.startswith("Fecha:") and "Torno" in linea:
+                linea = linea_anterior + " " + linea.strip()
+            else:
+                linea_anterior = linea.strip()
+
             coincidencia = patron.search(linea)
             if coincidencia:
                 torno = coincidencia.group(1)
