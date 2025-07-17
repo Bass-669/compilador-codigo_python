@@ -229,14 +229,13 @@ def obtener_datos():
     
     # Crear ventana para datos del Torno 2
     ventana_torno2 = tk.Toplevel()
-    ventana_torno2.title("Datos del Torno 2")
+    ventana_torno2.title("Ingresar datos del Torno 2")
     ventana_torno2.geometry("800x600")
-    
-    lbl_instruccion = tk.Label(ventana_torno2, text="Ingrese los datos del Torno 2:", font=("Arial", 12))
     lbl_instruccion.pack(pady=10)
     
     texto_torno2 = tk.Text(ventana_torno2, width=100, height=30)
     texto_torno2.pack(padx=10, pady=10)
+
     
     def continuar_a_fecha():
         datos_torno2 = texto_torno2.get("1.0", tk.END).strip()
@@ -247,10 +246,8 @@ def obtener_datos():
         ventana_torno2.destroy()
         pedir_fecha(lambda m,d,a: procesar_ambos_tornos(datos_torno1, datos_torno2, m, d, a))
     
-    btn_continuar = tk.Button(ventana_torno2, text="Continuar a Fecha", command=continuar_a_fecha)
+    btn_continuar = tk.Button(ventana_torno2, text="Ingresar Fecha", command=continuar_a_fecha)
     btn_continuar.pack(pady=10)
-
-
 
 def ejecutar(txt, torno, mes, dia, anio, callback_final=None):
     """Función de procesamiento con registro completo de log"""
@@ -754,7 +751,7 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, increm
                 messagebox.showwarning("Advertencia", "Error al cerrar el workbook")
                 escribir_log("Advertencia", "Error al cerrar el workbook")
         # 7. Actualizar barra de progreso
-        incrementar_barra(100)
+        # incrementar_barra(100)
         # 8. Mostrar mensaje de éxito solo si todo salió bien
         if exito:
             escribir_log(f"Éxito ✅ Valores actualizados correctamente")
