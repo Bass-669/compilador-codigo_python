@@ -232,7 +232,7 @@ def ejecutar(txt, torno, mes, dia, anio, callback_final=None):
         return False
 
 def obtener_rendimientos_de_log(fecha_ingresada):
-    """Función mejorada para registro de log"""
+    """Función optimizada para obtener rendimientos de una fecha específica"""
     escribir_log(f"Buscando rendimientos para fecha: {fecha_ingresada}")
     log_path = os.path.join(BASE_DIR, "tornos.log")
     fecha_str = fecha_ingresada.strftime("%Y-%m-%d")
@@ -246,36 +246,37 @@ def obtener_rendimientos_de_log(fecha_ingresada):
         with open(log_path, 'r', encoding='utf-8') as f:
             lineas = f.readlines()
 
-        # Patrón más flexible que maneja:
-        # 1. Distintos formatos de fecha
-        # 2. Presencia/ausencia de acumulado
-        # 3. Saltos de línea
+        # Patrón mejorado para capturar fecha y rendimientos
         patron = re.compile(
-            r"(?:Fecha:\s*" + re.escape(fecha_str) + r".*?)?Torno\s*(\d).*?Rendimiento:\s*(\d+\.\d+)",
-            re.IGNORECASE | re.DOTALL
+            r"Fecha:\s*" + re.escape(fecha_str) + 
+            r".*?Torno\s*1:\s*Rendimiento:\s*(\d+\.\d+).*?" +
+            r"Torno\s*2:\s*Rendimiento:\s*(\d+\.\d+)",
+            re.DOTALL | re.IGNORECASE
         )
 
-        # Buscar en las últimas 100 líneas (ajustable)
-        for linea in reversed(lineas[-100:]):
-            # Unir líneas consecutivas que no empiezan con Fecha:
-            if not linea.startswith("Fecha:") and "Torno" in linea:
-                linea = linea_anterior + " " + linea.strip()
-            else:
-                linea_anterior = linea.strip()
+        # Buscar desde el final hacia atrás para encontrar el más reciente
+        for linea in reversed(lineas):
+            if f"Fecha: {fecha_str}" in linea:
+                # Unir líneas hasta tener bloque completo
+                bloque = linea
+                idx = lineas.index(linea)
+                for siguiente in lineas[idx+1:idx+3]:  # Busca 2 líneas siguientes
+                    if "Torno" in siguiente:
+                        bloque += siguiente
+                    else:
+                        break
+                
+                coincidencia = patron.search(bloque)
+                if coincidencia:
+                    rendimientos['torno1'] = float(coincidencia.group(1))
+                    rendimientos['torno2'] = float(coincidencia.group(2))
+                    escribir_log(f"Rendimientos encontrados para {fecha_str}: "
+                               f"Torno1={rendimientos['torno1']}%, "
+                               f"Torno2={rendimientos['torno2']}%")
+                    return rendimientos
 
-            coincidencia = patron.search(linea)
-            if coincidencia:
-                torno = coincidencia.group(1)
-                rendimiento = float(coincidencia.group(2))
-                rendimientos[f'torno{torno}'] = rendimiento
-                escribir_log(f"Encontrado rendimiento para Torno {torno}: {rendimiento}%")
-
-        if None in rendimientos.values():
-            escribir_log("No se encontraron rendimientos para ambos tornos", nivel="warning")
-            return None
-
-        escribir_log(f"Rendimientos completos encontrados: {rendimientos}")
-        return rendimientos
+        escribir_log(f"No se encontraron rendimientos para {fecha_str}", nivel="warning")
+        return None
 
     except Exception as e:
         escribir_log(f"Error al leer el archivo de log: {str(e)}", nivel="error")
