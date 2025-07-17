@@ -230,11 +230,11 @@ def obtener_datos():
     # Crear ventana para datos del Torno 2
     ventana_torno2 = tk.Toplevel()
     ventana_torno2.title("Ingresar datos del Torno 2")
-    ventana_torno2.geometry("800x600")
-    lbl_instruccion.pack(pady=10)
-    
     texto_torno2 = tk.Text(ventana_torno2, width=100, height=30)
     texto_torno2.pack(padx=10, pady=10)
+    ventana_torno2.geometry("800x600")
+    lbl_instruccion.pack(pady=10)
+
 
     
     def continuar_a_fecha():
