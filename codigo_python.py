@@ -338,7 +338,7 @@ def procesar_ambos_tornos(datos_torno1, datos_torno2, mes, dia, anio):
             
             # Contenido del mensaje
             tk.Label(mensaje, 
-                    text="✅ Los datos se han actualizado correctamente\n"
+                    text="✅ Los datos se han actualizado correctamente\n")
 
             tk.Button(mensaje, text="Aceptar", command=ventana.destroy,
                     width=15).pack(pady=10)
