@@ -131,7 +131,7 @@ def obtener_datos():
     ventana_torno2 = tk.Toplevel()
     ventana_torno2.title("Ingresar datos del Torno 2")
     # Configuración idéntica a la ventana del Torno 1
-    ventana_torno2.geometry("800x600")
+    #ventana_torno2.geometry("800x600")
     # Área de texto con misma configuración
     texto_torno2 = tk.Text(ventana_torno2, width=100, height=30)
     texto_torno2.pack(padx=10, pady=10)
@@ -142,6 +142,14 @@ def obtener_datos():
         command=lambda: continuar_a_fecha(ventana_torno2, texto_torno2, datos_torno1),
     )
     btn_continuar.pack(pady=10)
+    # Botón Regresar (nuevamente visible)
+    btn_regresar = tk.Button(
+        marco_botones,
+        text="Regresar",
+        command=ventana_torno2.destroy,
+        width=15
+    )
+    btn_regresar.pack(side=tk.RIGHT, padx=5)
     # Poner foco en el área de texto (igual que en Torno 1)
     texto_torno2.focus_set()
 
