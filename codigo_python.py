@@ -123,65 +123,43 @@ def cerrar_carga():
 
 def obtener_datos():
     """Función principal que inicia el flujo de entrada de datos"""
-    # Configuración común para ambas ventanas
-    ventana_width = 800
-    ventana_height = 600
-    padx = 10
-    pady = 10
-    # Ventana principal (Torno 1)
     datos_torno1 = entrada_texto.get("1.0", tk.END).strip()
     if not datos_torno1:
         return messagebox.showwarning("Advertencia", "Ingresa los datos del Torno 1.")
 
-    # Crear ventana para Torno 2 (idéntica a la principal)
+    # Crear ventana para Torno 2 (ajustada para parecerse a la del Torno 1)
     ventana_torno2 = tk.Toplevel()
-    ventana_torno2.title("Datos del Torno 2")
-    ventana_torno2.geometry(f"{ventana_width}x{ventana_height}")
-    # Marco contenedor para mejor organización
-    marco_principal = tk.Frame(ventana_torno2)
-    marco_principal.pack(fill=tk.BOTH, expand=True, padx=padx, pady=pady)
-    # Etiqueta de instrucción
-    lbl_instruccion = tk.Label(
-        marco_principal, 
-        # text="Ingrese los datos del Torno 2:", 
-        # font=("Arial", 12)
-    )
-    lbl_instruccion.pack(pady=pady)
-    # Área de texto (mismo tamaño que la principal)
+    ventana_torno2.title("Ingresar datos del Torno 2")
+    
+    # Configuración idéntica a la ventana del Torno 1
+    ventana_torno2.geometry("800x600")  # Mismo tamaño que la ventana principal
+    
+    # Área de texto con misma configuración
     texto_torno2 = tk.Text(
-        marco_principal,
-        width=100,
+        ventana_torno2, 
+        width=100, 
         height=30,
         font=("Consolas", 10) if sys.platform == "win32" else ("Monospace", 10)
     )
-    texto_torno2.pack(fill=tk.BOTH, expand=True, padx=padx, pady=pady)
-    # Marco para botones
-    marco_botones = tk.Frame(marco_principal)
-    marco_botones.pack(fill=tk.X, pady=pady)
-    # Botón para continuar
+    texto_torno2.pack(padx=10, pady=10)
+    
+    # Botón con mismo estilo
     btn_continuar = tk.Button(
-        marco_botones,
-        text="Continuar a Fecha",
+        ventana_torno2, 
+        text="Continuar a Fecha", 
         command=lambda: continuar_a_fecha(ventana_torno2, texto_torno2, datos_torno1),
         font=("Arial", 10),
-        width=15
+        width=20
     )
-    btn_continuar.pack(side=tk.RIGHT, padx=padx)
-    # Botón para cancelar
-    btn_cancelar = tk.Button(
-        marco_botones,
-        text="Cancelar",
-        command=ventana_torno2.destroy,
-        font=("Arial", 10),
-        width=15
-    )
-    btn_cancelar.pack(side=tk.LEFT, padx=padx)
-    # Centrar ventana
+    btn_continuar.pack(pady=10)
+    
+    # Centrar ventana en la pantalla (opcional)
     ventana_torno2.update_idletasks()
-    x = (ventana_torno2.winfo_screenwidth() - ventana_width) // 2
-    y = (ventana_torno2.winfo_screenheight() - ventana_height) // 3
-    ventana_torno2.geometry(f"+{x}+{y}")
-    # Poner foco en el área de texto
+    width = ventana_torno2.winfo_width()
+    height = ventana_torno2.winfo_height()
+    x = (ventana_torno2.winfo_screenwidth() // 2) - (width // 2)
+    y = (ventana_torno2.winfo_screenheight() // 2) - (height // 2)
+    ventana_torno2.geometry(f'+{x}+{y}')
     texto_torno2.focus_set()
 
 def continuar_a_fecha(ventana, widget_texto, datos_torno1):
@@ -820,47 +798,11 @@ def dias_en_mes(mes, anio):
     meses_31_dias = ["Enero", "Marzo", "Mayo", "Julio", "Agosto", "Octubre", "Diciembre"]
     return 31 if mes in meses_31_dias else 30
 
-# def obtener_rendimientos_de_log(fecha_ingresada):
-#     escribir_log("Inicio de obtener_rendimientos_de_log")
-#     log_path = os.path.join(BASE_DIR, "tornos.log")
-#     fecha_str = fecha_ingresada.strftime("%Y-%m-%d")
-#     rendimientos = {'torno1': None, 'torno2': None}
-#     if not os.path.exists(log_path):
-#         escribir_log(f"Archivo de log no encontrado: {log_path}", nivel="warning")
-#         return None
-#     try:
-#         with open(log_path, 'r', encoding='utf-8') as f:
-#             lineas = f.readlines()
-#         # Buscar las líneas que contienen la fecha
-#         patron = re.compile(
-#             r"Fecha: " + re.escape(fecha_str) + 
-#             r" Torno (\d): Rendimiento: (\d+\.\d+)"
-#         )
-#         for linea in reversed(lineas[-20:]):  # Buscar en las últimas 20 líneas
-#             coincidencia = patron.search(linea)
-#             if coincidencia:
-#                 torno = coincidencia.group(1)
-#                 rendimiento = float(coincidencia.group(2))
-#                 rendimientos[f'torno{torno}'] = rendimiento
-#         # Verificar que tengamos ambos tornos
-#         if None in rendimientos.values():
-#             return None
-#         return rendimientos
-#     except Exception as e:
-#         escribir_log(f"Error al leer el archivo de log: {str(e)}", nivel="error")
-#         return None
-
-# ventana = tk.Tk()
-# ventana.title("Ingresar datos")
-# entrada_texto = tk.Text(ventana, width=100, height=30)
-# entrada_texto.pack(padx=10, pady=10)
-# tk.Button(ventana, text="Procesar", command=obtener_datos).pack(pady=10)
-# ventana.mainloop()
-
 # Cambiar el botón principal para usar la nueva función
 ventana = tk.Tk()
 ventana.title("Ingresar datos del Torno 1")
 entrada_texto = tk.Text(ventana, width=100, height=30)
 entrada_texto.pack(padx=10, pady=10)
 tk.Button(ventana, text="Continuar al Torno 2", command=obtener_datos).pack(pady=10)
+entrada_texto.focus_set()
 ventana.mainloop()
