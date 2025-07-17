@@ -223,30 +223,85 @@ def cerrar_carga():
 
 def obtener_datos():
     """Función principal que inicia el flujo de entrada de datos"""
+    # Configuración común para ambas ventanas
+    ventana_width = 800
+    ventana_height = 600
+    padx = 10
+    pady = 10
+    
+    # Ventana principal (Torno 1)
     datos_torno1 = entrada_texto.get("1.0", tk.END).strip()
     if not datos_torno1:
         return messagebox.showwarning("Advertencia", "Ingresa los datos del Torno 1.")
     
-    # Crear ventana para datos del Torno 2
+    # Crear ventana para Torno 2 (idéntica a la principal)
     ventana_torno2 = tk.Toplevel()
-    ventana_torno2.title("Ingresar datos del Torno 2")
-    texto_torno2 = tk.Text(ventana_torno2, width=100, height=30)
-    texto_torno2.pack(padx=10, pady=10)
-    ventana_torno2.geometry("800x600")
-
-
+    ventana_torno2.title("Datos del Torno 2")
+    ventana_torno2.geometry(f"{ventana_width}x{ventana_height}")
     
-    def continuar_a_fecha():
-        datos_torno2 = texto_torno2.get("1.0", tk.END).strip()
-        if not datos_torno2:
-            messagebox.showwarning("Advertencia", "Ingresa los datos del Torno 2.")
-            return
-        
-        ventana_torno2.destroy()
-        pedir_fecha(lambda m,d,a: procesar_ambos_tornos(datos_torno1, datos_torno2, m, d, a))
+    # Marco contenedor para mejor organización
+    marco_principal = tk.Frame(ventana_torno2)
+    marco_principal.pack(fill=tk.BOTH, expand=True, padx=padx, pady=pady)
     
-    btn_continuar = tk.Button(ventana_torno2, text="Ingresar Fecha", command=continuar_a_fecha)
-    btn_continuar.pack(pady=10)
+    # Etiqueta de instrucción
+    lbl_instruccion = tk.Label(
+        marco_principal, 
+        text="Ingrese los datos del Torno 2:", 
+        font=("Arial", 12)
+    )
+    lbl_instruccion.pack(pady=pady)
+    
+    # Área de texto (mismo tamaño que la principal)
+    texto_torno2 = tk.Text(
+        marco_principal,
+        width=100,
+        height=30,
+        font=("Consolas", 10) if sys.platform == "win32" else ("Monospace", 10)
+    )
+    texto_torno2.pack(fill=tk.BOTH, expand=True, padx=padx, pady=pady)
+    
+    # Marco para botones
+    marco_botones = tk.Frame(marco_principal)
+    marco_botones.pack(fill=tk.X, pady=pady)
+    
+    # Botón para continuar
+    btn_continuar = tk.Button(
+        marco_botones,
+        text="Continuar a Fecha",
+        command=lambda: continuar_a_fecha(ventana_torno2, texto_torno2, datos_torno1),
+        font=("Arial", 10),
+        width=15
+    )
+    btn_continuar.pack(side=tk.RIGHT, padx=padx)
+    
+    # Botón para cancelar
+    btn_cancelar = tk.Button(
+        marco_botones,
+        text="Cancelar",
+        command=ventana_torno2.destroy,
+        font=("Arial", 10),
+        width=15
+    )
+    btn_cancelar.pack(side=tk.LEFT, padx=padx)
+    
+    # Centrar ventana
+    ventana_torno2.update_idletasks()
+    x = (ventana_torno2.winfo_screenwidth() - ventana_width) // 2
+    y = (ventana_torno2.winfo_screenheight() - ventana_height) // 3
+    ventana_torno2.geometry(f"+{x}+{y}")
+    
+    # Poner foco en el área de texto
+    texto_torno2.focus_set()
+
+def continuar_a_fecha(ventana, widget_texto, datos_torno1):
+    """Función para manejar el paso a selección de fecha"""
+    datos_torno2 = widget_texto.get("1.0", tk.END).strip()
+    if not datos_torno2:
+        messagebox.showwarning("Advertencia", "Ingresa los datos del Torno 2.")
+        return
+    
+    ventana.destroy()
+    pedir_fecha(lambda m,d,a: procesar_ambos_tornos(datos_torno1, datos_torno2, m, d, a))
 
 def ejecutar(txt, torno, mes, dia, anio, callback_final=None):
     """Función de procesamiento con registro completo de log"""
@@ -305,7 +360,7 @@ def ejecutar(txt, torno, mes, dia, anio, callback_final=None):
                          rendimiento_log if torno == 2 else None)
         
         if resultado:
-            escribir_log(f"Procesamiento del Torno {torno} completado con éxito")
+            escribir_log(f"Procesamiento del Torno {torno} completado con éxito \n")
         else:
             escribir_log(f"Error en el procesamiento del Torno {torno}", nivel="error")
         
@@ -754,7 +809,7 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, increm
         # 8. Mostrar mensaje de éxito solo si todo salió bien
         if exito:
             escribir_log(f"Éxito ✅ Valores actualizados correctamente")
-            escribir_log(f"Fin de la ejecucucion \n")
+            escribir_log(f"Fin de la ejecucucion")
 
 def preparar_hoja_mes(mes, dia, anio):
     """Crea la hoja del mes si no existe y la configura con fórmulas iniciales."""
