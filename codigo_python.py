@@ -338,11 +338,12 @@ def procesar_ambos_tornos(datos_torno1, datos_torno2, mes, dia, anio):
             
             # Contenido del mensaje
             tk.Label(mensaje, 
-                    text="✅ Los datos se han actualizado correctamente\n")
-
+                    text="Éxito ✅ Valores actualizados correctamente.\n"
+                         f"Fecha: {dia}/{mes}/{anio}", pady=20).pack()
+            
             tk.Button(mensaje, text="Aceptar", command=ventana.destroy,
                     width=15).pack(pady=10)
-            
+                        
             # Configuración de enfoque
             mensaje.grab_set()
             mensaje.focus_force()
