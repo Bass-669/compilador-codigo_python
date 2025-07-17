@@ -318,49 +318,69 @@ def procesar_ambos_tornos(datos_torno1, datos_torno2, mes, dia, anio):
     mostrar_carga()
 
     def mostrar_resultado_final(exito):
-        """Muestra el mensaje final y cierra ventanas"""
+        """Muestra el mensaje final asegurando visibilidad"""
+        # Cerrar ventana de carga primero
         ventana_carga.destroy()
         
-        # Asegurar que la ventana principal esté enfocada primero
+        # Forzar enfoque en la ventana principal
+        ventana.attributes('-topmost', True)  # Temporalmente siempre visible
         ventana.lift()
         ventana.focus_force()
+        ventana.update_idletasks()
         
+        # Mostrar mensaje
         if exito:
-            # Crear messagebox personalizado para asegurar el foco
-            msg_box = tk.Toplevel(ventana)
-            msg_box.title("Éxito")
-            msg_box.transient(ventana)  # Asociar a la ventana principal
-            msg_box.grab_set()  # Modal
+            # Messagebox con enfoque garantizado
+            mensaje = tk.Toplevel(ventana)
+            mensaje.title("Proceso Completado")
+            mensaje.geometry("400x150")
+            mensaje.resizable(False, False)
             
-            tk.Label(msg_box, text="✅ Valores actualizados correctamente.", 
-                    font=("Arial", 11)).pack(padx=20, pady=10)
-            tk.Button(msg_box, text="Aceptar", command=msg_box.destroy,
-                     width=10).pack(pady=10)
+            # Contenido del mensaje
+            tk.Label(mensaje, 
+                    text="✅ Los datos se han actualizado correctamente\n"
+                         f"Fecha: {dia}/{mes}/{anio}",
+                    font=("Arial", 11), pady=20).pack()
+            tk.Button(mensaje, text="Aceptar", command=ventana.destroy,
+                    width=15).pack(pady=10)
             
-            # Posicionar en el centro y asegurar foco
-            msg_box.geometry(f"+{ventana.winfo_rootx()+50}+{ventana.winfo_rooty()+50}")
-            msg_box.focus_force()
+            # Configuración de enfoque
+            mensaje.grab_set()
+            mensaje.focus_force()
+            mensaje.attributes('-topmost', True)
+            
+            # Posicionamiento centrado
+            mensaje.update_idletasks()
+            x = ventana.winfo_x() + (ventana.winfo_width() - mensaje.winfo_width()) // 2
+            y = ventana.winfo_y() + (ventana.winfo_height() - mensaje.winfo_height()) // 2
+            mensaje.geometry(f"+{x}+{y}")
+            
+            # Restaurar estado normal después de mostrar
+            ventana.attributes('-topmost', False)
         else:
-            # Alternativa para errores
+            # Para errores usamos messagebox estándar pero con enfoque
             ventana.bell()  # Sonido de alerta
             messagebox.showerror(
                 "Error", 
                 "❌ Ocurrió un error durante el procesamiento\n"
                 "Revise el archivo de log para más detalles",
-                parent=ventana  # Asegurar que pertenece a la ventana principal
+                parent=ventana
             )
-        
-        ventana.destroy()  # Cierra la ventana principal
+            ventana.destroy()
 
     def tarea_principal():
-        # Procesar Torno 1 (0-50%)
-        if not ejecutar(datos_torno1, 1, mes, dia, anio):
-            ventana.after(0, lambda: mostrar_resultado_final(False))
-            return
+        try:
+            # Procesar Torno 1
+            if not ejecutar(datos_torno1, 1, mes, dia, anio):
+                ventana.after(0, lambda: mostrar_resultado_final(False))
+                return
 
-        # Procesar Torno 2 (50-100%) con callback para el mensaje final
-        ejecutar(datos_torno2, 2, mes, dia, anio, 
-                lambda exito: ventana.after(0, lambda: mostrar_resultado_final(exito)))
+            # Procesar Torno 2
+            ejecutar(datos_torno2, 2, mes, dia, anio, 
+                    lambda exito: ventana.after(0, lambda: mostrar_resultado_final(exito)))
+        except Exception as e:
+            escribir_log(f"Error inesperado: {str(e)}", nivel="error")
+            ventana.after(0, lambda: mostrar_resultado_final(False))
 
     threading.Thread(target=tarea_principal, daemon=True).start()
 
