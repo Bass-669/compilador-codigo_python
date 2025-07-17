@@ -335,26 +335,22 @@ def procesar_ambos_tornos(datos_torno1, datos_torno2, mes, dia, anio):
             mensaje.title("Proceso Completado")
             mensaje.geometry("400x150")
             mensaje.resizable(False, False)
-            
             # Contenido del mensaje
             tk.Label(mensaje, 
-                    text="Éxito ✅ Valores actualizados correctamente.\n"
+                    text="Éxito ✅ Valores actualizados correctamente para el día:\n"
                          f"Fecha: {dia}/{mes}/{anio}", pady=20).pack()
-            
+
             tk.Button(mensaje, text="Aceptar", command=ventana.destroy,
                     width=15).pack(pady=10)
-                        
             # Configuración de enfoque
             mensaje.grab_set()
             mensaje.focus_force()
             mensaje.attributes('-topmost', True)
-            
             # Posicionamiento centrado
             mensaje.update_idletasks()
             x = ventana.winfo_x() + (ventana.winfo_width() - mensaje.winfo_width()) // 2
             y = ventana.winfo_y() + (ventana.winfo_height() - mensaje.winfo_height()) // 2
             mensaje.geometry(f"+{x}+{y}")
-            
             # Restaurar estado normal después de mostrar
             ventana.attributes('-topmost', False)
         else:
