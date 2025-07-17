@@ -126,31 +126,31 @@ def obtener_datos():
     datos_torno1 = entrada_texto.get("1.0", tk.END).strip()
     if not datos_torno1:
         return messagebox.showwarning("Advertencia", "Ingresa los datos del Torno 1.")
-
-    # Crear ventana para Torno 2 (idéntica a la del Torno 1)
+    # Crear ventana para Torno 2
     ventana_torno2 = tk.Toplevel()
     ventana_torno2.title("Ingresar datos del Torno 2")
     # Área de texto con misma configuración
     texto_torno2 = tk.Text(ventana_torno2, width=100, height=30)
     texto_torno2.pack(padx=10, pady=10)
-    # Marco para organizar los botones (ESTE ERA EL ELEMENTO FALTANTE)
+    # Marco para organizar los botones
     marco_botones = tk.Frame(ventana_torno2)
-    marco_botones.pack(pady=10)
-    # Botón con mismo estilo pero diferente texto
-    btn_continuar = tk.Button(
-        ventana_torno2, 
-        text="Continuar a Fecha",  # Única diferencia en los botones
-        command=lambda: continuar_a_fecha(ventana_torno2, texto_torno2, datos_torno1),
-    )
-    btn_continuar.pack(pady=10)
-    # Botón Regresar (nuevamente visible)
+    marco_botones.pack(pady=10, fill='x', padx=10)
+    # Botón Regresar (izquierda)
     btn_regresar = tk.Button(
         marco_botones,
         text="Regresar",
         command=ventana_torno2.destroy,
         width=15
     )
-    btn_regresar.pack(side=tk.RIGHT, padx=5)
+    btn_regresar.pack(side=tk.LEFT, padx=5)
+    # Botón Continuar (derecha)
+    btn_continuar = tk.Button(
+        marco_botones,
+        text="Continuar a Fecha",
+        command=lambda: continuar_a_fecha(ventana_torno2, texto_torno2, datos_torno1),
+        width=15
+    )
+    btn_continuar.pack(side=tk.RIGHT, padx=5)
     # Poner foco en el área de texto (igual que en Torno 1)
     texto_torno2.focus_set()
 
