@@ -51,125 +51,293 @@ def configurar_log_completo():
 
 configurar_log_completo()
 
+
+def reintentos(func, max_intentos=3, espera=5, mensaje_reintento=None):
+    """
+    Ejecuta una función con reintentos si falla por archivo bloqueado.
+    
+    Args:
+        func (callable): Función a ejecutar
+        max_intentos (int): Número máximo de reintentos
+        espera (int): Segundos entre reintentos
+        mensaje_reintento (str): Mensaje personalizado para reintentos
+        
+    Returns:
+        bool: True si tuvo éxito, False si falló después de todos los intentos
+    """
+    intento = 0
+    while intento < max_intentos:
+        intento += 1
+        try:
+            return func()
+        except Exception as e:
+            if "The file is locked for editing" in str(e) or "El archivo está bloqueado" in str(e):
+                if intento < max_intentos:
+                    msg = mensaje_reintento or f"Archivo bloqueado (intento {intento}/{max_intentos}). Reintentando..."
+                    logger.info(msg)
+                    time.sleep(espera)
+                    continue
+                else:
+                    logger.error("No se pudo acceder al archivo después de varios intentos. ¿Está abierto en otro programa?")
+            logger.error(f"Error en operación: {str(e)}", exc_info=True)
+            return False
+
+
+
 ## ---------------------------------------------------------------
 ## 4. FUNCIONES PRINCIPALES (CORREGIDAS)
 ## ---------------------------------------------------------------
 
+# def procesar_archivo_odc():
+#     """Procesamiento completo corregido con manejo adecuado de excepciones"""
+#     excel = None
+#     workbook = None
+    
+#     try:
+#         # 1. LOCALIZAR ARCHIVO
+#         base_path = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).parent
+#         nombre_archivo = "CLNALMISOTPRD rwExport report_Peeling_Production query.odc"
+#         odc_path = base_path / nombre_archivo
+        
+#         if not odc_path.exists():
+#             raise FileNotFoundError(f"No se encontró el archivo ODC en {base_path}: {nombre_archivo}")
+
+#         # 2. CONFIGURAR EXCEL
+#         pythoncom.CoInitialize()
+#         excel = win32com.client.DispatchEx("Excel.Application")
+#         excel.Visible = False
+#         excel.DisplayAlerts = False
+#         excel.ScreenUpdating = False
+        
+#         # 3. ABRIR ARCHIVO
+#         logger.info("Abriendo archivo ODC...")
+#         workbook = excel.Workbooks.Open(
+#             str(odc_path.absolute()),
+#             UpdateLinks=0,
+#             ReadOnly=True
+#         )
+        
+#         # 4. ESPERA CON CONTROL
+#         start_time = time.time()
+#         while (time.time() - start_time) < 15:
+#             try:
+#                 if workbook.Application.Ready:
+#                     logger.info("Datos cargados correctamente")
+#                     break
+#                 time.sleep(1)
+#             except:
+#                 time.sleep(1)
+#         else:
+#             logger.warning("Tiempo de espera agotado, continuando...")
+        
+#         # 5. GUARDAR RESULTADOS
+#         output_path = odc_path.parent / "datos_actualizados.xlsx"
+#         if output_path.exists():
+#             logger.warning("El archivo de salida ya existe, se sobrescribirá")
+        
+#         workbook.SaveAs(
+#             str(output_path),
+#             FileFormat=51,
+#             ConflictResolution=2
+#         )
+#         logger.info(f"Datos exportados a: {output_path.name}")
+        
+#         # 6. GENERAR REPORTE
+#         datos = pd.read_excel(output_path)
+        
+#         if not datos.empty:
+            
+#             try:
+#                 datos['Fecha'] = pd.to_datetime(datos['Fecha'])
+#                 datos = datos.sort_values('Fecha', ascending=False)
+#                 fechas_unicas = datos['Fecha'].unique()
+#                 ultimas_fechas = fechas_unicas[:15]
+#                 ultima_fecha = datos['Fecha'].max()
+#                 mensaje = "=== RESUMEN DE DATOS ===\n"
+                
+#                 for fecha in ultimas_fechas:
+#                     if fecha == ultima_fecha:
+#                         continue
+#                     datos_fecha = datos[datos['Fecha'] == fecha]
+                    
+#                     # Torno 1
+#                     torno1 = datos_fecha[datos_fecha['WorkId'] == 3011]
+#                     if not torno1.empty:
+#                         mensaje += ("\n"
+#                             f"Fecha: {fecha.strftime('%Y-%m-%d')} Torno 1: Rendimiento: {torno1.iloc[0].get('Rendimiento', 0):.2f} | "
+#                             f"Acumulado: {torno1.iloc[0].get('Rendimiento_Acumulado', 0):.2f}\n"
+#                         )
+
+#                     else:
+#                         mensaje += ("Torno 1: Sin datos\n")
+
+#                     # Torno 2
+#                     torno2 = datos_fecha[datos_fecha['WorkId'] == 3012]
+#                     if not torno2.empty:
+#                         mensaje += (
+#                             f"Fecha: {fecha.strftime('%Y-%m-%d')} Torno 2: Rendimiento: {torno2.iloc[0].get('Rendimiento', 0):.2f} | "
+#                             f"Acumulado: {torno2.iloc[0].get('Rendimiento_Acumulado', 0):.2f}\n"
+#                         )
+
+#                     else:
+#                         mensaje += ("Torno 2: Sin datos\n")
+
+#                 logger.info(mensaje)
+                
+#             except Exception as e:
+#                 logger.error(f"Error procesando fechas: {str(e)}")
+        
+#         return True
+        
+#     except Exception as e:
+#         logger.error(f"Error en procesar_archivo_odc: {str(e)}", exc_info=True)
+#         return False
+        
+#     finally:
+#         # LIMPIEZA DE RECURSOS
+#         try:
+#             if workbook: 
+#                 workbook.Close(False)
+#             if excel: 
+#                 excel.Quit()
+#             pythoncom.CoUninitialize()
+#         except Exception as e:
+#             logger.warning(f"Error al limpiar recursos: {str(e)}")
+
+
 def procesar_archivo_odc():
-    """Procesamiento completo corregido con manejo adecuado de excepciones"""
+    """Procesamiento completo del archivo ODC con manejo de reintentos para archivos bloqueados"""
     excel = None
     workbook = None
     
-    try:
-        # 1. LOCALIZAR ARCHIVO
-        base_path = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).parent
-        nombre_archivo = "CLNALMISOTPRD rwExport report_Peeling_Production query.odc"
-        odc_path = base_path / nombre_archivo
-        
-        if not odc_path.exists():
-            raise FileNotFoundError(f"No se encontró el archivo ODC en {base_path}: {nombre_archivo}")
-
-        # 2. CONFIGURAR EXCEL
-        pythoncom.CoInitialize()
-        excel = win32com.client.DispatchEx("Excel.Application")
-        excel.Visible = False
-        excel.DisplayAlerts = False
-        excel.ScreenUpdating = False
-        
-        # 3. ABRIR ARCHIVO
-        logger.info("Abriendo archivo ODC...")
-        workbook = excel.Workbooks.Open(
-            str(odc_path.absolute()),
-            UpdateLinks=0,
-            ReadOnly=True
-        )
-        
-        # 4. ESPERA CON CONTROL
-        start_time = time.time()
-        while (time.time() - start_time) < 15:
-            try:
-                if workbook.Application.Ready:
-                    logger.info("Datos cargados correctamente")
-                    break
-                time.sleep(1)
-            except:
-                time.sleep(1)
-        else:
-            logger.warning("Tiempo de espera agotado, continuando...")
-        
-        # 5. GUARDAR RESULTADOS
-        output_path = odc_path.parent / "datos_actualizados.xlsx"
-        if output_path.exists():
-            logger.warning("El archivo de salida ya existe, se sobrescribirá")
-        
-        workbook.SaveAs(
-            str(output_path),
-            FileFormat=51,
-            ConflictResolution=2
-        )
-        logger.info(f"Datos exportados a: {output_path.name}")
-        
-        # 6. GENERAR REPORTE
-        datos = pd.read_excel(output_path)
-        
-        if not datos.empty:
-            
-            try:
-                datos['Fecha'] = pd.to_datetime(datos['Fecha'])
-                datos = datos.sort_values('Fecha', ascending=False)
-                fechas_unicas = datos['Fecha'].unique()
-                ultimas_fechas = fechas_unicas[:15]
-                ultima_fecha = datos['Fecha'].max()
-                mensaje = "=== RESUMEN DE DATOS ===\n"
-                
-                for fecha in ultimas_fechas:
-                    if fecha == ultima_fecha:
-                        continue
-                    datos_fecha = datos[datos['Fecha'] == fecha]
-                    
-                    # Torno 1
-                    torno1 = datos_fecha[datos_fecha['WorkId'] == 3011]
-                    if not torno1.empty:
-                        mensaje += ("\n"
-                            f"Fecha: {fecha.strftime('%Y-%m-%d')} Torno 1: Rendimiento: {torno1.iloc[0].get('Rendimiento', 0):.2f} | "
-                            f"Acumulado: {torno1.iloc[0].get('Rendimiento_Acumulado', 0):.2f}\n"
-                        )
-
-                    else:
-                        mensaje += ("Torno 1: Sin datos\n")
-
-                    # Torno 2
-                    torno2 = datos_fecha[datos_fecha['WorkId'] == 3012]
-                    if not torno2.empty:
-                        mensaje += (
-                            f"Fecha: {fecha.strftime('%Y-%m-%d')} Torno 2: Rendimiento: {torno2.iloc[0].get('Rendimiento', 0):.2f} | "
-                            f"Acumulado: {torno2.iloc[0].get('Rendimiento_Acumulado', 0):.2f}\n"
-                        )
-
-                    else:
-                        mensaje += ("Torno 2: Sin datos\n")
-
-                logger.info(mensaje)
-                
-            except Exception as e:
-                logger.error(f"Error procesando fechas: {str(e)}")
-        
-        return True
-        
-    except Exception as e:
-        logger.error(f"Error en procesar_archivo_odc: {str(e)}", exc_info=True)
-        return False
-        
-    finally:
-        # LIMPIEZA DE RECURSOS
+    def _procesar_interno():
+        nonlocal excel, workbook
         try:
-            if workbook: 
-                workbook.Close(False)
-            if excel: 
-                excel.Quit()
-            pythoncom.CoUninitialize()
+            # 1. LOCALIZAR ARCHIVO
+            base_path = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).parent
+            nombre_archivo = "CLNALMISOTPRD rwExport report_Peeling_Production query.odc"
+            odc_path = base_path / nombre_archivo
+            
+            if not odc_path.exists():
+                raise FileNotFoundError(f"No se encontró el archivo ODC en {base_path}: {nombre_archivo}")
+
+            # 2. CONFIGURAR EXCEL
+            pythoncom.CoInitialize()
+            excel = win32com.client.DispatchEx("Excel.Application")
+            excel.Visible = False
+            excel.DisplayAlerts = False
+            excel.ScreenUpdating = False
+            
+            # 3. ABRIR ARCHIVO
+            logger.info("Abriendo archivo ODC...")
+            workbook = excel.Workbooks.Open(
+                str(odc_path.absolute()),
+                UpdateLinks=0,
+                ReadOnly=True
+            )
+            
+            # 4. ESPERA CON CONTROL
+            start_time = time.time()
+            while (time.time() - start_time) < 15:
+                try:
+                    if workbook.Application.Ready:
+                        logger.info("Datos cargados correctamente")
+                        break
+                    time.sleep(1)
+                except:
+                    time.sleep(1)
+            else:
+                logger.warning("Tiempo de espera agotado, continuando...")
+            
+            # 5. GUARDAR RESULTADOS
+            output_path = odc_path.parent / "datos_actualizados.xlsx"
+            if output_path.exists():
+                logger.warning("El archivo de salida ya existe, se sobrescribirá")
+            
+            workbook.SaveAs(
+                str(output_path),
+                FileFormat=51,
+                ConflictResolution=2
+            )
+            logger.info(f"Datos exportados a: {output_path.name}")
+            
+            # 6. GENERAR REPORTE
+            datos = pd.read_excel(output_path)
+            
+            if not datos.empty:
+                try:
+                    datos['Fecha'] = pd.to_datetime(datos['Fecha'])
+                    datos = datos.sort_values('Fecha', ascending=False)
+                    fechas_unicas = datos['Fecha'].unique()
+                    ultimas_fechas = fechas_unicas[:15]
+                    ultima_fecha = datos['Fecha'].max()
+                    mensaje = "=== RESUMEN DE DATOS ===\n"
+                    
+                    for fecha in ultimas_fechas:
+                        if fecha == ultima_fecha:
+                            continue
+                        datos_fecha = datos[datos['Fecha'] == fecha]
+                        
+                        # Torno 1
+                        torno1 = datos_fecha[datos_fecha['WorkId'] == 3011]
+                        if not torno1.empty:
+                            mensaje += (f"\nFecha: {fecha.strftime('%Y-%m-%d')} Torno 1: Rendimiento: {torno1.iloc[0].get('Rendimiento', 0):.2f} | "
+                                      f"Acumulado: {torno1.iloc[0].get('Rendimiento_Acumulado', 0):.2f}\n")
+                        else:
+                            mensaje += "Torno 1: Sin datos\n"
+
+                        # Torno 2
+                        torno2 = datos_fecha[datos_fecha['WorkId'] == 3012]
+                        if not torno2.empty:
+                            mensaje += (f"Fecha: {fecha.strftime('%Y-%m-%d')} Torno 2: Rendimiento: {torno2.iloc[0].get('Rendimiento', 0):.2f} | "
+                                      f"Acumulado: {torno2.iloc[0].get('Rendimiento_Acumulado', 0):.2f}\n")
+                        else:
+                            mensaje += "Torno 2: Sin datos\n"
+
+                    logger.info(mensaje)
+                    
+                except Exception as e:
+                    logger.error(f"Error procesando fechas: {str(e)}")
+            
+            return True
+            
         except Exception as e:
-            logger.warning(f"Error al limpiar recursos: {str(e)}")
+            if "The file is locked for editing" in str(e) or "El archivo está bloqueado" in str(e):
+                raise  # Esto será capturado por el manejador de reintentos
+            logger.error(f"Error en procesamiento: {str(e)}", exc_info=True)
+            return False
+            
+        finally:
+            # LIMPIEZA DE RECURSOS
+            try:
+                if workbook: 
+                    workbook.Close(False)
+                if excel: 
+                    excel.Quit()
+                pythoncom.CoUninitialize()
+            except Exception as e:
+                logger.warning(f"Error al limpiar recursos: {str(e)}")
+
+    # Ejecutar con reintentos
+    max_intentos = 3
+    espera = 5
+    intento = 0
+    
+    while intento < max_intentos:
+        intento += 1
+        resultado = _procesar_interno()
+        
+        if resultado is not False:  # Si es True o None (éxito o error no relacionado)
+            return resultado
+        
+        if intento < max_intentos:
+            logger.info(f"Intento {intento}/{max_intentos} fallido. Reintentando en {espera} segundos...")
+            time.sleep(espera)
+    
+    logger.error(f"No se pudo completar la operación después de {max_intentos} intentos")
+    return False
+
+
 ## ---------------------------------------------------------------
 ## 5. EJECUCIÓN PRINCIPAL
 ## ---------------------------------------------------------------
