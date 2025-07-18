@@ -78,7 +78,7 @@ def reintentos(func, max_intentos=3, espera=5, mensaje_reintento=None):
                     time.sleep(espera)
                     continue
                 else:
-                    logger.error("No se pudo acceder al archivo después de varios intentos. ¿Está abierto en otro programa?")
+                    logger.error("No se pudo acceder al archivo después de varios intentos. ¿Está abierto en otro programa?\n")
             logger.error(f"Error en operación: {str(e)}", exc_info=True)
             return False
 
@@ -206,12 +206,13 @@ def reintentos(func, max_intentos=3, espera=5, mensaje_reintento=None):
 
 
 def procesar_archivo_odc():
-    """Procesamiento completo del archivo ODC con manejo de reintentos para archivos bloqueados"""
+    """Procesamiento completo del archivo ODC con manejo mejorado de reintentos"""
     excel = None
     workbook = None
+    reporte_generado = False
     
     def _procesar_interno():
-        nonlocal excel, workbook
+        nonlocal excel, workbook, reporte_generado
         try:
             # 1. LOCALIZAR ARCHIVO
             base_path = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).parent
@@ -261,48 +262,50 @@ def procesar_archivo_odc():
             )
             logger.info(f"Datos exportados a: {output_path.name}")
             
-            # 6. GENERAR REPORTE
-            datos = pd.read_excel(output_path)
-            
-            if not datos.empty:
-                try:
-                    datos['Fecha'] = pd.to_datetime(datos['Fecha'])
-                    datos = datos.sort_values('Fecha', ascending=False)
-                    fechas_unicas = datos['Fecha'].unique()
-                    ultimas_fechas = fechas_unicas[:15]
-                    ultima_fecha = datos['Fecha'].max()
-                    mensaje = "=== RESUMEN DE DATOS ===\n"
-                    
-                    for fecha in ultimas_fechas:
-                        if fecha == ultima_fecha:
-                            continue
-                        datos_fecha = datos[datos['Fecha'] == fecha]
+            # 6. GENERAR REPORTE (solo si no se ha generado antes)
+            if not reporte_generado:
+                datos = pd.read_excel(output_path)
+                
+                if not datos.empty:
+                    try:
+                        datos['Fecha'] = pd.to_datetime(datos['Fecha'])
+                        datos = datos.sort_values('Fecha', ascending=False)
+                        fechas_unicas = datos['Fecha'].unique()
+                        ultimas_fechas = fechas_unicas[:15]
+                        ultima_fecha = datos['Fecha'].max()
+                        mensaje = "=== RESUMEN DE DATOS ===\n"
                         
-                        # Torno 1
-                        torno1 = datos_fecha[datos_fecha['WorkId'] == 3011]
-                        if not torno1.empty:
-                            mensaje += (f"\nFecha: {fecha.strftime('%Y-%m-%d')} Torno 1: Rendimiento: {torno1.iloc[0].get('Rendimiento', 0):.2f} | "
-                                      f"Acumulado: {torno1.iloc[0].get('Rendimiento_Acumulado', 0):.2f}\n")
-                        else:
-                            mensaje += "Torno 1: Sin datos\n"
+                        for fecha in ultimas_fechas:
+                            if fecha == ultima_fecha:
+                                continue
+                            datos_fecha = datos[datos['Fecha'] == fecha]
+                            
+                            # Torno 1
+                            torno1 = datos_fecha[datos_fecha['WorkId'] == 3011]
+                            if not torno1.empty:
+                                mensaje += (f"\nFecha: {fecha.strftime('%Y-%m-%d')} Torno 1: Rendimiento: {torno1.iloc[0].get('Rendimiento', 0):.2f} | "
+                                          f"Acumulado: {torno1.iloc[0].get('Rendimiento_Acumulado', 0):.2f}\n")
+                            else:
+                                mensaje += "Torno 1: Sin datos\n"
 
-                        # Torno 2
-                        torno2 = datos_fecha[datos_fecha['WorkId'] == 3012]
-                        if not torno2.empty:
-                            mensaje += (f"Fecha: {fecha.strftime('%Y-%m-%d')} Torno 2: Rendimiento: {torno2.iloc[0].get('Rendimiento', 0):.2f} | "
-                                      f"Acumulado: {torno2.iloc[0].get('Rendimiento_Acumulado', 0):.2f}\n")
-                        else:
-                            mensaje += "Torno 2: Sin datos\n"
+                            # Torno 2
+                            torno2 = datos_fecha[datos_fecha['WorkId'] == 3012]
+                            if not torno2.empty:
+                                mensaje += (f"Fecha: {fecha.strftime('%Y-%m-%d')} Torno 2: Rendimiento: {torno2.iloc[0].get('Rendimiento', 0):.2f} | "
+                                          f"Acumulado: {torno2.iloc[0].get('Rendimiento_Acumulado', 0):.2f}\n")
+                            else:
+                                mensaje += "Torno 2: Sin datos\n"
 
-                    logger.info(mensaje)
-                    
-                except Exception as e:
-                    logger.error(f"Error procesando fechas: {str(e)}")
+                        logger.info(mensaje)
+                        reporte_generado = True
+                        
+                    except Exception as e:
+                        logger.error(f"Error procesando fechas: {str(e)}")
             
             return True
             
         except Exception as e:
-            if "The file is locked for editing" in str(e) or "El archivo está bloqueado" in str(e):
+            if "The file is locked for editing" in str(e) or "El archivo está bloqueado" in str(e) or "No se puede obtener acceso" in str(e):
                 raise  # Esto será capturado por el manejador de reintentos
             logger.error(f"Error en procesamiento: {str(e)}", exc_info=True)
             return False
@@ -319,20 +322,33 @@ def procesar_archivo_odc():
                 logger.warning(f"Error al limpiar recursos: {str(e)}")
 
     # Ejecutar con reintentos
-    max_intentos = 3
+    max_intentos = 5
     espera = 5
     intento = 0
     
     while intento < max_intentos:
         intento += 1
-        resultado = _procesar_interno()
-        
-        if resultado is not False:  # Si es True o None (éxito o error no relacionado)
-            return resultado
-        
-        if intento < max_intentos:
-            logger.info(f"Intento {intento}/{max_intentos} fallido. Reintentando en {espera} segundos...")
-            time.sleep(espera)
+        try:
+            resultado = _procesar_interno()
+            
+            if resultado:
+                return True
+                
+            if intento < max_intentos:
+                logger.info(f"Intento {intento}/{max_intentos} fallido. Reintentando en {espera} segundos...")
+                time.sleep(espera)
+                
+        except Exception as e:
+            if "The file is locked for editing" in str(e) or "El archivo está bloqueado" in str(e) or "No se puede obtener acceso" in str(e):
+                if intento < max_intentos:
+                    logger.info(f"Archivo bloqueado (intento {intento}/{max_intentos}). Reintentando en {espera} segundos...")
+                    time.sleep(espera)
+                    continue
+                else:
+                    logger.error("No se pudo acceder al archivo después de varios intentos. ¿Está abierto en otro programa?")
+            else:
+                logger.error(f"Error crítico: {str(e)}", exc_info=True)
+            return False
     
     logger.error(f"No se pudo completar la operación después de {max_intentos} intentos")
     return False
