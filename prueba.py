@@ -91,7 +91,7 @@ def reintentos(func, max_intentos=3, espera=5, mensaje_reintento=None):
 
 def procesar_archivo_odc():
     """Procesamiento completo con gestión robusta de reintentos"""
-    max_intentos = 10
+    max_intentos = 20
     espera_entre_intentos = 10
     intento = 0
     resultado = False
