@@ -206,23 +206,29 @@ def reintentos(func, max_intentos=3, espera=5, mensaje_reintento=None):
 
 
 def procesar_archivo_odc():
-    """Procesamiento completo del archivo ODC con manejo mejorado de reintentos"""
-    excel = None
-    workbook = None
-    reporte_generado = False
-    
-    def _procesar_interno():
-        nonlocal excel, workbook, reporte_generado
+    """Procesamiento completo con gestión robusta de reintentos"""
+    max_intentos = 5
+    espera_entre_intentos = 5
+    intento = 0
+    resultado = False
+
+    while intento < max_intentos and not resultado:
+        intento += 1
+        excel = None
+        workbook = None
+        
         try:
+            logger.info(f"Intento {intento}/{max_intentos}")
+            
             # 1. LOCALIZAR ARCHIVO
             base_path = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).parent
             nombre_archivo = "CLNALMISOTPRD rwExport report_Peeling_Production query.odc"
             odc_path = base_path / nombre_archivo
             
             if not odc_path.exists():
-                raise FileNotFoundError(f"No se encontró el archivo ODC en {base_path}: {nombre_archivo}")
+                raise FileNotFoundError(f"No se encontró el archivo ODC: {nombre_archivo}")
 
-            # 2. CONFIGURAR EXCEL
+            # 2. CONFIGURAR EXCEL (nueva instancia cada intento)
             pythoncom.CoInitialize()
             excel = win32com.client.DispatchEx("Excel.Application")
             excel.Visible = False
@@ -237,121 +243,107 @@ def procesar_archivo_odc():
                 ReadOnly=True
             )
             
-            # 4. ESPERA CON CONTROL
+            # 4. ESPERA CON CONTROL (versión mejorada)
+            datos_cargados = False
             start_time = time.time()
             while (time.time() - start_time) < 15:
                 try:
                     if workbook.Application.Ready:
                         logger.info("Datos cargados correctamente")
+                        datos_cargados = True
                         break
                     time.sleep(1)
                 except:
                     time.sleep(1)
-            else:
+            
+            if not datos_cargados:
                 logger.warning("Tiempo de espera agotado, continuando...")
             
-            # 5. GUARDAR RESULTADOS
+            # 5. GUARDAR RESULTADOS (con verificación adicional)
             output_path = odc_path.parent / "datos_actualizados.xlsx"
             if output_path.exists():
                 logger.warning("El archivo de salida ya existe, se sobrescribirá")
             
-            workbook.SaveAs(
-                str(output_path),
-                FileFormat=51,
-                ConflictResolution=2
-            )
-            logger.info(f"Datos exportados a: {output_path.name}")
-            
-            # 6. GENERAR REPORTE (solo si no se ha generado antes)
-            if not reporte_generado:
-                datos = pd.read_excel(output_path)
+            # Intento de guardado con manejo específico
+            try:
+                workbook.SaveAs(
+                    str(output_path),
+                    FileFormat=51,
+                    ConflictResolution=2
+                )
+                logger.info(f"Datos exportados correctamente a: {output_path.name}")
                 
-                if not datos.empty:
-                    try:
+                # 6. GENERAR REPORTE (solo si el guardado fue exitoso)
+                try:
+                    datos = pd.read_excel(output_path)
+                    
+                    if not datos.empty:
                         datos['Fecha'] = pd.to_datetime(datos['Fecha'])
                         datos = datos.sort_values('Fecha', ascending=False)
                         fechas_unicas = datos['Fecha'].unique()
                         ultimas_fechas = fechas_unicas[:15]
                         ultima_fecha = datos['Fecha'].max()
-                        mensaje = "=== RESUMEN DE DATOS ===\n"
                         
+                        mensaje = "\n=== RESUMEN DE DATOS ===\n"
                         for fecha in ultimas_fechas:
                             if fecha == ultima_fecha:
                                 continue
+                                
                             datos_fecha = datos[datos['Fecha'] == fecha]
+                            mensaje += f"\nFecha: {fecha.strftime('%Y-%m-%d')}\n"
                             
                             # Torno 1
                             torno1 = datos_fecha[datos_fecha['WorkId'] == 3011]
                             if not torno1.empty:
-                                mensaje += (f"\nFecha: {fecha.strftime('%Y-%m-%d')} Torno 1: Rendimiento: {torno1.iloc[0].get('Rendimiento', 0):.2f} | "
-                                          f"Acumulado: {torno1.iloc[0].get('Rendimiento_Acumulado', 0):.2f}\n")
+                                mensaje += f"Torno 1: Rendimiento: {torno1.iloc[0].get('Rendimiento', 0):.2f} | Acumulado: {torno1.iloc[0].get('Rendimiento_Acumulado', 0):.2f}\n"
                             else:
                                 mensaje += "Torno 1: Sin datos\n"
-
+                            
                             # Torno 2
                             torno2 = datos_fecha[datos_fecha['WorkId'] == 3012]
                             if not torno2.empty:
-                                mensaje += (f"Fecha: {fecha.strftime('%Y-%m-%d')} Torno 2: Rendimiento: {torno2.iloc[0].get('Rendimiento', 0):.2f} | "
-                                          f"Acumulado: {torno2.iloc[0].get('Rendimiento_Acumulado', 0):.2f}\n")
+                                mensaje += f"Torno 2: Rendimiento: {torno2.iloc[0].get('Rendimiento', 0):.2f} | Acumulado: {torno2.iloc[0].get('Rendimiento_Acumulado', 0):.2f}\n"
                             else:
                                 mensaje += "Torno 2: Sin datos\n"
-
-                        logger.info(mensaje)
-                        reporte_generado = True
                         
-                    except Exception as e:
-                        logger.error(f"Error procesando fechas: {str(e)}")
-            
-            return True
-            
+                        logger.info(mensaje)
+                
+                except Exception as e:
+                    logger.error(f"Error generando reporte: {str(e)}")
+                
+                resultado = True
+                
+            except Exception as e:
+                if "locked" in str(e).lower() or "bloqueado" in str(e).lower() or "acceso" in str(e).lower():
+                    logger.warning(f"Archivo bloqueado durante guardado (intento {intento}/{max_intentos})")
+                    raise  # Forzará un reintento
+                logger.error(f"Error al guardar: {str(e)}")
+                resultado = False
+                
         except Exception as e:
-            if "The file is locked for editing" in str(e) or "El archivo está bloqueado" in str(e) or "No se puede obtener acceso" in str(e):
-                raise  # Esto será capturado por el manejador de reintentos
-            logger.error(f"Error en procesamiento: {str(e)}", exc_info=True)
-            return False
-            
+            if "locked" in str(e).lower() or "bloqueado" in str(e).lower() or "acceso" in str(e).lower():
+                if intento < max_intentos:
+                    logger.info(f"Archivo bloqueado detectado. Reintentando en {espera_entre_intentos} segundos...")
+                    time.sleep(espera_entre_intentos)
+                else:
+                    logger.error("Máximo de intentos alcanzado. El archivo sigue bloqueado.")
+            else:
+                logger.error(f"Error inesperado: {str(e)}", exc_info=True)
+                resultado = False
+                
         finally:
-            # LIMPIEZA DE RECURSOS
+            # LIMPIEZA DE RECURSOS (asegurada)
             try:
-                if workbook: 
+                if workbook is not None:
                     workbook.Close(False)
-                if excel: 
+                if excel is not None:
                     excel.Quit()
                 pythoncom.CoUninitialize()
             except Exception as e:
-                logger.warning(f"Error al limpiar recursos: {str(e)}")
-
-    # Ejecutar con reintentos
-    max_intentos = 5
-    espera = 5
-    intento = 0
+                logger.warning(f"Error limpiando recursos Excel: {str(e)}")
+                # No afecta el resultado, continuamos
     
-    while intento < max_intentos:
-        intento += 1
-        try:
-            resultado = _procesar_interno()
-            
-            if resultado:
-                return True
-                
-            if intento < max_intentos:
-                logger.info(f"Intento {intento}/{max_intentos} fallido. Reintentando en {espera} segundos...")
-                time.sleep(espera)
-                
-        except Exception as e:
-            if "The file is locked for editing" in str(e) or "El archivo está bloqueado" in str(e) or "No se puede obtener acceso" in str(e):
-                if intento < max_intentos:
-                    logger.info(f"Archivo bloqueado (intento {intento}/{max_intentos}). Reintentando en {espera} segundos...")
-                    time.sleep(espera)
-                    continue
-                else:
-                    logger.error("No se pudo acceder al archivo después de varios intentos. ¿Está abierto en otro programa?")
-            else:
-                logger.error(f"Error crítico: {str(e)}", exc_info=True)
-            return False
-    
-    logger.error(f"No se pudo completar la operación después de {max_intentos} intentos")
-    return False
+    return resultado
 
 
 ## ---------------------------------------------------------------
