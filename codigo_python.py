@@ -75,39 +75,39 @@ def escribir_log(mensaje, nivel="info"):
     except Exception as e:
         escribir_log(f"Error al escribir en log: {e}", file=sys.stderr)
 
-# def pedir_fecha(callback):
-#     ventana = tk.Toplevel()
-#     ventana.title("Fecha del reporte")
-#     ventana.geometry("300x200")
-#     ventana.resizable(False, False)
-#     tk.Label(ventana, text="Selecciona la fecha:").pack(pady=10)
-#     ent_fecha = DateEntry(ventana, date_pattern='dd/MM/yyyy')
-#     ent_fecha.pack(pady=10); ent_fecha.set_date(datetime.now())
-#     def confirmar():
-#         f = ent_fecha.get_date()
-#         callback(MESES[f.strftime("%B")], f.day, f.year)
-#         ventana.destroy()
-#     tk.Button(ventana, text="Aceptar", command=confirmar).pack(pady=10)
-#     ventana.grab_set()
-
 def pedir_fecha(callback):
     ventana = tk.Toplevel()
     ventana.title("Fecha del reporte")
     ventana.geometry("300x200")
     ventana.resizable(False, False)
     tk.Label(ventana, text="Selecciona la fecha:").pack(pady=10)
-    # Obtener fecha de ayer
-    fecha_ayer = datetime.now() - timedelta(days=1)
     ent_fecha = DateEntry(ventana, date_pattern='dd/MM/yyyy')
-    ent_fecha.pack(pady=10)
-    ent_fecha.set_date(fecha_ayer)  # Establecer fecha de ayer por defecto
-
+    ent_fecha.pack(pady=10); ent_fecha.set_date(datetime.now())
     def confirmar():
         f = ent_fecha.get_date()
         callback(MESES[f.strftime("%B")], f.day, f.year)
         ventana.destroy()
     tk.Button(ventana, text="Aceptar", command=confirmar).pack(pady=10)
     ventana.grab_set()
+
+# def pedir_fecha(callback):
+#     ventana = tk.Toplevel()
+#     ventana.title("Fecha del reporte")
+#     ventana.geometry("300x200")
+#     ventana.resizable(False, False)
+#     tk.Label(ventana, text="Selecciona la fecha:").pack(pady=10)
+#     # Obtener fecha de ayer
+#     fecha_ayer = datetime.now() - timedelta(days=1)
+#     ent_fecha = DateEntry(ventana, date_pattern='dd/MM/yyyy')
+#     ent_fecha.pack(pady=10)
+#     ent_fecha.set_date(fecha_ayer)  # Establecer fecha de ayer por defecto
+
+#     def confirmar():
+#         f = ent_fecha.get_date()
+#         callback(MESES[f.strftime("%B")], f.day, f.year)
+#         ventana.destroy()
+#     tk.Button(ventana, text="Aceptar", command=confirmar).pack(pady=10)
+#     ventana.grab_set()
 
 def iniciar(texto, torno, mes, dia, anio):
     mostrar_carga()
