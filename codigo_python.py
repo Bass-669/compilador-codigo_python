@@ -90,25 +90,6 @@ def pedir_fecha(callback):
     tk.Button(ventana, text="Aceptar", command=confirmar).pack(pady=10)
     ventana.grab_set()
 
-# def pedir_fecha(callback):
-#     ventana = tk.Toplevel()
-#     ventana.title("Fecha del reporte")
-#     ventana.geometry("300x200")
-#     ventana.resizable(False, False)
-#     tk.Label(ventana, text="Selecciona la fecha:").pack(pady=10)
-#     # Obtener fecha de ayer
-#     fecha_ayer = datetime.now() - timedelta(days=1)
-#     ent_fecha = DateEntry(ventana, date_pattern='dd/MM/yyyy')
-#     ent_fecha.pack(pady=10)
-#     ent_fecha.set_date(fecha_ayer)  # Establecer fecha de ayer por defecto
-
-#     def confirmar():
-#         f = ent_fecha.get_date()
-#         callback(MESES[f.strftime("%B")], f.day, f.year)
-#         ventana.destroy()
-#     tk.Button(ventana, text="Aceptar", command=confirmar).pack(pady=10)
-#     ventana.grab_set()
-
 def iniciar(texto, torno, mes, dia, anio):
     mostrar_carga()
     threading.Thread(target=lambda: ejecutar(texto, torno, mes, dia, anio), daemon=True).start()
@@ -300,37 +281,6 @@ def obtener_rendimientos_de_log(fecha_ingresada):
     except Exception as e:
         escribir_log(f"Error al leer el archivo de log: {str(e)}", nivel="error")
         return None
-
-# def procesar_ambos_tornos(datos_torno1, datos_torno2, mes, dia, anio):
-#     """Función principal con mensaje único al final"""
-#     mostrar_carga()
-
-#     def mostrar_resultado_final(exito):
-#         """Muestra el mensaje final y cierra ventanas"""
-#         ventana_carga.destroy()
-#         ventana.destroy()  # Cierra la ventana principal de entrada de datos
-
-#         if exito:
-#             messagebox.showinfo("Éxito", "✅ Valores actualizados correctamente.")
-#         else:
-#             messagebox.showerror(
-#                 "Error", 
-#                 "❌ Ocurrió un error durante el procesamiento\n"
-#                 "Revise el archivo de log para más detalles"
-#             )
-
-#     def tarea_principal():
-#         # Procesar Torno 1 (0-50%)
-#         if not ejecutar(datos_torno1, 1, mes, dia, anio):
-#             ventana.after(0, lambda: mostrar_resultado_final(False))
-#             return
-
-#         # Procesar Torno 2 (50-100%) con callback para el mensaje final
-#         ejecutar(datos_torno2, 2, mes, dia, anio, 
-#                 lambda exito: ventana.after(0, lambda: mostrar_resultado_final(exito)))
-
-#     threading.Thread(target=tarea_principal, daemon=True).start()
-
 
 def procesar_ambos_tornos(datos_torno1, datos_torno2, mes, dia, anio):
     """Función principal con mensaje único al final"""
@@ -638,8 +588,8 @@ def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque
     letra_actual = openpyxl.utils.get_column_letter(col_dia)
     try:
         # 1. Escribir fórmulas para los cálculos
-        hoja.cell(row=34, column=col_dia, 
-                 value=f"=IFERROR(AVERAGE({letra_actual}32:{letra_actual}33), 0)").number_format = '0.00%'
+        # hoja.cell(row=34, column=col_dia, 
+        #          value=f"=IFERROR(AVERAGE({letra_actual}32:{letra_actual}33), 0)").number_format = '0.00%'
         hoja.cell(row=38, column=col_dia, 
                  value=f"=IFERROR({letra_actual}32/{letra_actual}23, 0)").font = Font(color='000000')
         hoja.cell(row=39, column=col_dia, 
