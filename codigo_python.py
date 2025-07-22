@@ -244,8 +244,8 @@ def pedir_fecha():
             return
             
         # # Leer y transformar datos
-        # datos_torno1 = transformar_datos_txt_a_formato(leer_archivo_torno(archivo_torno1))
-        # datos_torno2 = transformar_datos_txt_a_formato(leer_archivo_torno(archivo_torno2))
+        datos_torno1
+        datos_torno2
         
         if not datos_torno1 or not datos_torno2:
             messagebox.showerror(
