@@ -406,10 +406,9 @@ def procesar_datos(entrada, torno, mes, dia, anio):
     bloques_detectados = []
     sumas_ad_por_bloque = []
     # 1. Verificación inicial del archivo
-    if not os.path.exists(RUTA_ENTRADA):
-        error_msg = f"No se encontró el archivo Excel en:\n{RUTA_ENTRADA}"
-        messagebox.showerror("Error", error_msg)
-        escribir_log("ERROR - Archivo no encontrado", nivel="error")
+    if not re.search(r'\* \* \.\.\.', entrada):
+        escribir_log(f"ERROR - Datos del Torno {torno} no tienen formato esperado", nivel="error")
+        messagebox.showerror("Error", f"El archivo del Torno {torno} no tiene el formato correcto")
         return None, None
     # 2. Verificación de permisos de escritura
     try:
