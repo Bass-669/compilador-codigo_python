@@ -240,8 +240,10 @@ def ejecutar(txt, torno, mes, dia, anio, callback_final=None):
         escribir_log(f"Procesando datos del Torno {torno}...")
         incrementar_barra(40)
         bloques, porcentajes = procesar_datos(txt, torno, mes, dia, anio)
+        
+        # Añadir verificación explícita
         if bloques is None or porcentajes is None:
-            escribir_log("Error al procesar datos", nivel="error")
+            escribir_log("Error: procesar_datos() devolvió valores None", nivel="error")
             if callback_final:
                 callback_final(False)
             return False
@@ -401,10 +403,18 @@ def finalizar_proceso():
     messagebox.showinfo("✅ Los datos de ambos tornos se han actualizado correctamente\n")
 
 def procesar_datos(entrada, torno, mes, dia, anio):
-    # Validación inicial del formato
-    if "RADIATA" not in entrada:
-        escribir_log("Formato incorrecto: Falta 'RADIATA'", nivel="error")
-        messagebox.showerror("Error", "El formato debe comenzar con 'RADIATA'")
+    """Procesa los datos y escribe en el archivo Excel con manejo de errores mejorado"""
+    escribir_log(f"Inicio de procesar_datos - Torno: {torno}, Fecha: {dia}/{mes}/{anio}")
+    
+    # Inicializar las listas que se devolverán
+    bloques_detectados = []
+    sumas_ad_por_bloque = []
+    
+    # 1. Verificación inicial del archivo
+    if not os.path.exists(RUTA_ENTRADA):
+        error_msg = f"No se encontró el archivo Excel en:\n{RUTA_ENTRADA}"
+        messagebox.showerror("Error", error_msg)
+        escribir_log("ERROR - Archivo no encontrado", nivel="error")
         return None, None
     # 2. Verificación de permisos de escritura
     try:
@@ -424,32 +434,38 @@ def procesar_datos(entrada, torno, mes, dia, anio):
     # 3. Procesamiento principal
     wb = None
     try:
-        # Intentar abrir el workbook
         wb = openpyxl.load_workbook(RUTA_ENTRADA)
-        # Verificar si existe la hoja "IR diario "
         if "IR diario " not in wb.sheetnames:
             error_msg = 'No se encontró la hoja "IR diario " en el archivo Excel'
             messagebox.showerror("Error", error_msg)
             escribir_log("ERROR - Hoja 'IR diario ' no encontrada", nivel="error")
             return None, None
+
         hoja = wb["IR diario "]
         ultima_fila = None
+        
         # Buscar última fila con patrón "* * ..."
         for fila in hoja.iter_rows():
             if [str(c.value).strip() if c.value else "" for c in fila[:3]] == ["*", "*", "..."]:
                 ultima_fila = fila[0].row
+
         if not ultima_fila:
             raise ValueError("No se encontró '* * ...'")
+
         fila = ultima_fila + 1
+        
+        # Procesar cada bloque
         for b in extraer_bloques(entrada):
             try:
                 f_ini = fila
                 subs = sub_bloques(b)
                 filas_validas = []
-                # Procesar cada subbloque
+                
                 for sub in subs:
+                    # Procesamiento de cada sub-bloque
                     txt = sub[0] if not re.match(r'^\d', sub[0]) else ""
                     datos = sub[1:] if txt else sub
+                    
                     # Construir datos de columnas
                     p = txt.split()
                     col_txt = (
@@ -459,22 +475,30 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                         ["", p[0], p[1], p[2], "", p[3]] if len(p) == 4 else
                         [""] * 6
                     )
+                    
                     col_nums = [val for l in datos for val in l.strip().split()]
                     fila_vals = col_txt + col_nums
-                    # Escribir valores en las celdas (columnas 1-24)
+                    
+                    # Escribir valores en las celdas
                     for col, val in enumerate(fila_vals[:24], 1):
                         try:
                             n = float(val.replace(",", ".")) if 3 <= col <= 24 and val else val
                             escribir(hoja, fila, col, n, isinstance(n, float))
                         except:
                             escribir(hoja, fila, col, val)
-                    # Escribir metadatos (columnas 25-28)
+                    
+                    # Escribir metadatos
                     for col, val in zip(range(25, 29), [torno, mes, dia, anio]):
                         hoja.cell(row=fila, column=col, value=val).alignment = ALIGN_R
+                    
                     fila += 1
+
                 f_fin = fila - 1
                 tipo_bloque = "PODADO" if "PODADO" in txt.upper() else "REGULAR"
+
+                # Añadir a bloques_detectados (asegurando que siempre se añade)
                 bloques_detectados.append((tipo_bloque, f_fin))
+
                 # Insertar fórmulas proporcionales (columna AD)
                 if len(subs) > 1:
                     for f in range(f_ini, f_fin):
