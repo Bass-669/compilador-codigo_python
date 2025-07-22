@@ -462,13 +462,12 @@ def procesar_datos(entrada, torno, mes, dia, anio):
             try:
                 f_ini = fila
                 subs = sub_bloques(b)
-                filas_validas = []
                 
                 for sub in subs:
                     # Determinar si es línea de texto o de datos
-                    if not re.match(r'^\d', sub[0]):  # Línea de texto
+                    if not re.match(r'^\d', sub[0]):  # Línea de texto (encabezado)
                         txt = sub[0]
-                        datos = sub[1:]
+                        datos = sub[1:] if len(sub) > 1 else []
                     else:  # Línea de datos
                         txt = ""
                         datos = sub
@@ -479,7 +478,8 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                         # Escribir en columnas 1-6
                         hoja.cell(row=fila, column=1, value=partes[0])  # RADIATA
                         hoja.cell(row=fila, column=2, value=partes[1])  # PODADO/REGULAR
-                        hoja.cell(row=fila, column=3, value=partes[2])  # Rango (220...239)
+                        if len(partes) > 2:
+                            hoja.cell(row=fila, column=3, value=partes[2])  # Rango (220...239)
                         if len(partes) > 3:
                             try:
                                 hoja.cell(row=fila, column=4, value=float(partes[3]))  # Cantidad
@@ -609,7 +609,7 @@ def Pasar_referencia(celda_origen):
     return referencia
 
 def extraer_bloques(txt):
-    """Versión corregida que maneja el formato real con RADIATA"""
+    """Versión corregida para manejar el formato real con RADIATA"""
     escribir_log("Inicio de extraer_bloques (versión corregida)")
     
     lineas = [l.strip() for l in txt.split('\n') if l.strip()]
@@ -617,8 +617,8 @@ def extraer_bloques(txt):
     bloque_actual = []
     
     for linea in lineas:
-        # Detecta inicio de nuevo bloque (RADIATA)
-        if linea.startswith('RADIATA'):
+        # Detecta inicio de nuevo bloque (RADIATA o línea con PODADO/REGULAR)
+        if linea.startswith('RADIATA') or ('PODADO' in linea and '...' not in linea) or ('REGULAR' in linea and '...' not in linea):
             if bloque_actual:  # Guardar el bloque anterior
                 bloques.append(bloque_actual)
                 bloque_actual = []
@@ -631,23 +631,19 @@ def extraer_bloques(txt):
     return bloques
 
 def sub_bloques(b):
-    """Divide cada bloque RADIATA en sub-bloques PODADO/REGULAR"""
+    """Divide cada bloque en sub-bloques de datos"""
     escribir_log("Inicio de sub_bloques (versión adaptada)")
-    
     subs = []
     sub_actual = []
-    
     for linea in b:
-        # Líneas con PODADO/REGULAR son nuevos sub-bloques
-        if 'PODADO' in linea or 'REGULAR' in linea:
+        # Líneas con RADIATA o PODADO/REGULAR son nuevos sub-bloques
+        if linea.startswith('RADIATA') or ('PODADO' in linea and '...' not in linea) or ('REGULAR' in linea and '...' not in linea):
             if sub_actual:
                 subs.append(sub_actual)
                 sub_actual = []
         sub_actual.append(linea)
-    
     if sub_actual:
         subs.append(sub_actual)
-    
     return subs
 
 def escribir_valor_bloque(hoja, col_dia, torno, valor, tipo_bloque):
