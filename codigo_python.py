@@ -495,20 +495,36 @@ def finalizar_proceso():
     messagebox.showinfo("✅ Los datos de ambos tornos se han actualizado correctamente\n")
 
 def procesar_datos(entrada, torno, mes, dia, anio):
-    """Procesa los datos y escribe en el archivo Excel con formato correcto"""
+    """Procesa los datos y escribe en el archivo Excel con manejo de errores mejorado"""
     escribir_log(f"Inicio de procesar_datos - Torno: {torno}, Fecha: {dia}/{mes}/{anio}")
     bloques_detectados = []
     sumas_ad_por_bloque = []
     
-    # Verificación inicial del archivo
+    # 1. Verificación inicial del archivo
     if not os.path.exists(RUTA_ENTRADA):
         error_msg = f"No se encontró el archivo Excel en:\n{RUTA_ENTRADA}"
         messagebox.showerror("Error", error_msg)
         escribir_log("ERROR - Archivo no encontrado", nivel="error")
         return None, None
-        
+
+    # 2. Verificación de permisos de escritura
     try:
-        # Abrir el workbook
+        with open(RUTA_ENTRADA, 'a+b') as test_file:
+            pass
+    except PermissionError:
+        error_msg = f"El archivo está abierto en Excel. Por favor cierre:\n{RUTA_ENTRADA}"
+        messagebox.showerror("Error", error_msg)
+        escribir_log("ERROR - El archivo esta abierto", nivel="error")
+        return None, None
+    except Exception as e:
+        error_msg = f"No se puede acceder al archivo:\n{str(e)}"
+        messagebox.showerror("Error", error_msg)
+        escribir_log(f"ERROR - Acceso al archivo: {str(e)}", nivel="error")
+        return None, None
+
+    # 3. Procesamiento principal
+    wb = None
+    try:
         wb = openpyxl.load_workbook(RUTA_ENTRADA)
         
         if "IR diario " not in wb.sheetnames:
@@ -526,7 +542,7 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                 ultima_fila = fila[0].row
                 
         if not ultima_fila:
-            raise ValueError("No se encontró '* * ...' en la hoja 'IR diario '")
+            raise ValueError("No se encontró el marcador '* * ...' en la hoja")
             
         fila = ultima_fila + 1
         
@@ -534,14 +550,12 @@ def procesar_datos(entrada, torno, mes, dia, anio):
             try:
                 f_ini = fila
                 subs = sub_bloques(b)
-                filas_validas = []
                 
                 for sub in subs:
-                    # Procesar cada subbloque
                     txt = sub[0] if not re.match(r'^\d', sub[0]) else ""
                     datos = sub[1:] if txt else sub
                     
-                    # Construir datos de columnas según el formato observado
+                    # Construir datos de columnas (versión mejorada)
                     if txt.startswith("RADIATA"):
                         partes = txt.split()
                         col_txt = [partes[0], partes[1], partes[2], partes[3], "", partes[4]] if len(partes) >= 5 else [""]*6
@@ -551,7 +565,7 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                         partes = txt.split()
                         col_txt = [partes[0], partes[1], partes[2], partes[3], "", partes[4]] if len(partes) >= 5 else [""]*6
                     
-                    # Procesar valores numéricos
+                    # Procesar valores numéricos (versión mejorada)
                     col_nums = []
                     for l in datos:
                         for val in l.strip().split():
@@ -571,13 +585,9 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                             celda.border = BORDER
                             celda.alignment = ALIGN_R
                             
-                            # Formato numérico para columnas específicas
-                            if col >= 5:  # A partir de la columna 5 (E) son números
-                                try:
-                                    if isinstance(val, (int, float)):
-                                        celda.number_format = '0.00'
-                                except:
-                                    pass
+                            # Aplicar formato numérico solo a columnas de valores
+                            if col >= 5 and isinstance(val, (int, float)):
+                                celda.number_format = '0.00'
                         except Exception as e:
                             escribir_log(f"Error escribiendo valor en fila {fila}, col {col}: {str(e)}", nivel="warning")
                     
@@ -589,28 +599,40 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                 
                 f_fin = fila - 1
                 tipo_bloque = "PODADO" if "PODADO" in txt.upper() else "REGULAR"
-                bloques_detectados.append((tipo_bloque, f_fin))
                 
                 # Insertar fórmulas proporcionales (columna AD)
                 if len(subs) > 1:
                     for f in range(f_ini, f_fin):
-                        hoja.cell(row=f, column=30, value=f"=IFERROR(AC{f}*D{f}/D{f_fin}, 0)")
+                        celda = hoja.cell(row=f, column=30)
+                        celda.value = f"=IFERROR(AC{f}*D{f}/D{f_fin}, 0)"
+                        celda.number_format = '0.00'
                 
                 # Configurar celda de autosuma
-                for col in range(25, 30):
-                    hoja.cell(row=f_fin, column=col, value="")
-                
                 celda_autosuma = hoja.cell(row=f_fin, column=30)
                 celda_autosuma.value = f"=SUM(AD{f_ini}:AD{f_fin-1})"
                 celda_autosuma.fill = FILL_AMARILLO
+                celda_autosuma.number_format = '0.00'
                 
-                # Obtener valor de referencia para el bloque
+                # Obtener valores para resumen
+                valor_d = hoja.cell(row=f_fin, column=4).value
+                try:
+                    valor_d = float(str(valor_d).replace(",", ".")) if valor_d else 0
+                except:
+                    valor_d = 0
+                
                 try:
                     valor_ae = Pasar_referencia(f"AD{f_fin}")
-                    sumas_ad_por_bloque.append(valor_ae)
                 except Exception as e:
-                    sumas_ad_por_bloque.append(0.0)
+                    valor_ae = 0.0
                     escribir_log(f"Error al obtener referencia AD{f_fin}: {str(e)}", nivel="warning")
+                
+                # Almacenar datos del bloque
+                bloques_detectados.append((tipo_bloque, {
+                    'fila_fin': f_fin,
+                    'valor_d': valor_d,
+                    'valor_ae': valor_ae
+                }))
+                sumas_ad_por_bloque.append(valor_ae)
                 
                 # Guardar cambios después de cada bloque
                 try:
