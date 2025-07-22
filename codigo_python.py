@@ -11,7 +11,7 @@ from logging.handlers import RotatingFileHandler
 BASE_DIR = os.path.dirname(sys.executable if getattr(sys, 'frozen', False) else os.path.abspath(__file__))
 CARPETA_DATOS = os.path.join(BASE_DIR, "Reportes_Tornos", "datos")  # Nueva ruta para los datos
 CARPETA_REPORTES = os.path.join(BASE_DIR, "reportes")  # Carpeta para los reportes Excel
-ARCHIVO = "Reporte IR Tornos.xlsx"
+CARPETA, ARCHIVO = "reportes", "Reporte IR Tornos.xlsx"
 RUTA_ENTRADA = os.path.join(CARPETA_REPORTES, ARCHIVO)
 MESES = dict(zip(
     ["January","February","March","April","May","June","July","August","September","October","November","December"],
