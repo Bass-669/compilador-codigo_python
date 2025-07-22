@@ -9,8 +9,10 @@ import logging
 from logging.handlers import RotatingFileHandler
 
 BASE_DIR = os.path.dirname(sys.executable if getattr(sys, 'frozen', False) else os.path.abspath(__file__))
-CARPETA, ARCHIVO = "reportes", "Reporte IR Tornos.xlsx"
-RUTA_ENTRADA = os.path.join(BASE_DIR, CARPETA, ARCHIVO)
+CARPETA_DATOS = os.path.join(BASE_DIR, "Reportes_Tornos", "datos")  # Nueva ruta para los datos
+CARPETA_REPORTES = os.path.join(BASE_DIR, "reportes")  # Carpeta para los reportes Excel
+ARCHIVO = "Reporte IR Tornos.xlsx"
+RUTA_ENTRADA = os.path.join(CARPETA_REPORTES, ARCHIVO)
 MESES = dict(zip(
     ["January","February","March","April","May","June","July","August","September","October","November","December"],
     ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"]
@@ -121,38 +123,71 @@ def mostrar_carga():
 def cerrar_carga():
     if ventana_carga: ventana_carga.destroy()
 
+def obtener_datos_desde_archivo(fecha, numero_torno):
+    """Lee los datos del archivo TXT correspondiente a la fecha y torno especificados"""
+    dia = fecha.day
+    mes = fecha.month
+    anio = fecha.year
+    formato_fecha = f"{dia:02d}-{mes:02d}-{anio}"
+    codigo_torno = "3011" if numero_torno == 1 else "3012"
+    nombre_archivo = f"Reporte_{formato_fecha}_{codigo_torno}.txt"
+    ruta_archivo = os.path.join(CARPETA_DATOS, nombre_archivo)
+    
+    if not os.path.exists(ruta_archivo):
+        escribir_log(f"No se encontró el archivo para Torno {numero_torno}: {ruta_archivo}", nivel="warning")
+        return None
+    
+    try:
+        with open(ruta_archivo, 'r', encoding='utf-8') as f:
+            contenido = f.read().strip()
+            escribir_log(f"Datos leídos correctamente del Torno {numero_torno}")
+            return contenido
+    except Exception as e:
+        escribir_log(f"Error al leer archivo del Torno {numero_torno}: {str(e)}", nivel="error")
+        return None
+
 def obtener_datos():
-    """Función principal que inicia el flujo de entrada de datos"""
-    datos_torno1 = entrada_texto.get("1.0", tk.END).strip()
-    if not datos_torno1:
-        return messagebox.showwarning("Advertencia", "Ingresa los datos del Torno 1.")
-    # Crear ventana para Torno 2
-    ventana_torno2 = tk.Toplevel()
-    ventana_torno2.title("Ingresar datos del Torno 2")
-    # Área de texto con misma configuración
-    texto_torno2 = tk.Text(ventana_torno2, width=100, height=30)
-    texto_torno2.pack(padx=10, pady=10)
-    # Marco para organizar los botones
-    marco_botones = tk.Frame(ventana_torno2)
-    marco_botones.pack(pady=10, fill='x', padx=10)
-    # Botón Regresar (izquierda)
-    btn_regresar = tk.Button(
-        marco_botones,
-        text="Regresar",
-        command=ventana_torno2.destroy,
-        width=15
-    )
-    btn_regresar.pack(side=tk.LEFT, padx=5)
-    # Botón Continuar (derecha)
-    btn_continuar = tk.Button(
-        marco_botones,
-        text="Continuar a Fecha",
-        command=lambda: continuar_a_fecha(ventana_torno2, texto_torno2, datos_torno1),
-        width=15
-    )
-    btn_continuar.pack(side=tk.RIGHT, padx=5)
-    # Poner foco en el área de texto (igual que en Torno 1)
-    texto_torno2.focus_set()
+    """Función principal modificada para obtener datos de archivos"""
+    # Pedir fecha al usuario
+    def procesar_fecha(fecha_seleccionada):
+        # Obtener datos de ambos tornos
+        datos_torno1 = obtener_datos_desde_archivo(fecha_seleccionada, 1)
+        datos_torno2 = obtener_datos_desde_archivo(fecha_seleccionada, 2)
+        
+        if not datos_torno1 and not datos_torno2:
+            messagebox.showerror("Error", "No se encontraron archivos de datos para la fecha seleccionada")
+            return
+        
+        if not datos_torno1:
+            messagebox.showerror("Error", "No se encontró el archivo de datos para el Torno 1")
+            return
+        
+        if not datos_torno2:
+            messagebox.showerror("Error", "No se encontró el archivo de datos para el Torno 2")
+            return
+        
+        # Extraer mes, día y año para procesar
+        mes = MESES[fecha_seleccionada.strftime("%B")]
+        dia = fecha_seleccionada.day
+        anio = fecha_seleccionada.year
+        
+        # Iniciar el procesamiento
+        procesar_ambos_tornos(datos_torno1, datos_torno2, mes, dia, anio)
+    
+    # Mostrar selector de fecha
+    ventana_fecha = tk.Toplevel()
+    ventana_fecha.title("Seleccionar fecha del reporte")
+    ventana_fecha.geometry("300x150")
+    
+    tk.Label(ventana_fecha, text="Seleccione la fecha:").pack(pady=10)
+    cal = DateEntry(ventana_fecha, date_pattern='dd/MM/yyyy')
+    cal.pack(pady=10)
+    cal.set_date(datetime.now())
+    
+    tk.Button(ventana_fecha, text="Procesar", 
+             command=lambda: procesar_fecha(cal.get_date())).pack(pady=10)
+    
+    ventana_fecha.grab_set()
 
 def continuar_a_fecha(ventana, widget_texto, datos_torno1):
     """Función para manejar el paso a selección de fecha"""
@@ -837,11 +872,18 @@ def dias_en_mes(mes, anio):
     meses_31_dias = ["Enero", "Marzo", "Mayo", "Julio", "Agosto", "Octubre", "Diciembre"]
     return 31 if mes in meses_31_dias else 30
 
-# Cambiar el botón principal para usar la nueva función
+# Modificar la creación de la ventana principal
 ventana = tk.Tk()
-ventana.title("Ingresar datos del Torno 1")
-entrada_texto = tk.Text(ventana, width=100, height=30)
-entrada_texto.pack(padx=10, pady=10)
-tk.Button(ventana, text="Continuar al Torno 2", command=obtener_datos).pack(pady=10)
-entrada_texto.focus_set()
+ventana.title("Procesador de Reportes de Tornos")
+ventana.geometry("400x200")
+
+tk.Label(ventana, text="Procesador Automático de Reportes", 
+        font=("Arial", 14)).pack(pady=20)
+tk.Label(ventana, text="Los datos se leerán automáticamente\n"
+                      "de los archivos en la carpeta 'datos'").pack(pady=10)
+
+tk.Button(ventana, text="Iniciar Proceso", 
+         command=obtener_datos, 
+         width=20, height=2).pack(pady=20)
+
 ventana.mainloop()
