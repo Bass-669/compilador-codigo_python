@@ -401,14 +401,10 @@ def finalizar_proceso():
     messagebox.showinfo("✅ Los datos de ambos tornos se han actualizado correctamente\n")
 
 def procesar_datos(entrada, torno, mes, dia, anio):
-    """Procesa los datos y escribe en el archivo Excel con manejo de errores mejorado"""
-    escribir_log(f"Inicio de procesar_datos - Torno: {torno}, Fecha: {dia}/{mes}/{anio}")
-    bloques_detectados = []
-    sumas_ad_por_bloque = []
-    # 1. Verificación inicial del archivo
-    if not re.search(r'\* \* \.\.\.', entrada):
-        escribir_log(f"ERROR - Datos del Torno {torno} no tienen formato esperado", nivel="error")
-        messagebox.showerror("Error", f"El archivo del Torno {torno} no tiene el formato correcto")
+    # Validación inicial del formato
+    if "RADIATA" not in entrada:
+        escribir_log("Formato incorrecto: Falta 'RADIATA'", nivel="error")
+        messagebox.showerror("Error", "El formato debe comenzar con 'RADIATA'")
         return None, None
     # 2. Verificación de permisos de escritura
     try:
@@ -564,32 +560,45 @@ def Pasar_referencia(celda_origen):
     return referencia
 
 def extraer_bloques(txt):
-    escribir_log("Inicio de extraer_bloques")
-    lineas = [l.strip() for l in txt.strip().split("\n") if l.strip()]
-    bloques, b, i = [], [], 0
-    while i < len(lineas):
-        l = lineas[i]
-        if re.match(r'^\* \* \.\.\.', l):
-            b.append(l)
-            if i+1 < len(lineas) and re.match(r'^\d', lineas[i+1]):
-                b.append(lineas[i+1])
-                i += 1
-            bloques.append(b)
-            b = []
-        else: b.append(l)
-        i += 1
-    if b: bloques.append(b)
+    """Versión corregida que maneja el formato real con RADIATA"""
+    escribir_log("Inicio de extraer_bloques (versión corregida)")
+    
+    lineas = [l.strip() for l in txt.split('\n') if l.strip()]
+    bloques = []
+    bloque_actual = []
+    
+    for linea in lineas:
+        # Detecta inicio de nuevo bloque (RADIATA)
+        if linea.startswith('RADIATA'):
+            if bloque_actual:  # Guardar el bloque anterior
+                bloques.append(bloque_actual)
+                bloque_actual = []
+        bloque_actual.append(linea)
+    
+    if bloque_actual:  # Añadir el último bloque
+        bloques.append(bloque_actual)
+    
+    escribir_log(f"Bloques identificados: {len(bloques)}")
     return bloques
 
 def sub_bloques(b):
-    escribir_log("Inicio de sub_bloques")
-    subs, tmp = [], []
-    for l in b:
-        if re.match(r'^\D', l) or '*' in l:
-            if tmp: subs.append(tmp)
-            tmp = [l]
-        else: tmp.append(l)
-    if tmp: subs.append(tmp)
+    """Divide cada bloque RADIATA en sub-bloques PODADO/REGULAR"""
+    escribir_log("Inicio de sub_bloques (versión adaptada)")
+    
+    subs = []
+    sub_actual = []
+    
+    for linea in b:
+        # Líneas con PODADO/REGULAR son nuevos sub-bloques
+        if 'PODADO' in linea or 'REGULAR' in linea:
+            if sub_actual:
+                subs.append(sub_actual)
+                sub_actual = []
+        sub_actual.append(linea)
+    
+    if sub_actual:
+        subs.append(sub_actual)
+    
     return subs
 
 def escribir_valor_bloque(hoja, col_dia, torno, valor, tipo_bloque):
