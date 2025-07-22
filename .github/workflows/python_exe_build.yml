@@ -1,56 +1,56 @@
-# name: Build Python EXE
+name: Build Python EXE
 
-# on:
-#   push:
-#     branches: [main]
-#   pull_request:
-#     branches: [main]
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
 
-# jobs:
-#   build:
-#     runs-on: windows-latest
+jobs:
+  build:
+    runs-on: windows-latest
 
-#     steps:
-#     - name: Checkout repository
-#       uses: actions/checkout@v2
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
 
-#     - name: Set up Python
-#       uses: actions/setup-python@v2
-#       with:
-#         python-version: '3.11'
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.11'
 
-#     - name: Install dependencies
-#       run: |
-#         python -m pip install --upgrade pip
-#         pip install openpyxl>=3.1.0
-#         pip install pyinstaller
-#         pip install tkcalendar
-#         pip install xlwings
-#         pip install pywin32
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install openpyxl>=3.1.0
+        pip install pyinstaller
+        pip install tkcalendar
+        pip install xlwings
+        pip install pywin32
         
-#         pip install pandas
-#         pip install --upgrade numpy pandas pyinstaller
-#         pip install numpy pandas pywin32 openpyxl
+        pip install pandas
+        pip install --upgrade numpy pandas pyinstaller
+        pip install numpy pandas pywin32 openpyxl
         
-#     - name: Crear carpeta reportes
-#       run: mkdir reportes
+    - name: Crear carpeta reportes
+      run: mkdir reportes
 
-#     - name: Build EXE
-#       run: pyinstaller --onefile --windowed --name=procesador_excel_gui --hidden-import=openpyxl --hidden-import=tkinter --exclude-module=numpy codigo_python.py
-#       # run: pyinstaller --onefile --windowed --name=procesador_excel_gui --hidden-import=openpyxl --hidden-import=tkinter --exclude-module=numpy prueba.py
+    - name: Build EXE
+      run: pyinstaller --onefile --windowed --name=procesador_excel_gui --hidden-import=openpyxl --hidden-import=tkinter --exclude-module=numpy codigo_python.py
+      # run: pyinstaller --onefile --windowed --name=procesador_excel_gui --hidden-import=openpyxl --hidden-import=tkinter --exclude-module=numpy prueba.py
 
-#     - name: Crear archivo LEEME
-#       run: echo "Este archivo fue generado automáticamente. Es seguro y no contiene malware." > dist\LEEME.txt
+    - name: Crear archivo LEEME
+      run: echo "Este archivo fue generado automáticamente. Es seguro y no contiene malware." > dist\LEEME.txt
 
-#     - name: Comprimir EXE en ZIP
-#       run: powershell Compress-Archive -Path dist\procesador_excel_gui.exe,dist\LEEME.txt -DestinationPath dist\procesador_excel.zip
+    - name: Comprimir EXE en ZIP
+      run: powershell Compress-Archive -Path dist\procesador_excel_gui.exe,dist\LEEME.txt -DestinationPath dist\procesador_excel.zip
 
-#     - name: Upload ZIP artifact
-#       uses: actions/upload-artifact@v4
-#       with:
-#         name: procesador_excel
-#         path: dist/procesador_excel.zip
-#         retention-days: 1
+    - name: Upload ZIP artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: procesador_excel
+        path: dist/procesador_excel.zip
+        retention-days: 1
 
 
 
@@ -121,60 +121,60 @@
 
 
 
-name: Build Python EXE
+# name: Build Python EXE
 
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+# on:
+#   push:
+#     branches: [main]
+#   pull_request:
+#     branches: [main]
 
-jobs:
-  build:
-    runs-on: windows-latest
+# jobs:
+#   build:
+#     runs-on: windows-latest
 
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+#     steps:
+#     - name: Checkout repository
+#       uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-        architecture: 'x64'
+#     - name: Set up Python
+#       uses: actions/setup-python@v5
+#       with:
+#         python-version: '3.11'
+#         architecture: 'x64'
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install numpy pandas pywin32 openpyxl xlwings tkcalendar pyinstaller beautifulsoup4
+#     - name: Install dependencies
+#       run: |
+#         python -m pip install --upgrade pip
+#         pip install numpy pandas pywin32 openpyxl xlwings tkcalendar pyinstaller beautifulsoup4
         
-    - name: Crear carpeta reportes
-      run: mkdir reportes
+#     - name: Crear carpeta reportes
+#       run: mkdir reportes
 
-    # AQUÍ VA EL BLOQUE DE BUILD EXE QUE PREGUNTASTE
-    - name: Build EXE
-      run: |
-        pyinstaller --onefile --windowed `
-          --name=filtro `
-          --hidden-import=numpy `
-          --hidden-import=pandas `
-          --hidden-import=openpyxl `
-          --hidden-import=tkinter `
-          --collect-all numpy `
-          --collect-all pandas `
-          --collect-all pytz `
-          --collect-all dateutil `
-          filtro.py
+#     # AQUÍ VA EL BLOQUE DE BUILD EXE QUE PREGUNTASTE
+#     - name: Build EXE
+#       run: |
+#         pyinstaller --onefile --windowed `
+#           --name=filtro `
+#           --hidden-import=numpy `
+#           --hidden-import=pandas `
+#           --hidden-import=openpyxl `
+#           --hidden-import=tkinter `
+#           --collect-all numpy `
+#           --collect-all pandas `
+#           --collect-all pytz `
+#           --collect-all dateutil `
+#           filtro.py
 
-    - name: Crear archivo LEEME
-      run: echo "Este archivo fue generado automáticamente. Es seguro y no contiene malware." > dist\LEEME.txt
+#     - name: Crear archivo LEEME
+#       run: echo "Este archivo fue generado automáticamente. Es seguro y no contiene malware." > dist\LEEME.txt
 
-    - name: Comprimir EXE en ZIP
-      run: powershell Compress-Archive -Path dist\filtro.exe,dist\LEEME.txt -DestinationPath dist\filtro.zip
+#     - name: Comprimir EXE en ZIP
+#       run: powershell Compress-Archive -Path dist\filtro.exe,dist\LEEME.txt -DestinationPath dist\filtro.zip
 
-    - name: Upload ZIP artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: filtro
-        path: dist/filtro.zip
-        retention-days: 1
+#     - name: Upload ZIP artifact
+#       uses: actions/upload-artifact@v4
+#       with:
+#         name: filtro
+#         path: dist/filtro.zip
+#         retention-days: 1
