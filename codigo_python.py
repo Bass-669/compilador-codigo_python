@@ -266,6 +266,58 @@ def pedir_fecha():
 # FUNCIONES EXISTENTES (CON MODIFICACIONES MENORES)
 # ==============================================
 
+def obtener_rendimientos_de_log(fecha_ingresada):
+    """Función optimizada para obtener rendimientos de una fecha específica"""
+    escribir_log(f"Buscando rendimientos para fecha: {fecha_ingresada}")
+    log_path = os.path.join(BASE_DIR, "tornos.log")
+    fecha_str = fecha_ingresada.strftime("%Y-%m-%d")
+    rendimientos = {'torno1': None, 'torno2': None}
+
+    if not os.path.exists(log_path):
+        escribir_log(f"Archivo de log no encontrado: {log_path}", nivel="warning")
+        return None
+
+    try:
+        with open(log_path, 'r', encoding='utf-8') as f:
+            lineas = f.readlines()
+
+        # Patrón mejorado para capturar fecha y rendimientos
+        patron = re.compile(
+            r"Fecha:\s*" + re.escape(fecha_str) + 
+            r".*?Torno\s*1:\s*Rendimiento:\s*(\d+\.\d+).*?" +
+            r"Torno\s*2:\s*Rendimiento:\s*(\d+\.\d+)",
+            re.DOTALL | re.IGNORECASE
+        )
+
+        # Buscar desde el final hacia atrás para encontrar el más reciente
+        for linea in reversed(lineas):
+            if f"Fecha: {fecha_str}" in linea:
+                # Unir líneas hasta tener bloque completo
+                bloque = linea
+                idx = lineas.index(linea)
+                for siguiente in lineas[idx+1:idx+3]:  # Busca 2 líneas siguientes
+                    if "Torno" in siguiente:
+                        bloque += siguiente
+                    else:
+                        break
+                
+                coincidencia = patron.search(bloque)
+                if coincidencia:
+                    rendimientos['torno1'] = float(coincidencia.group(1))
+                    rendimientos['torno2'] = float(coincidencia.group(2))
+                    escribir_log(f"Rendimientos encontrados para {fecha_str}: "
+                               f"Torno1={rendimientos['torno1']}%, "
+                               f"Torno2={rendimientos['torno2']}%")
+                    return rendimientos
+
+        escribir_log(f"No se encontraron rendimientos para {fecha_str}", nivel="warning")
+        return None
+
+    except Exception as e:
+        escribir_log(f"Error al leer el archivo de log: {str(e)}", nivel="error")
+        return None
+
+
 def mostrar_carga():
     """Muestra la ventana de carga de manera persistente"""
     global ventana_carga, barra
