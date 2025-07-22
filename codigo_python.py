@@ -403,44 +403,47 @@ def finalizar_proceso():
     messagebox.showinfo("✅ Los datos de ambos tornos se han actualizado correctamente\n")
 
 def procesar_datos(entrada, torno, mes, dia, anio):
-    """Procesa los datos y escribe en el archivo Excel con manejo de errores mejorado"""
+    """Procesa los datos y escribe en el archivo Excel con el formato correcto"""
     escribir_log(f"Inicio de procesar_datos - Torno: {torno}, Fecha: {dia}/{mes}/{anio}")
     
-    # Inicializar las listas que se devolverán
+    # Inicializar listas de retorno
     bloques_detectados = []
     sumas_ad_por_bloque = []
     
-    # 1. Verificación inicial del archivo
+    # 1. Verificación inicial del archivo Excel
     if not os.path.exists(RUTA_ENTRADA):
         error_msg = f"No se encontró el archivo Excel en:\n{RUTA_ENTRADA}"
         messagebox.showerror("Error", error_msg)
         escribir_log("ERROR - Archivo no encontrado", nivel="error")
         return None, None
+    
     # 2. Verificación de permisos de escritura
     try:
-        # Intento de apertura para verificar permisos
         with open(RUTA_ENTRADA, 'a+b') as test_file:
             pass
     except PermissionError:
         error_msg = f"El archivo está abierto en Excel. Por favor cierre:\n{RUTA_ENTRADA}"
         messagebox.showerror("Error", error_msg)
-        escribir_log("ERROR - El archivo esta abierto \n", nivel="error")
+        escribir_log("ERROR - El archivo está abierto", nivel="error")
         return None, None
     except Exception as e:
         error_msg = f"No se puede acceder al archivo:\n{str(e)}"
         messagebox.showerror("Error", error_msg)
         escribir_log(f"ERROR - Acceso al archivo: {str(e)}", nivel="error")
         return None, None
+    
     # 3. Procesamiento principal
     wb = None
     try:
         wb = openpyxl.load_workbook(RUTA_ENTRADA)
+        
+        # Verificar si existe la hoja "IR diario "
         if "IR diario " not in wb.sheetnames:
             error_msg = 'No se encontró la hoja "IR diario " en el archivo Excel'
             messagebox.showerror("Error", error_msg)
             escribir_log("ERROR - Hoja 'IR diario ' no encontrada", nivel="error")
             return None, None
-
+        
         hoja = wb["IR diario "]
         ultima_fila = None
         
@@ -448,10 +451,10 @@ def procesar_datos(entrada, torno, mes, dia, anio):
         for fila in hoja.iter_rows():
             if [str(c.value).strip() if c.value else "" for c in fila[:3]] == ["*", "*", "..."]:
                 ultima_fila = fila[0].row
-
+        
         if not ultima_fila:
-            raise ValueError("No se encontró '* * ...'")
-
+            raise ValueError("No se encontró el marcador '* * ...' en la hoja")
+        
         fila = ultima_fila + 1
         
         # Procesar cada bloque
@@ -462,71 +465,84 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                 filas_validas = []
                 
                 for sub in subs:
-                    # Procesamiento de cada sub-bloque
-                    txt = sub[0] if not re.match(r'^\d', sub[0]) else ""
-                    datos = sub[1:] if txt else sub
+                    # Determinar si es línea de texto o de datos
+                    if not re.match(r'^\d', sub[0]):  # Línea de texto
+                        txt = sub[0]
+                        datos = sub[1:]
+                    else:  # Línea de datos
+                        txt = ""
+                        datos = sub
                     
-                    # Construir datos de columnas
-                    p = txt.split()
-                    col_txt = (
-                        [p[0], p[1], p[2], p[3], "", p[4]] if "*" in txt and len(p) >= 5 and p[0] == "*" else
-                        ["*", "*", "...", "", "", ""] if "*" in txt else
-                        [p[0], p[1], p[2], p[3], "", p[4]] if len(p) >= 5 else
-                        ["", p[0], p[1], p[2], "", p[3]] if len(p) == 4 else
-                        [""] * 6
-                    )
+                    # Procesar encabezado (RADIATA PODADO/REGULAR)
+                    if txt.startswith('RADIATA'):
+                        partes = txt.split()
+                        # Escribir en columnas 1-6
+                        hoja.cell(row=fila, column=1, value=partes[0])  # RADIATA
+                        hoja.cell(row=fila, column=2, value=partes[1])  # PODADO/REGULAR
+                        hoja.cell(row=fila, column=3, value=partes[2])  # Rango (220...239)
+                        if len(partes) > 3:
+                            try:
+                                hoja.cell(row=fila, column=4, value=float(partes[3]))  # Cantidad
+                            except:
+                                hoja.cell(row=fila, column=4, value=partes[3])
                     
-                    col_nums = [val for l in datos for val in l.strip().split()]
-                    fila_vals = col_txt + col_nums
+                    # Procesar líneas de datos
+                    for linea in datos:
+                        valores = linea.strip().split()
+                        # Escribir valores numéricos (columnas 5-24)
+                        for col, val in enumerate(valores[:20], 5):
+                            try:
+                                num = float(val.replace(",", "."))
+                                escribir(hoja, fila, col, num, True)
+                            except:
+                                escribir(hoja, fila, col, val)
                     
-                    # Escribir valores en las celdas
-                    for col, val in enumerate(fila_vals[:24], 1):
-                        try:
-                            n = float(val.replace(",", ".")) if 3 <= col <= 24 and val else val
-                            escribir(hoja, fila, col, n, isinstance(n, float))
-                        except:
-                            escribir(hoja, fila, col, val)
-                    
-                    # Escribir metadatos
-                    for col, val in zip(range(25, 29), [torno, mes, dia, anio]):
-                        hoja.cell(row=fila, column=col, value=val).alignment = ALIGN_R
+                    # Escribir metadatos (torno, mes, día, año)
+                    hoja.cell(row=fila, column=25, value=torno).alignment = ALIGN_R
+                    hoja.cell(row=fila, column=26, value=mes).alignment = ALIGN_R
+                    hoja.cell(row=fila, column=27, value=dia).alignment = ALIGN_R
+                    hoja.cell(row=fila, column=28, value=anio).alignment = ALIGN_R
                     
                     fila += 1
-
+                
                 f_fin = fila - 1
-                tipo_bloque = "PODADO" if "PODADO" in txt.upper() else "REGULAR"
-
-                # Añadir a bloques_detectados (asegurando que siempre se añade)
-                bloques_detectados.append((tipo_bloque, f_fin))
-
-                # Insertar fórmulas proporcionales (columna AD)
-                if len(subs) > 1:
-                    for f in range(f_ini, f_fin):
-                        hoja.cell(row=f, column=30, value=f"=IFERROR(AC{f}*D{f}/D{f_fin}, 0)")
-                # Configurar celda de autosuma
-                for col in range(25, 30):
-                    hoja.cell(row=f_fin, column=col, value="")
-                celda_autosuma = hoja.cell(row=f_fin, column=30)
-                celda_autosuma.value = f"=SUM(AD{f_ini}:AD{f_fin-1})"
-                celda_autosuma.fill = FILL_AMARILLO
+                
+                # Determinar tipo de bloque (PODADO/REGULAR)
                 bloque_texto = " ".join(b).upper()
                 tipo_bloque = "PODADO" if "PODADO" in bloque_texto else "REGULAR"
+                
+                # Obtener valor de la columna D (cantidad)
                 valor_d = hoja.cell(row=f_fin, column=4).value
                 try:
                     valor_d = float(str(valor_d).replace(",", ".")) if valor_d else 0
                 except:
                     valor_d = 0
+                
+                # Agregar a bloques detectados
+                bloques_detectados.append((tipo_bloque, f_fin))
                 bloques_detectados.append((tipo_bloque, valor_d))
                 
-                if tipo_bloque != "PODADO":
-                    for col in range(25, 30):
-                        hoja.cell(row=f_fin, column=col, value="")
+                # Procesar fórmulas y totales
+                if len(subs) > 1:
+                    for f in range(f_ini, f_fin):
+                        hoja.cell(row=f, column=30, value=f"=IFERROR(AC{f}*D{f}/D{f_fin}, 0)")
+                
+                # Configurar celda de total
+                for col in range(25, 30):
+                    hoja.cell(row=f_fin, column=col, value="")
+                
+                celda_autosuma = hoja.cell(row=f_fin, column=30)
+                celda_autosuma.value = f"=SUM(AD{f_ini}:AD{f_fin-1})"
+                celda_autosuma.fill = FILL_AMARILLO
+                
+                # Obtener referencia para resumen
                 try:
                     valor_ae = Pasar_referencia(f"AD{f_fin}")
                     sumas_ad_por_bloque.append(valor_ae)
                 except Exception as e:
                     sumas_ad_por_bloque.append(0.0)
                     escribir_log(f"Error al obtener referencia AD{f_fin}: {str(e)}", nivel="warning")
+                
                 # Guardar cambios después de cada bloque
                 try:
                     wb.save(RUTA_ENTRADA)
@@ -535,17 +551,21 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                     messagebox.showerror("Error", error_msg)
                     escribir_log("ERROR - Archivo bloqueado durante la ejecución", nivel="error")
                     return None, None
+            
             except Exception as e:
                 escribir_log(f"Error procesando bloque: {str(e)}", nivel="error")
                 continue
-        # Copia de seguridad
+        
+        # Crear copia de seguridad
         try:
-            backup_path = os.path.join(BASE_DIR, CARPETA, "Reporte IR Tornos copia_de_seguridad.xlsx")
+            backup_path = os.path.join(BASE_DIR, CARPETA_REPORTES, "Reporte IR Tornos copia_de_seguridad.xlsx")
             shutil.copy(RUTA_ENTRADA, backup_path)
-            escribir_log(f"Copia de seguridad creada")
+            escribir_log("Copia de seguridad creada correctamente")
         except Exception as e:
             escribir_log(f"No se pudo crear copia de seguridad: {str(e)}", nivel="warning")
+        
         return bloques_detectados, sumas_ad_por_bloque
+    
     except PermissionError:
         error_msg = "El archivo Excel fue abierto durante la ejecución. Operación cancelada."
         messagebox.showerror("Error", error_msg)
@@ -565,12 +585,17 @@ def procesar_datos(entrada, torno, mes, dia, anio):
         escribir_log("Procesamiento de datos completado")
 
 def escribir(hoja, fila, col, valor, es_numero=False):
-    """Escribe un valor en la celda con formato adecuado"""
+    """Escribe valores con formato mejorado"""
     celda = hoja.cell(row=fila, column=col, value=valor)
     celda.border = BORDER
-    celda.alignment = ALIGN_R
-    if es_numero:
-        celda.number_format = '0.00'
+    
+    # Alineación diferente para texto vs números
+    if isinstance(valor, str):
+        celda.alignment = Alignment(horizontal='left')
+    else:
+        celda.alignment = ALIGN_R
+        if es_numero:
+            celda.number_format = '0.00'
 
 def Pasar_referencia(celda_origen):
     """Retorna la referencia CORRECTAMENTE formateada"""
