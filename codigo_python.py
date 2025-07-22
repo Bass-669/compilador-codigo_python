@@ -144,21 +144,27 @@ def buscar_archivos_torno(fecha):
 def leer_archivo_torno(ruta_archivo):
     """
     Lee el contenido de un archivo de reporte de torno y lo devuelve como texto.
-    Si el archivo no existe o hay error, retorna None.
+    Versión modificada para aceptar el formato real de los archivos.
     """
     if not ruta_archivo or not os.path.exists(ruta_archivo):
+        escribir_log(f"Archivo no encontrado: {ruta_archivo}", nivel="warning")
         return None
         
     try:
         with open(ruta_archivo, 'r', encoding='utf-8') as f:
             contenido = f.read()
             
-        # Limpiar el contenido si es necesario
+        # Normalizar saltos de línea y limpiar espacios
         contenido = contenido.replace('\r\n', '\n').replace('\r', '\n').strip()
         
-        # Verificar que el contenido tenga datos válidos
-        if not contenido or "* * ..." not in contenido:
-            escribir_log(f"Archivo {ruta_archivo} no contiene datos válidos", nivel="warning")
+        # Verificar que el contenido tenga datos válidos (ahora más flexible)
+        if not contenido:
+            escribir_log(f"Archivo vacío: {ruta_archivo}", nivel="warning")
+            return None
+            
+        # Verificar si contiene al menos una línea con "RADIATA" que indica datos válidos
+        if "RADIATA" not in contenido:
+            escribir_log(f"Archivo no contiene datos RADIATA: {ruta_archivo}", nivel="warning")
             return None
             
         return contenido
@@ -170,7 +176,7 @@ def leer_archivo_torno(ruta_archivo):
 def transformar_datos_txt_a_formato(datos_txt):
     """
     Transforma los datos del archivo TXT al formato esperado por las funciones existentes.
-    Realiza limpieza y ajustes necesarios para mantener compatibilidad.
+    Versión adaptada al formato real de los archivos.
     """
     if not datos_txt:
         return None
@@ -178,18 +184,26 @@ def transformar_datos_txt_a_formato(datos_txt):
     # Dividir líneas y limpiar
     lineas = [linea.strip() for linea in datos_txt.split('\n') if linea.strip()]
     
-    # Eliminar líneas no deseadas (encabezados, pies de página, etc.)
+    # Eliminar líneas completamente vacías o que no contienen datos relevantes
     lineas_filtradas = []
     for linea in lineas:
-        # Eliminar líneas que parecen ser encabezados o pies de página
-        if any(palabra in linea.lower() for palabra in ["fecha", "hora", "pagina", "página", "reporte"]):
-            continue
-        # Mantener líneas con datos relevantes
-        if "*" in linea or linea[0].isdigit():
+        # Mantener líneas con datos numéricos o marcadores especiales
+        if (linea.startswith("RADIATA") or 
+            linea.startswith("PODADO") or 
+            linea.startswith("REGULAR") or 
+            linea.startswith("*") or 
+            any(c.isdigit() for c in linea)):
             lineas_filtradas.append(linea)
     
     # Unir nuevamente las líneas válidas
-    return '\n'.join(lineas_filtradas)
+    datos_transformados = '\n'.join(lineas_filtradas)
+    
+    # Verificar que tenemos datos transformados válidos
+    if not datos_transformados or ("PODADO" not in datos_transformados and "REGULAR" not in datos_transformados):
+        escribir_log("Datos transformados no contienen bloques PODADO/REGULAR", nivel="warning")
+        return None
+        
+    return datos_transformados
 
 # ==============================================
 # MODIFICACIONES AL FLUJO PRINCIPAL
