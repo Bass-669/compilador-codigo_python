@@ -173,37 +173,37 @@ def leer_archivo_torno(ruta_archivo):
         escribir_log(f"Error leyendo archivo {ruta_archivo}: {str(e)}", nivel="error")
         return None
 
-def transformar_datos_txt_a_formato(datos_txt):
-    """
-    Transforma los datos del archivo TXT al formato esperado por las funciones existentes.
-    Versión adaptada al formato real de los archivos.
-    """
-    if not datos_txt:
-        return None
+# def transformar_datos_txt_a_formato(datos_txt):
+#     """
+#     Transforma los datos del archivo TXT al formato esperado por las funciones existentes.
+#     Versión adaptada al formato real de los archivos.
+#     """
+#     if not datos_txt:
+#         return None
         
-    # Dividir líneas y limpiar
-    lineas = [linea.strip() for linea in datos_txt.split('\n') if linea.strip()]
+#     # Dividir líneas y limpiar
+#     lineas = [linea.strip() for linea in datos_txt.split('\n') if linea.strip()]
     
-    # Eliminar líneas completamente vacías o que no contienen datos relevantes
-    lineas_filtradas = []
-    for linea in lineas:
-        # Mantener líneas con datos numéricos o marcadores especiales
-        if (linea.startswith("RADIATA") or 
-            linea.startswith("PODADO") or 
-            linea.startswith("REGULAR") or 
-            linea.startswith("*") or 
-            any(c.isdigit() for c in linea)):
-            lineas_filtradas.append(linea)
+#     # Eliminar líneas completamente vacías o que no contienen datos relevantes
+#     lineas_filtradas = []
+#     for linea in lineas:
+#         # Mantener líneas con datos numéricos o marcadores especiales
+#         if (linea.startswith("RADIATA") or 
+#             linea.startswith("PODADO") or 
+#             linea.startswith("REGULAR") or 
+#             linea.startswith("*") or 
+#             any(c.isdigit() for c in linea)):
+#             lineas_filtradas.append(linea)
     
-    # Unir nuevamente las líneas válidas
-    datos_transformados = '\n'.join(lineas_filtradas)
+#     # Unir nuevamente las líneas válidas
+#     datos_transformados = '\n'.join(lineas_filtradas)
     
-    # Verificar que tenemos datos transformados válidos
-    if not datos_transformados or ("PODADO" not in datos_transformados and "REGULAR" not in datos_transformados):
-        escribir_log("Datos transformados no contienen bloques PODADO/REGULAR", nivel="warning")
-        return None
+#     # Verificar que tenemos datos transformados válidos
+#     if not datos_transformados or ("PODADO" not in datos_transformados and "REGULAR" not in datos_transformados):
+#         escribir_log("Datos transformados no contienen bloques PODADO/REGULAR", nivel="warning")
+#         return None
         
-    return datos_transformados
+#     return datos_transformados
 
 # ==============================================
 # MODIFICACIONES AL FLUJO PRINCIPAL
@@ -243,9 +243,9 @@ def pedir_fecha():
             ventana.destroy()
             return
             
-        # Leer y transformar datos
-        datos_torno1 = transformar_datos_txt_a_formato(leer_archivo_torno(archivo_torno1))
-        datos_torno2 = transformar_datos_txt_a_formato(leer_archivo_torno(archivo_torno2))
+        # # Leer y transformar datos
+        # datos_torno1 = transformar_datos_txt_a_formato(leer_archivo_torno(archivo_torno1))
+        # datos_torno2 = transformar_datos_txt_a_formato(leer_archivo_torno(archivo_torno2))
         
         if not datos_torno1 or not datos_torno2:
             messagebox.showerror(
