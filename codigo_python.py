@@ -173,16 +173,41 @@ def leer_archivo_torno(ruta_archivo):
         escribir_log(f"Error leyendo archivo {ruta_archivo}: {str(e)}", nivel="error")
         return None
 
+def mostrar_carga(mensaje="Procesando datos..."):
+    """Muestra la ventana de carga con un mensaje personalizado"""
+    global ventana_carga, barra, lbl_estado
+    
+    if 'ventana_carga' not in globals() or not ventana_carga.winfo_exists():
+        ventana_carga = tk.Toplevel()
+        ventana_carga.title("Procesando...")
+        ventana_carga.geometry("400x150")
+        ventana_carga.resizable(False, False)
+        ventana_carga.protocol("WM_DELETE_WINDOW", lambda: None)
+        
+        tk.Label(ventana_carga, text="Por favor espere...", font=("Arial", 12)).pack(pady=10)
+        
+        barra = ttk.Progressbar(ventana_carga, mode='indeterminate')
+        barra.pack(fill='x', padx=20, pady=5)
+        barra.start()
+        
+        lbl_estado = tk.Label(ventana_carga, text=mensaje, font=("Arial", 10))
+        lbl_estado.pack()
+        
+        ventana_carga.grab_set()
+    else:
+        lbl_estado.config(text=mensaje)
+        ventana_carga.deiconify()
+    
+    ventana_carga.update()
+
+
 # ==============================================
 # MODIFICACIONES AL FLUJO PRINCIPAL
 # ==============================================
 
 def pedir_fecha():
-    """
-    Nueva versión de pedir_fecha que ahora inicia todo el proceso automático.
-    """
-    ventana = tk.Toplevel()
-    ventana.title("Fecha del reporte")
+    ventana_fecha = tk.Toplevel(ventana_principal)
+    ventana_fecha.title("Fecha del reporte")
     ventana.geometry("300x200")
     ventana.resizable(False, False)
     
@@ -192,43 +217,66 @@ def pedir_fecha():
     ent_fecha.set_date(datetime.now())
     
     def procesar():
+    try:
         fecha_seleccionada = ent_fecha.get_date()
         mes = MESES[fecha_seleccionada.strftime("%B")]
         dia = fecha_seleccionada.day
         anio = fecha_seleccionada.year
         
+        # Mostrar ventana de carga mientras se buscan los archivos
+        mostrar_carga("Buscando archivos de reporte...")
+        
         # Buscar archivos automáticamente
         archivo_torno1, archivo_torno2 = buscar_archivos_torno(fecha_seleccionada)
         
         if not archivo_torno1 or not archivo_torno2:
+            cerrar_carga()
             messagebox.showerror(
                 "Error", 
                 f"No se encontraron los archivos de reporte para la fecha {fecha_seleccionada.strftime('%d/%m/%Y')}\n"
                 f"Archivos esperados:\n"
                 f"Reporte_{fecha_seleccionada.strftime('%d-%m-%Y')}_3011.txt\n"
-                f"Reporte_{fecha_seleccionada.strftime('%d-%m-%Y')}_3012.txt"
+                f"Reporte_{fecha_seleccionada.strftime('%d-%m-%Y')}_3012.txt\n\n"
+                f"Busqueda realizada en:\n{os.path.join(BASE_DIR, 'Reportes_Tornos', 'datos')}"
             )
-            ventana.destroy()
             return
             
-        # Leer y procesar datos
+        # Actualizar estado de carga
+        lbl_estado.config(text="Leyendo archivos...")
+        ventana_carga.update()
+        
+        # Leer archivos
         datos_torno1 = leer_archivo_torno(archivo_torno1)
         datos_torno2 = leer_archivo_torno(archivo_torno2)
         
         if not datos_torno1 or not datos_torno2:
+            cerrar_carga()
             messagebox.showerror(
                 "Error", 
-                "Los archivos de reporte no contienen datos válidos o están vacíos."
+                "Los archivos de reporte no contienen datos válidos o están vacíos.\n"
+                f"Archivo 1: {archivo_torno1}\n"
+                f"Archivo 2: {archivo_torno2}"
             )
-            ventana.destroy()
             return
             
         # Iniciar procesamiento
+        lbl_estado.config(text="Procesando datos...")
+        ventana_carga.update()
+        
         ventana.destroy()
         procesar_ambos_tornos(datos_torno1, datos_torno2, mes, dia, anio)
-    
-    tk.Button(ventana, text="Procesar", command=procesar).pack(pady=10)
-    ventana.grab_set()
+        
+    except Exception as e:
+        cerrar_carga()
+        escribir_log(f"Error inesperado en procesar(): {str(e)}", nivel="error")
+        messagebox.showerror(
+            "Error Crítico", 
+            f"Ocurrió un error inesperado:\n{str(e)}\n\n"
+            "Por favor revise el archivo de log para más detalles."
+        )
+    finally:
+        if 'ventana_carga' in globals() and ventana_carga.winfo_exists():
+            ventana_carga.destroy()
 
 # ==============================================
 # FUNCIONES EXISTENTES (CON MODIFICACIONES MENORES)
@@ -842,9 +890,9 @@ def dias_en_mes(mes, anio):
     return 31 if mes in meses_31_dias else 30
 
 # INTERFAZ PRINCIPAL SIMPLIFICADA
-ventana = tk.Tk()
-ventana.title("Sistema de Reportes de Tornos Automático")
-ventana.geometry("400x200")
+ventana_principal = tk.Tk()
+ventana_principal.title("Sistema de Reportes de Tornos Automático")
+ventana_principal.geometry("400x200")
 
 tk.Label(ventana, 
         text="Sistema Automático de Reportes de Tornos\n\n"
