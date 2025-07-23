@@ -19,14 +19,14 @@ def format_data_row(row, is_subtotal=False):
     # Para líneas normales (no subtotal)
     if not is_subtotal:
         first_line = ' '.join(first_line_parts)
-        second_line = ' '.join(cell.get_text(strip=True) for cell in cells[4:] 
-                         if cell.get_text(strip=True) not in ('&nbsp;', '')])
+        second_line = ' '.join([cell.get_text(strip=True) for cell in cells[4:] 
+                             if cell.get_text(strip=True) not in ('&nbsp;', '')])
         return f"{first_line} \n {second_line} \n"
     # Para línea de subtotal
     else:
         first_line = ' '.join(first_line_parts)
-        second_line = ' '.join(cell.get_text(strip=True) for cell in cells[4:] 
-                         if cell.get_text(strip=True) not in ('&nbsp;', '')])
+        second_line = ' '.join([cell.get_text(strip=True) for cell in cells[4:] 
+                             if cell.get_text(strip=True) not in ('&nbsp;', '')])
         return f"{first_line} \n {second_line} \n"
 
 def process_html_file(html_file, output_file):
