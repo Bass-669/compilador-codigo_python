@@ -24,6 +24,16 @@ BORDER = Border(*(Side(style='thin'),)*4)
 ALIGN_R = Alignment(horizontal='right')
 FILL_AMARILLO = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
 
+def incrementar_barra(hasta, paso=1):
+    """Función mejorada con registro de progreso"""
+    nonlocal inicio_barra
+    valor_final = inicio_barra + hasta
+    escribir_log(f"Progreso Torno {torno}: {barra['value']}% -> {valor_final}%")
+    for i in range(barra['value'], valor_final + 1, paso):
+        barra['value'] = i
+        ventana_carga.update_idletasks()
+        time.sleep(0.01)
+
 def configurar_logging():
     """Configura un sistema de logging robusto con rotación de archivos"""
     posibles_rutas = [
