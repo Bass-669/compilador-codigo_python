@@ -2,28 +2,32 @@ from bs4 import BeautifulSoup
 import os
 import sys
 
-def format_data_row(row):
+def format_data_row(row, is_subtotal=False):
     cells = row.find_all('td', class_='RWReport')
     if not cells or len(cells) < 5:
         return None
 
-    first_line = []
+    # Procesar primera línea (cabecera)
+    first_line_parts = []
     for i, cell in enumerate(cells[:4]):
         text = cell.get_text(strip=True)
         if i == 0 and text in ('', '&nbsp;', '*'):
-            first_line.append(' ')
+            first_line_parts.append('*')
         else:
-            first_line.append(text if text not in ('&nbsp;', '') else ' ')
-
-    second_line = []
-    for cell in cells[4:]:
-        text = cell.get_text(strip=True)
-        if cell.find('table'):
-            continue
-        second_line.append(text if text not in ('&nbsp;', '') else ' ')
-
-    formatted = ' '.join(first_line) + ' \n ' + ' '.join(second_line) + ' \n'
-    return formatted.replace('  ', ' ')
+            first_line_parts.append(text if text not in ('&nbsp;', '') else ' ')
+    
+    # Para líneas normales (no subtotal)
+    if not is_subtotal:
+        first_line = ' '.join(first_line_parts)
+        second_line = ' '.join(cell.get_text(strip=True) for cell in cells[4:] 
+                         if cell.get_text(strip=True) not in ('&nbsp;', '')])
+        return f"{first_line} \n {second_line} \n"
+    # Para línea de subtotal
+    else:
+        first_line = ' '.join(first_line_parts)
+        second_line = ' '.join(cell.get_text(strip=True) for cell in cells[4:] 
+                         if cell.get_text(strip=True) not in ('&nbsp;', '')])
+        return f"{first_line} \n {second_line} \n"
 
 def process_html_file(html_file, output_file):
     with open(html_file, 'r', encoding='utf-8') as file:
@@ -37,18 +41,36 @@ def process_html_file(html_file, output_file):
 
     diameter_table = h4_diametro.find_next('table')
     output_lines = []
+    current_category = None
 
     for row in diameter_table.find_all('tr')[1:-1]:
+        first_cell = row.find('td', class_='RWReport')
+        if not first_cell:
+            continue
+            
+        cell_text = first_cell.get_text(strip=True)
+        
+        # Detectar cambio de categoría (RADIATA PODADO/REGULAR)
+        if cell_text and cell_text not in ('', '&nbsp;', '*'):
+            if "PODADO" in cell_text.upper() or "REGULAR" in cell_text.upper():
+                current_category = cell_text
+                output_lines.append(f"{current_category} \n")
+                continue
+        
         formatted_row = format_data_row(row)
         if formatted_row:
             output_lines.append(formatted_row)
 
+    # Procesar fila de subtotal
     subtotal_row = diameter_table.find_all('tr')[-2]
     if '*' in subtotal_row.get_text():
-        output_lines.append(format_data_row(subtotal_row))
+        formatted_subtotal = format_data_row(subtotal_row, is_subtotal=True)
+        if formatted_subtotal:
+            output_lines.append(formatted_subtotal)
 
-    with open(output_file, 'a', encoding='utf-8') as f:
-        f.write(''.join(output_lines))
+    # Escribir al archivo con el formato específico
+    with open(output_file, 'w', encoding='utf-8') as f:
+        f.write(''.join(output_lines).replace('  ', ' ').replace(' \n ', '\n'))
 
     return True
 
