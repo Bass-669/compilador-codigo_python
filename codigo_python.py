@@ -229,38 +229,72 @@ def mostrar_carga():
 def cerrar_carga():
     if ventana_carga: ventana_carga.destroy()
 
+# def obtener_datos():
+#     """Función principal que inicia el flujo de entrada de datos"""
+#     datos_torno1 = entrada_texto.get("1.0", tk.END).strip()
+#     if not datos_torno1:
+#         return messagebox.showwarning("Advertencia", "Ingresa los datos del Torno 1.")
+#     # Crear ventana para Torno 2
+#     ventana_torno2 = tk.Toplevel()
+#     ventana_torno2.title("Ingresar datos del Torno 2")
+#     # Área de texto con misma configuración
+#     texto_torno2 = tk.Text(ventana_torno2, width=100, height=30)
+#     texto_torno2.pack(padx=10, pady=10)
+#     # Marco para organizar los botones
+#     marco_botones = tk.Frame(ventana_torno2)
+#     marco_botones.pack(pady=10, fill='x', padx=10)
+#     # Botón Regresar (izquierda)
+#     btn_regresar = tk.Button(
+#         marco_botones,
+#         text="Regresar",
+#         command=ventana_torno2.destroy,
+#         width=15
+#     )
+#     btn_regresar.pack(side=tk.LEFT, padx=5)
+#     # Botón Continuar (derecha)
+#     btn_continuar = tk.Button(
+#         marco_botones,
+#         text="Continuar a Fecha",
+#         command=lambda: continuar_a_fecha(ventana_torno2, texto_torno2, datos_torno1),
+#         width=15
+#     )
+#     btn_continuar.pack(side=tk.RIGHT, padx=5)
+#     # Poner foco en el área de texto (igual que en Torno 1)
+#     texto_torno2.focus_set()
+
 def obtener_datos():
-    """Función principal que inicia el flujo de entrada de datos"""
-    datos_torno1 = entrada_texto.get("1.0", tk.END).strip()
-    if not datos_torno1:
-        return messagebox.showwarning("Advertencia", "Ingresa los datos del Torno 1.")
-    # Crear ventana para Torno 2
-    ventana_torno2 = tk.Toplevel()
-    ventana_torno2.title("Ingresar datos del Torno 2")
-    # Área de texto con misma configuración
-    texto_torno2 = tk.Text(ventana_torno2, width=100, height=30)
-    texto_torno2.pack(padx=10, pady=10)
-    # Marco para organizar los botones
-    marco_botones = tk.Frame(ventana_torno2)
-    marco_botones.pack(pady=10, fill='x', padx=10)
-    # Botón Regresar (izquierda)
-    btn_regresar = tk.Button(
-        marco_botones,
-        text="Regresar",
-        command=ventana_torno2.destroy,
-        width=15
-    )
-    btn_regresar.pack(side=tk.LEFT, padx=5)
-    # Botón Continuar (derecha)
-    btn_continuar = tk.Button(
-        marco_botones,
-        text="Continuar a Fecha",
-        command=lambda: continuar_a_fecha(ventana_torno2, texto_torno2, datos_torno1),
-        width=15
-    )
-    btn_continuar.pack(side=tk.RIGHT, padx=5)
-    # Poner foco en el área de texto (igual que en Torno 1)
-    texto_torno2.focus_set()
+    """Función principal que obtiene datos de archivos TXT en lugar de la interfaz"""
+    try:
+        # Pedir fecha primero
+        def procesar_con_fecha(mes, dia, anio):
+            fecha_seleccionada = datetime(anio, MESES_NUM[mes], dia)
+            
+            # Buscar archivos de tornos
+            archivo_torno1, archivo_torno2 = buscar_archivos_torno(fecha_seleccionada)
+            
+            if not archivo_torno1 or not archivo_torno2:
+                messagebox.showerror("Error", "No se encontraron los archivos de reporte para la fecha seleccionada")
+                return
+            
+            # Leer contenidos
+            datos_torno1 = leer_archivo_torno(archivo_torno1)
+            datos_torno2 = leer_archivo_torno(archivo_torno2)
+            
+            if not datos_torno1 or not datos_torno2:
+                messagebox.showerror("Error", "No se pudieron leer los archivos de reporte")
+                return
+            
+            # Procesar los datos
+            procesar_ambos_tornos(datos_torno1, datos_torno2, mes, dia, anio)
+        
+        # Mostrar selector de fecha
+        pedir_fecha(procesar_con_fecha)
+        
+    except Exception as e:
+        messagebox.showerror("Error", f"Error al obtener datos: {str(e)}")
+        escribir_log(f"Error en obtener_datos: {str(e)}", nivel="error")
+
+
 
 def continuar_a_fecha(ventana, widget_texto, datos_torno1):
     """Función para manejar el paso a selección de fecha"""
@@ -945,11 +979,34 @@ def dias_en_mes(mes, anio):
     meses_31_dias = ["Enero", "Marzo", "Mayo", "Julio", "Agosto", "Octubre", "Diciembre"]
     return 31 if mes in meses_31_dias else 30
 
-# Cambiar el botón principal para usar la nueva función
-ventana = tk.Tk()
-ventana.title("Ingresar datos del Torno 1")
-entrada_texto = tk.Text(ventana, width=100, height=30)
-entrada_texto.pack(padx=10, pady=10)
-tk.Button(ventana, text="Continuar al Torno 2", command=obtener_datos).pack(pady=10)
-entrada_texto.focus_set()
-ventana.mainloop()
+# # Cambiar el botón principal para usar la nueva función
+# ventana = tk.Tk()
+# ventana.title("Ingresar datos del Torno 1")
+# entrada_texto = tk.Text(ventana, width=100, height=30)
+# entrada_texto.pack(padx=10, pady=10)
+# tk.Button(ventana, text="Continuar al Torno 2", command=obtener_datos).pack(pady=10)
+# entrada_texto.focus_set()
+# ventana.mainloop()
+
+# [Nuevo código - versión simplificada]
+if __name__ == "__main__":
+    ventana = tk.Tk()
+    ventana.title("Procesador de Reportes de Tornos")
+    ventana.geometry("400x200")  # Ventana más pequeña y centrada
+    
+    # Logo/Mensaje principal (opcional)
+    tk.Label(ventana, 
+             text="Procesador Automático de Reportes",
+             font=("Arial", 14)).pack(pady=20)
+    
+    # Botón de acción principal
+    btn_iniciar = tk.Button(
+        ventana,
+        text="Iniciar Proceso",
+        command=obtener_datos,  # ¡Esta función ahora manejará la lectura de TXT!
+        width=20,
+        height=2
+    )
+    btn_iniciar.pack(pady=20)
+    
+    ventana.mainloop()
