@@ -90,6 +90,114 @@ def pedir_fecha(callback):
     tk.Button(ventana, text="Aceptar", command=confirmar).pack(pady=10)
     ventana.grab_set()
 
+
+# ==============================================
+# NUEVAS FUNCIONES PARA MANEJO DE ARCHIVOS TXT
+# ==============================================
+
+def buscar_archivos_torno(fecha):
+    """
+    Busca los archivos de reporte para los tornos 3011 y 3012 en la fecha especificada.
+    Retorna una tupla con las rutas (torno1_path, torno2_path) o None si no se encuentran.
+    """
+    fecha_str = fecha.strftime("%d-%m-%Y")
+    patron_torno1 = f"Reporte_{fecha_str}_3011.txt"
+    patron_torno2 = f"Reporte_{fecha_str}_3012.txt"
+    
+    # Buscar en las posibles rutas según la estructura proporcionada
+    posibles_rutas = [
+        os.path.join(BASE_DIR, "Reportes_Tornos", "datos"),  # Ruta relativa al ejecutable
+        os.path.join(BASE_DIR, "..", "Reportes_Tornos", "datos"),  # Ruta alternativa
+        os.path.join(BASE_DIR, "..", "..", "Reportes_Tornos", "datos"),  # Otra posible ubicación
+        os.path.join(os.path.dirname(BASE_DIR), "Reportes_Tornos", "datos")  # Ruta absoluta alternativa
+    ]
+    
+    archivos_encontrados = {"3011": None, "3012": None}
+    
+    for ruta in posibles_rutas:
+        try:
+            if not os.path.isdir(ruta):
+                escribir_log(f"Directorio no encontrado: {ruta}", nivel="debug")
+                continue
+                
+            # Listar archivos en el directorio
+            for archivo in os.listdir(ruta):
+                if archivo == patron_torno1:
+                    archivos_encontrados["3011"] = os.path.join(ruta, archivo)
+                elif archivo == patron_torno2:
+                    archivos_encontrados["3012"] = os.path.join(ruta, archivo)
+                        
+            # Si ya encontramos ambos archivos, salir del bucle
+            if all(archivos_encontrados.values()):
+                break
+                
+        except Exception as e:
+            escribir_log(f"Error buscando archivos en {ruta}: {str(e)}", nivel="warning")
+    
+    # Si no encontramos en las rutas estándar, intentar búsqueda flexible
+    if not all(archivos_encontrados.values()):
+        escribir_log("No se encontraron archivos en rutas estándar, intentando búsqueda flexible...", nivel="debug")
+        for ruta in posibles_rutas:
+            try:
+                if not os.path.isdir(ruta):
+                    continue
+                    
+                # Búsqueda flexible por fecha (puede variar el prefijo o formato)
+                for archivo in os.listdir(ruta):
+                    if fecha_str in archivo and archivo.endswith(".txt"):
+                        if "3011" in archivo:
+                            archivos_encontrados["3011"] = os.path.join(ruta, archivo)
+                        elif "3012" in archivo:
+                            archivos_encontrados["3012"] = os.path.join(ruta, archivo)
+                            
+                if all(archivos_encontrados.values()):
+                    break
+                    
+            except Exception as e:
+                escribir_log(f"Error en búsqueda flexible en {ruta}: {str(e)}", nivel="warning")
+    
+    # Registrar resultados de la búsqueda
+    escribir_log(f"Resultados de búsqueda - Torno1: {archivos_encontrados['3011']}, Torno2: {archivos_encontrados['3012']}")
+    
+    return archivos_encontrados["3011"], archivos_encontrados["3012"]
+
+def leer_archivo_torno(ruta_archivo):
+    """
+    Lee el contenido de un archivo de reporte de torno y lo devuelve como texto.
+    Versión modificada para aceptar el formato real de los archivos.
+    """
+    if not ruta_archivo or not os.path.exists(ruta_archivo):
+        escribir_log(f"Archivo no encontrado: {ruta_archivo}", nivel="warning")
+        return None
+
+    try:
+        with open(ruta_archivo, 'r', encoding='utf-8') as f:
+            contenido = f.read()
+
+        # Normalizar saltos de línea y limpiar espacios
+        contenido = contenido.replace('\r\n', '\n').replace('\r', '\n').strip()
+
+        # Verificar que el contenido tenga datos válidos (ahora más flexible)
+        if not contenido:
+            escribir_log(f"Archivo vacío: {ruta_archivo}", nivel="warning")
+            return None
+
+        # Verificar si contiene al menos una línea con "RADIATA" que indica datos válidos
+        if "RADIATA" not in contenido:
+            escribir_log(f"Archivo no contiene datos RADIATA: {ruta_archivo}", nivel="warning")
+            return None
+
+        return contenido
+
+    except Exception as e:
+        escribir_log(f"Error leyendo archivo {ruta_archivo}: {str(e)}", nivel="error")
+        return None
+
+# ==============================================
+# NUEVAS FUNCIONES PARA MANEJO DE ARCHIVOS TXT
+# ==============================================
+
+
 def iniciar(texto, torno, mes, dia, anio):
     mostrar_carga()
     threading.Thread(target=lambda: ejecutar(texto, torno, mes, dia, anio), daemon=True).start()
