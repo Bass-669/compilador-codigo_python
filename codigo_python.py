@@ -71,6 +71,10 @@ def escribir_log(mensaje, nivel="info"):
     except Exception as e:
         escribir_log(f"Error al escribir en log: {e}", file=sys.stderr)
 
+def cerrar_carga():
+    if 'ventana_carga' in globals() and ventana_carga.winfo_exists():
+        ventana_carga.destroy()
+
 # ==============================================
 # NUEVAS FUNCIONES PARA MANEJO DE ARCHIVOS TXT
 # ==============================================
@@ -173,32 +177,27 @@ def leer_archivo_torno(ruta_archivo):
         escribir_log(f"Error leyendo archivo {ruta_archivo}: {str(e)}", nivel="error")
         return None
 
-def mostrar_carga(mensaje="Procesando datos..."):
-    """Muestra la ventana de carga con un mensaje personalizado"""
+def mostrar_carga(mensaje="Procesando..."):
     global ventana_carga, barra, lbl_estado
     
-    if 'ventana_carga' not in globals() or not ventana_carga.winfo_exists():
-        ventana_carga = tk.Toplevel()
-        ventana_carga.title("Procesando...")
-        ventana_carga.geometry("400x150")
-        ventana_carga.resizable(False, False)
-        ventana_carga.protocol("WM_DELETE_WINDOW", lambda: None)
-        
-        tk.Label(ventana_carga, text="Por favor espere...", font=("Arial", 12)).pack(pady=10)
-        
-        barra = ttk.Progressbar(ventana_carga, mode='indeterminate')
-        barra.pack(fill='x', padx=20, pady=5)
-        barra.start()
-        
-        lbl_estado = tk.Label(ventana_carga, text=mensaje, font=("Arial", 10))
-        lbl_estado.pack()
-        
-        ventana_carga.grab_set()
-    else:
-        lbl_estado.config(text=mensaje)
-        ventana_carga.deiconify()
+    ventana_carga = tk.Toplevel()
+    ventana_carga.title("Procesando datos")
+    ventana_carga.geometry("400x150")
+    ventana_carga.resizable(False, False)
+    ventana_carga.protocol("WM_DELETE_WINDOW", lambda: None)  # Evitar cierre manual
     
-    ventana_carga.update()
+    # Barra de progreso indeterminada
+    barra = ttk.Progressbar(ventana_carga, mode='indeterminate')
+    barra.pack(fill='x', padx=20, pady=20)
+    barra.start()  # Iniciar animación
+    
+    # Etiqueta de estado
+    lbl_estado = tk.Label(ventana_carga, text=mensaje, font=("Arial", 10))
+    lbl_estado.pack()
+    
+    # Forzar actualización de la ventana
+    ventana_carga.update_idletasks()
+    ventana_carga.grab_set()
 
 
 # ==============================================
@@ -346,19 +345,27 @@ def procesar_ambos_tornos(datos_torno1, datos_torno2, mes, dia, anio):
 
     def tarea_principal():
         try:
-            # Procesar Torno 1 - Cambiado de ejecutar() a procesar_datos()
+            # Procesar Torno 1
+            lbl_estado.config(text="Procesando Torno 1...")
+            ventana_carga.update()
             bloques1, sumas1 = procesar_datos(datos_torno1, 1, mes, dia, anio)
+            
             if not bloques1:
-                ventana_principal.after(0, lambda: mostrar_resultado_final(False))
+                ventana_principal.after(0, lambda: mostrar_resultado(False))
                 return
 
-            # Procesar Torno 2 - Cambiado de ejecutar() a procesar_datos()
+            # Procesar Torno 2
+            lbl_estado.config(text="Procesando Torno 2...")
+            ventana_carga.update()
             bloques2, sumas2 = procesar_datos(datos_torno2, 2, mes, dia, anio)
-            ventana_principal.after(0, lambda: mostrar_resultado_final(bloques2 is not None))
+            
+            ventana_principal.after(0, lambda: mostrar_resultado(bloques2 is not None))
             
         except Exception as e:
-            escribir_log(f"Error inesperado: {str(e)}", nivel="error")
-            ventana_principal.after(0, lambda: mostrar_resultado_final(False))
+            escribir_log(f"Error en procesamiento: {str(e)}", nivel="error")
+            ventana_principal.after(0, lambda: mostrar_resultado(False))
+        finally:
+            ventana_principal.after(0, cerrar_carga)
 
     threading.Thread(target=tarea_principal, daemon=True).start()
 
