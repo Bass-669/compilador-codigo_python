@@ -149,26 +149,26 @@ def leer_archivo_torno(ruta_archivo):
     if not ruta_archivo or not os.path.exists(ruta_archivo):
         escribir_log(f"Archivo no encontrado: {ruta_archivo}", nivel="warning")
         return None
-        
+
     try:
         with open(ruta_archivo, 'r', encoding='utf-8') as f:
             contenido = f.read()
-            
+
         # Normalizar saltos de línea y limpiar espacios
         contenido = contenido.replace('\r\n', '\n').replace('\r', '\n').strip()
-        
+
         # Verificar que el contenido tenga datos válidos (ahora más flexible)
         if not contenido:
             escribir_log(f"Archivo vacío: {ruta_archivo}", nivel="warning")
             return None
-            
+
         # Verificar si contiene al menos una línea con "RADIATA" que indica datos válidos
         if "RADIATA" not in contenido:
             escribir_log(f"Archivo no contiene datos RADIATA: {ruta_archivo}", nivel="warning")
             return None
-            
+
         return contenido
-        
+
     except Exception as e:
         escribir_log(f"Error leyendo archivo {ruta_archivo}: {str(e)}", nivel="error")
         return None
@@ -285,133 +285,49 @@ def obtener_rendimientos_de_log(fecha_ingresada):
         escribir_log(f"Error al leer el archivo de log: {str(e)}", nivel="error")
         return None
 
-
-def mostrar_carga():
-    """Muestra la ventana de carga de manera persistente"""
-    global ventana_carga, barra
-    if 'ventana_carga' not in globals() or not ventana_carga.winfo_exists():
-        ventana_carga = tk.Toplevel()
-        ventana_carga.title("Procesando datos...")
-        ventana_carga.geometry("400x120")
-        ventana_carga.resizable(False, False)
-        ventana_carga.protocol("WM_DELETE_WINDOW", lambda: None)
-        tk.Label(ventana_carga, 
-                text="Procesando datos...", 
-                font=("Arial", 12)).pack(pady=10)
-        barra = ttk.Progressbar(ventana_carga, mode='determinate', maximum=100)
-        barra.pack(fill='x', padx=20, pady=5)
-        global lbl_estado
-        lbl_estado = tk.Label(ventana_carga, text="", font=("Arial", 10))
-        lbl_estado.pack()
-        ventana_carga.grab_set()
-
-    barra['value'] = 0
-    ventana_carga.deiconify()
-
-def cerrar_carga():
-    if ventana_carga: ventana_carga.destroy()
-
-def iniciar(texto, torno, mes, dia, anio):
-    mostrar_carga()
-    threading.Thread(target=lambda: ejecutar(texto, torno, mes, dia, anio), daemon=True).start()
-
-def ejecutar(txt, torno, mes, dia, anio, callback_final=None):
-    """Función de procesamiento con registro completo de log"""
-    try:
-        escribir_log(f"Iniciando procesamiento para Torno {torno} - Fecha: {dia}/{mes}/{anio}")
-        inicio_barra = 0 if torno == 1 else 50
-        barra['value'] = inicio_barra
-        ventana_carga.update_idletasks()
-        
-        def incrementar_barra(hasta, paso=1):
-            nonlocal inicio_barra
-            valor_final = inicio_barra + hasta
-            escribir_log(f"Progreso Torno {torno}: {barra['value']}% -> {valor_final}%")
-            for i in range(barra['value'], valor_final + 1, paso):
-                barra['value'] = i
-                ventana_carga.update_idletasks()
-                time.sleep(0.01)
-
-        # Paso 1: Obtener rendimientos (10%)
-        escribir_log("Obteniendo rendimientos del log...")
-        incrementar_barra(10)
-        fecha_actual = datetime(anio, MESES_NUM[mes], dia).date()
-        rendimiento_log = obtener_rendimientos_de_log(fecha_actual)
-        
-        if rendimiento_log:
-            escribir_log(f"Rendimientos obtenidos - Torno 1: {rendimiento_log.get('torno1', 'N/A')}%, "
-                       f"Torno 2: {rendimiento_log.get('torno2', 'N/A')}%")
-
-        # Paso 2: Preparar hoja (30%)
-        escribir_log("Preparando hoja del mes...")
-        incrementar_barra(20)
-        if not preparar_hoja_mes(mes, dia, anio):
-            escribir_log("Error al preparar hoja del mes", nivel="error")
-            if callback_final:
-                callback_final(False)
-            return False
-
-        # Paso 3: Procesar datos (70%)
-        escribir_log(f"Procesando datos del Torno {torno}...")
-        incrementar_barra(40)
-        bloques, porcentajes = procesar_datos(txt, torno, mes, dia, anio)
-        if bloques is None or porcentajes is None:
-            escribir_log("Error al procesar datos", nivel="error")
-            if callback_final:
-                callback_final(False)
-            return False
-
-        # Paso 4: Escribir en hoja (100%)
-        escribir_log("Escribiendo datos en hoja mensual...")
-        incrementar_barra(30)
-        resultado = fecha(mes, dia, anio, torno, bloques, porcentajes, 
-                         lambda h: incrementar_barra(h), 
-                         rendimiento_log if torno == 2 else None)
-        if resultado:
-            escribir_log(f"Procesamiento del Torno {torno} completado con éxito \n")
-        else:
-            escribir_log(f"Error en el procesamiento del Torno {torno}", nivel="error")
-        if callback_final and torno == 2:
-            callback_final(resultado)
-        return resultado
-
-    except Exception as e:
-        escribir_log(f"Error crítico en Torno {torno}: {str(e)}", nivel="error")
-        if callback_final and torno == 2:
-            callback_final(False)
-        return False
-
 def procesar_ambos_tornos(datos_torno1, datos_torno2, mes, dia, anio):
     """Función principal con mensaje único al final"""
     mostrar_carga()
 
     def mostrar_resultado_final(exito):
+        """Muestra el mensaje final asegurando visibilidad"""
+        # Cerrar ventana de carga primero
         ventana_carga.destroy()
-        ventana.attributes('-topmost', True)
+        
+        # Forzar enfoque en la ventana principal
+        ventana.attributes('-topmost', True)  # Temporalmente siempre visible
         ventana.lift()
         ventana.focus_force()
         ventana.update_idletasks()
         
+        # Mostrar mensaje
         if exito:
+            # Messagebox con enfoque garantizado
             mensaje = tk.Toplevel(ventana)
             mensaje.title("Proceso Completado")
             mensaje.geometry("400x150")
             mensaje.resizable(False, False)
+            # Contenido del mensaje
             tk.Label(mensaje, 
                     text="Éxito ✅ Valores actualizados correctamente para el día:\n"
                          f"Fecha: {dia}/{mes}/{anio}", pady=20).pack()
+
             tk.Button(mensaje, text="Aceptar", command=ventana.destroy,
                     width=15).pack(pady=10)
+            # Configuración de enfoque
             mensaje.grab_set()
             mensaje.focus_force()
             mensaje.attributes('-topmost', True)
+            # Posicionamiento centrado
             mensaje.update_idletasks()
             x = ventana.winfo_x() + (ventana.winfo_width() - mensaje.winfo_width()) // 2
             y = ventana.winfo_y() + (ventana.winfo_height() - mensaje.winfo_height()) // 2
             mensaje.geometry(f"+{x}+{y}")
+            # Restaurar estado normal después de mostrar
             ventana.attributes('-topmost', False)
         else:
-            ventana.bell()
+            # Para errores usamos messagebox estándar pero con enfoque
+            ventana.bell()  # Sonido de alerta
             messagebox.showerror(
                 "Error", 
                 "❌ Ocurrió un error durante el procesamiento\n"
@@ -422,10 +338,12 @@ def procesar_ambos_tornos(datos_torno1, datos_torno2, mes, dia, anio):
 
     def tarea_principal():
         try:
+            # Procesar Torno 1
             if not ejecutar(datos_torno1, 1, mes, dia, anio):
                 ventana.after(0, lambda: mostrar_resultado_final(False))
                 return
 
+            # Procesar Torno 2
             ejecutar(datos_torno2, 2, mes, dia, anio, 
                     lambda exito: ventana.after(0, lambda: mostrar_resultado_final(exito)))
         except Exception as e:
@@ -433,18 +351,6 @@ def procesar_ambos_tornos(datos_torno1, datos_torno2, mes, dia, anio):
             ventana.after(0, lambda: mostrar_resultado_final(False))
 
     threading.Thread(target=tarea_principal, daemon=True).start()
-
-# ==============================================
-# FUNCIONES EXISTENTES SIN CAMBIOS
-# ==============================================
-# [Todas las demás funciones permanecen iguales: 
-# obtener_rendimientos_de_log, procesar_datos, escribir, 
-# Pasar_referencia, extraer_bloques, sub_bloques, 
-# escribir_valor_bloque, escribir_valores_resumen_bloques, 
-# fecha, preparar_hoja_mes, dias_en_mes]
-# ==============================================
-
-
 
 
 
@@ -607,19 +513,13 @@ def procesar_datos(entrada, torno, mes, dia, anio):
                 pass
         escribir_log("Procesamiento de datos completado")
 
-
 def escribir(hoja, fila, col, valor, es_numero=False):
-    """Escribe valores con formato mejorado"""
+    """Escribe un valor en la celda con formato adecuado"""
     celda = hoja.cell(row=fila, column=col, value=valor)
     celda.border = BORDER
-    
-    # Alineación diferente para texto vs números
-    if isinstance(valor, str):
-        celda.alignment = Alignment(horizontal='left')
-    else:
-        celda.alignment = ALIGN_R
-        if es_numero:
-            celda.number_format = '0.00'
+    celda.alignment = ALIGN_R
+    if es_numero:
+        celda.number_format = '0.00'
 
 def Pasar_referencia(celda_origen):
     """Retorna la referencia CORRECTAMENTE formateada"""
@@ -633,42 +533,34 @@ def Pasar_referencia(celda_origen):
     return referencia
 
 def extraer_bloques(txt):
-    """Versión corregida para manejar el formato real con RADIATA"""
-    escribir_log("Inicio de extraer_bloques (versión corregida)")
-    
-    lineas = [l.strip() for l in txt.split('\n') if l.strip()]
-    bloques = []
-    bloque_actual = []
-    
-    for linea in lineas:
-        # Detecta inicio de nuevo bloque (RADIATA o línea con PODADO/REGULAR)
-        if linea.startswith('RADIATA') or ('PODADO' in linea and '...' not in linea) or ('REGULAR' in linea and '...' not in linea):
-            if bloque_actual:  # Guardar el bloque anterior
-                bloques.append(bloque_actual)
-                bloque_actual = []
-        bloque_actual.append(linea)
-    
-    if bloque_actual:  # Añadir el último bloque
-        bloques.append(bloque_actual)
-    
-    escribir_log(f"Bloques identificados: {len(bloques)}")
+    escribir_log("Inicio de extraer_bloques")
+    lineas = [l.strip() for l in txt.strip().split("\n") if l.strip()]
+    bloques, b, i = [], [], 0
+    while i < len(lineas):
+        l = lineas[i]
+        if re.match(r'^\* \* \.\.\.', l):
+            b.append(l)
+            if i+1 < len(lineas) and re.match(r'^\d', lineas[i+1]):
+                b.append(lineas[i+1])
+                i += 1
+            bloques.append(b)
+            b = []
+        else: b.append(l)
+        i += 1
+    if b: bloques.append(b)
     return bloques
 
 def sub_bloques(b):
-    """Divide cada bloque en sub-bloques de datos"""
-    escribir_log("Inicio de sub_bloques (versión adaptada)")
-    subs = []
-    sub_actual = []
-    for linea in b:
-        # Líneas con RADIATA o PODADO/REGULAR son nuevos sub-bloques
-        if linea.startswith('RADIATA') or ('PODADO' in linea and '...' not in linea) or ('REGULAR' in linea and '...' not in linea):
-            if sub_actual:
-                subs.append(sub_actual)
-                sub_actual = []
-        sub_actual.append(linea)
-    if sub_actual:
-        subs.append(sub_actual)
+    escribir_log("Inicio de sub_bloques")
+    subs, tmp = [], []
+    for l in b:
+        if re.match(r'^\D', l) or '*' in l:
+            if tmp: subs.append(tmp)
+            tmp = [l]
+        else: tmp.append(l)
+    if tmp: subs.append(tmp)
     return subs
+
 
 def escribir_valor_bloque(hoja, col_dia, torno, valor, tipo_bloque):
     escribir_log("Inicio de escribir_valor_bloque")
