@@ -2,55 +2,68 @@ from bs4 import BeautifulSoup
 import os
 import sys
 
-def format_data_row(row):
+def format_data_row(row, is_category=False):
     cells = row.find_all('td', class_=['RWReport', 'RWReportSUM'])
-    if not cells or len(cells) < 19:  # Asegurarnos de tener todas las columnas necesarias
+    if not cells or len(cells) < 19:
         return None
-    
-    # Procesar primera línea (columnas 0, 2, 3, 5)
-    first_line_parts = []
-    
-    # Columna 0: Tipo madera (solo para filas de categoría)
-    part0 = cells[0].get_text(strip=True) if cells[0].get_text(strip=True) not in ('', '&nbsp;') else ''
-    
-    # Columna 2: Diámetro clase JAS
-    part2 = cells[2].get_text(strip=True) if len(cells) > 2 and cells[2].get_text(strip=True) not in ('', '&nbsp;') else ''
-    
-    # Columna 3: Trozos
-    part3 = cells[3].get_text(strip=True) if len(cells) > 3 and cells[3].get_text(strip=True) not in ('', '&nbsp;') else ''
-    
-    # Columna 5: Distribución (puede tener tabla anidada)
-    part5 = ' '
-    if len(cells) > 5:
-        dist_cell = cells[5]
-        if dist_cell.find('table'):
-            dist_text = dist_cell.find('table').find_all('td')[-1].get_text(strip=True)
-            part5 = dist_text.split('&nbsp;')[0].strip()
-        else:
-            part5 = dist_cell.get_text(strip=True) if dist_cell.get_text(strip=True) not in ('', '&nbsp;') else ' '
-    
-    # Manejar caso especial de subtotal (* * ...)
-    if part0 == '*':
-        first_line = f"* * ... {part3}  {part5}\n"
+
+    # Procesar primera línea
+    if is_category:
+        # Para líneas de categoría (RADIATA PODADO/REGULAR)
+        tipo_madera = cells[0].get_text(strip=True)
+        tipo = cells[1].get_text(strip=True)
+        diametro = cells[2].get_text(strip=True)
+        trozos = cells[3].get_text(strip=True)
+        
+        # Manejar distribución (puede tener tabla anidada)
+        distribucion = ' '
+        if len(cells) > 5:
+            dist_cell = cells[5]
+            if dist_cell.find('table'):
+                dist_text = dist_cell.find('table').find_all('td')[-1].get_text(strip=True)
+                distribucion = dist_text.split('&nbsp;')[0].strip()
+            else:
+                distribucion = dist_cell.get_text(strip=True) if dist_cell.get_text(strip=True) not in ('', '&nbsp;') else ' '
+        
+        first_line = f"{tipo_madera} {tipo} {diametro} {trozos}  {distribucion}\n"
+    elif cells[0].get_text(strip=True) == '*':
+        # Para línea de subtotal (* * ...)
+        trozos = cells[3].get_text(strip=True)
+        distribucion = ' '
+        if len(cells) > 5:
+            dist_cell = cells[5]
+            if dist_cell.find('table'):
+                dist_text = dist_cell.find('table').find_all('td')[-1].get_text(strip=True)
+                distribucion = dist_text.split('&nbsp;')[0].strip()
+            else:
+                distribucion = dist_cell.get_text(strip=True) if dist_cell.get_text(strip=True) not in ('', '&nbsp;') else ' '
+        
+        first_line = f"* * ... {trozos}  {distribucion}\n"
     else:
-        if part0:  # Es una fila de categoría
-            first_line = f"{part0} {part2} {part3}  {part5}\n"
-        else:  # Fila normal
-            first_line = f" {part2} {part3}  {part5}\n"
-    
-    # Procesar segunda línea (columnas 4, 6-18)
+        # Para líneas normales
+        tipo = cells[1].get_text(strip=True)
+        diametro = cells[2].get_text(strip=True)
+        trozos = cells[3].get_text(strip=True)
+        
+        # Manejar distribución
+        distribucion = ' '
+        if len(cells) > 5:
+            dist_cell = cells[5]
+            if dist_cell.find('table'):
+                dist_text = dist_cell.find('table').find_all('td')[-1].get_text(strip=True)
+                distribucion = dist_text.split('&nbsp;')[0].strip()
+            else:
+                distribucion = dist_cell.get_text(strip=True) if dist_cell.get_text(strip=True) not in ('', '&nbsp;') else ' '
+        
+        first_line = f" {tipo} {diametro} {trozos}  {distribucion}\n"
+
+    # Procesar segunda línea (19 valores)
     second_line_parts = []
-    # Columna 4: Diámetro máximo
-    if len(cells) > 4:
-        part4 = cells[4].get_text(strip=True) if cells[4].get_text(strip=True) not in ('', '&nbsp;') else ' '
-        second_line_parts.append(part4)
+    indices = [4] + list(range(6, 19))  # Columnas requeridas: 4,6,7,...,18
     
-    # Columnas 6-18
-    for i in range(6, 19):
+    for i in indices:
         if i < len(cells):
             cell = cells[i]
-            if cell.find('table'):
-                continue
             text = cell.get_text(strip=True)
             if text not in ('', '&nbsp;'):
                 second_line_parts.append(text)
@@ -59,7 +72,7 @@ def format_data_row(row):
         else:
             second_line_parts.append(' ')
     
-    # Asegurar que tenemos exactamente 19 valores
+    # Asegurar 19 valores exactos
     if len(second_line_parts) < 19:
         second_line_parts.extend([' '] * (19 - len(second_line_parts)))
     
@@ -85,17 +98,21 @@ def process_html_file(html_file, output_file):
     if len(rows) < 2:
         return False
     
-    # Procesar todas las filas excepto la cabecera y la última (total general)
+    # Procesar filas (excepto cabecera y total)
     for row in rows[1:-1]:
-        # Manejar cambio de categoría
         first_cell = row.find('td', class_=['RWReport', 'RWReportSUM'])
         if first_cell:
             cell_text = first_cell.get_text(strip=True)
             if cell_text and cell_text not in ('', '&nbsp;', '*'):
                 if "PODADO" in cell_text.upper() or "REGULAR" in cell_text.upper():
                     current_category = cell_text
-                    output_lines.append(f"{current_category} \n")
+                    # Procesar como línea de categoría
+                    formatted_row = format_data_row(row, is_category=True)
+                    if formatted_row:
+                        output_lines.append(formatted_row)
+                    continue
         
+        # Procesar como línea normal
         formatted_row = format_data_row(row)
         if formatted_row:
             output_lines.append(formatted_row)
@@ -108,7 +125,7 @@ def process_html_file(html_file, output_file):
             if formatted_subtotal:
                 output_lines.append(formatted_subtotal)
     
-    # Escribir en el archivo de salida
+    # Escribir archivo de salida
     with open(output_file, 'w', encoding='utf-8') as f:
         f.write(''.join(output_lines))
 
@@ -155,7 +172,6 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
 # from bs4 import BeautifulSoup
 # import os
