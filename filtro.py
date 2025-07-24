@@ -53,12 +53,14 @@ def format_data_row(row, is_first_in_category=False):
     
     # Extraer los valores de las celdas
     values = []
-    for cell in cells:
+    distribution = ' '  # Valor por defecto para distribución
+    for i, cell in enumerate(cells):
         # Manejar celdas con tablas anidadas (para distribución)
         if cell.find('table'):
             table = cell.find('table')
             dist_value = table.find_all('td')[-1].get_text(strip=True)
-            values.append(dist_value.split('&nbsp;')[0].strip())
+            distribution = dist_value.split('&nbsp;')[0].strip()
+            values.append(' ')  # Marcador de posición
         else:
             text = cell.get_text(strip=True)
             values.append(text if text not in ('', '&nbsp;') else ' ')
@@ -70,24 +72,22 @@ def format_data_row(row, is_first_in_category=False):
         tipo = values[1]
         diametro_clase = values[2]
         trozos = values[3]
-        distribucion = values[4] if len(values) > 4 else ' '
         
         # Construir primera línea
-        first_line = f"{tipo_madera} {tipo} {diametro_clase} {trozos}  {distribucion}"
+        first_line = f"{tipo_madera} {tipo} {diametro_clase} {trozos}  {distribution}"
         
-        # Construir segunda línea con los valores restantes (omitir distribución)
-        second_line = ' ' + ' '.join(values[5:])
+        # Construir segunda línea con los valores restantes (comenzando desde el índice 4)
+        second_line = ' ' + ' '.join(values[4:])
         
         return f"{first_line} \n{second_line} \n"
     elif len(values) >= 3 and values[0] == '*' and values[1] == '*':
         # Es una fila de subtotal (* * ...)
         trozos = values[3]
-        distribucion = values[4] if len(values) > 4 else ' '
-        return f"* * ... {trozos}  {distribucion} \n {' '.join(values[5:])} \n"
+        return f"* * ... {trozos}  {distribution} \n {' '.join(values[4:])} \n"
     else:
         # Es una fila de datos normal
         first_part = ' '.join(values[:4])
-        second_part = ' ' + ' '.join(values[5:])  # Omitir el valor de distribución (values[4])
+        second_part = ' ' + ' '.join(values[4:])
         return f" {first_part} \n{second_part} \n"
 
 def process_html_file(html_file, output_file):
