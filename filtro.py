@@ -9,13 +9,14 @@ def format_data_row(row, is_first_in_category=False):
 
     values = []
     distribution = ' '
+
     for i, cell in enumerate(cells):
         if cell.find('table'):
-            # Extraer solo el valor de distribución
+            # Extraer solo el valor de distribución desde la tabla interna
             inner_table_cells = cell.find_all('td', class_='RWReport')
             if inner_table_cells:
                 distribution = inner_table_cells[-1].get_text(strip=True)
-            # values.append(' ')  # Marcador vacío para no duplicar el valor
+            continue  # <-- ¡IMPORTANTE! No agregamos nada a `values`
         else:
             text = cell.get_text(strip=True)
             values.append(text if text not in ('', '&nbsp;') else ' ')
@@ -28,15 +29,17 @@ def format_data_row(row, is_first_in_category=False):
 
         first_line = f"{tipo_madera} {tipo} {diametro_clase} {trozos}  {distribution}"
         second_line = ' ' + ' '.join(values[4:])
-
         return f"{first_line} \n{second_line} \n"
+
     elif len(values) >= 3 and values[0] == '*' and values[1] == '*':
         trozos = values[3]
         return f"* * ... {trozos}  {distribution} \n {' '.join(values[4:])} \n"
+
     else:
         first_part = ' '.join(values[:4])
         second_part = ' ' + ' '.join(values[4:])
         return f" {first_part} \n{second_part} \n"
+
 
 
 def process_html_file(html_file, output_file):
