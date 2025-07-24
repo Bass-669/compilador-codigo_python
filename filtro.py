@@ -25,13 +25,12 @@ def format_data_row(row):
             # Extraer solo el valor numérico de la tabla anidada
             dist_text = dist_cell.find('table').find_all('td')[-1].get_text(strip=True)
             first_line_parts[3] = dist_text.split('&nbsp;')[0].strip()
-        elif dist_cell.get_text(strip=True) == '':
-            first_line_parts[3] = ' '
     
     # Construir primera línea con 2 espacios antes del porcentaje
-    first_line = ' '.join(first_line_parts[:3])
     if len(first_line_parts) > 3:
-        first_line += '  ' + first_line_parts[3]  # Dos espacios antes del porcentaje
+        first_line = ' '.join(first_line_parts[:3]) + '  ' + first_line_parts[3]
+    else:
+        first_line = ' '.join(first_line_parts)
     
     # Procesar segunda línea (resto de columnas)
     second_line_parts = []
