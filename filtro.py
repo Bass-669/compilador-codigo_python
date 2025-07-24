@@ -2,7 +2,7 @@ from bs4 import BeautifulSoup
 import os
 import sys
 
-def format_data_row(row, is_category_row=False):
+def format_data_row(row, is_category=False):
     cells = row.find_all('td', class_=['RWReport', 'RWReportSUM'])
     if not cells or len(cells) < 19:
         return None
@@ -15,21 +15,11 @@ def format_data_row(row, is_category_row=False):
     if part0 == '*':
         subtotal_part3 = cells[3].get_text(strip=True) if len(cells) > 3 and cells[3].get_text(strip=True) not in ('', '&nbsp;') else ' '
         subtotal_part5 = cells[5].get_text(strip=True) if len(cells) > 5 and cells[5].get_text(strip=True) not in ('', '&nbsp;') else ' '
-        first_line = f"* * ... {subtotal_part3}  {subtotal_part5}".strip()
+        first_line = f"* * ... {subtotal_part3}  {subtotal_part5}\n"
     else:
         # Normal row formatting
-        # Part 1-2: Diameter range (HTML[1]...HTML[2])
-        min_d = cells[1].get_text(strip=True) if len(cells) > 1 else ''
-        max_d = cells[2].get_text(strip=True) if len(cells) > 2 else ''
-        
-        if min_d not in ('', '&nbsp;') and max_d not in ('', '&nbsp;'):
-            part1_2 = f"{min_d}...{max_d}"
-        elif min_d not in ('', '&nbsp;'):
-            part1_2 = min_d
-        elif max_d not in ('', '&nbsp;'):
-            part1_2 = max_d
-        else:
-            part1_2 = ''
+        # Part 1-2: Diameter range (HTML[2])
+        part1_2 = cells[2].get_text(strip=True) if len(cells) > 2 and cells[2].get_text(strip=True) not in ('', '&nbsp;') else ''
 
         # Part 3: Distribution (HTML[3])
         part3 = ' '
@@ -44,11 +34,10 @@ def format_data_row(row, is_category_row=False):
         # Part 5: Dry weight % (HTML[5])
         part5 = cells[5].get_text(strip=True) if len(cells) > 5 and cells[5].get_text(strip=True) not in ('', '&nbsp;') else ' '
 
-        # For category rows (PODADO/REGULAR), don't include part0 in the first line
-        if is_category_row:
-            first_line = f"{part1_2} {part3}  {part5}".strip()
+        if is_category:
+            first_line = f"{part0} {part1_2} {part3}  {part5}\n"
         else:
-            first_line = f"{part0} {part1_2} {part3}  {part5}".strip()
+            first_line = f" {part0} {part1_2} {part3}  {part5}\n"
 
     # --- Second line formatting ---
     # We need all 19 values (indices 4,6-18)
@@ -66,14 +55,14 @@ def format_data_row(row, is_category_row=False):
                 text = cell_text
         line2_parts.append(text)
     
-    # Ensure we have exactly 19 values (4 + 6-18)
+    # Ensure we have exactly 19 values
     if len(line2_parts) < 19:
         line2_parts.extend([' '] * (19 - len(line2_parts)))
     
-    second_line = ' ' + ' '.join(line2_parts).strip()
+    second_line = ' ' + ' '.join(line2_parts) + ' \n'
 
     # Combine the lines
-    formatted = f"{first_line}\n{second_line}\n"
+    formatted = f"{first_line}{second_line}"
     
     if not first_line.strip() and not second_line.strip():
         return None
@@ -94,14 +83,12 @@ def process_html_file(html_file, output_file):
     output_lines = []
     current_category = None
     
-    # Process all rows except header
-    rows_to_process = diameter_table.find_all('tr')[1:]
-    
-    # Check if last row is a grand total to be excluded
-    if len(rows_to_process) > 1:
-        last_row_cells = rows_to_process[-1].find_all('td', class_=['RWReport', 'RWReportSUM'])
-        if last_row_cells and last_row_cells[0].get_text(strip=True) not in ('', '&nbsp;', '*'):
-            rows_to_process = rows_to_process[:-1]
+    # Process all rows except header and total
+    rows = diameter_table.find_all('tr')
+    if len(rows) < 2:
+        return False
+        
+    rows_to_process = rows[1:-1]  # Skip header and total row
     
     for row in rows_to_process:
         # Handle category changes (PODADO/REGULAR)
@@ -111,25 +98,27 @@ def process_html_file(html_file, output_file):
             if cell_text and cell_text not in ('', '&nbsp;', '*'):
                 if "PODADO" in cell_text.upper() or "REGULAR" in cell_text.upper():
                     current_category = cell_text
-                    output_lines.append(f"{current_category}\n")
-                    # Format the category row without repeating the category name
-                    formatted_row = format_data_row(row, is_category_row=True)
-                else:
-                    formatted_row = format_data_row(row)
-            else:
-                formatted_row = format_data_row(row)
-        else:
-            formatted_row = format_data_row(row)
+                    # Format the category row
+                    formatted_row = format_data_row(row, is_category=True)
+                    if formatted_row:
+                        output_lines.append(formatted_row)
+                    continue
         
+        formatted_row = format_data_row(row)
         if formatted_row:
-            # Add indentation for non-category rows
-            if current_category and not any(x in formatted_row for x in ['RADIATA PODADO', 'RADIATA REGULAR', '* * ...']):
-                formatted_row = ' ' + formatted_row
             output_lines.append(formatted_row)
+    
+    # Process subtotal row (second to last)
+    if len(rows) > 1:
+        subtotal_row = rows[-2]
+        if '*' in subtotal_row.get_text():
+            formatted_subtotal = format_data_row(subtotal_row)
+            if formatted_subtotal:
+                output_lines.append(formatted_subtotal)
     
     # Write to output file
     with open(output_file, 'w', encoding='utf-8') as f:
-        f.write(''.join(output_lines).strip())
+        f.write(''.join(output_lines))
 
     return True
 
@@ -176,7 +165,6 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
 
 # from bs4 import BeautifulSoup
