@@ -10,19 +10,21 @@ def format_data_row(row, is_first_in_category=False):
     values = []
     distribution = ' '
 
-    for i, cell in enumerate(cells):
+    for cell in cells:
+        # Si la celda contiene una tabla (caso distribución)
         if cell.find('table'):
-            # Extraer solo el valor de distribución desde la tabla interna
-            inner_table_cells = cell.find_all('td', class_='RWReport')
-            if inner_table_cells:
-                distribution = inner_table_cells[-1].get_text(strip=True)
-            continue  # <-- ¡IMPORTANTE! No agregamos nada a `values`
+            inner_td = cell.find('td', class_='RWReport')
+            if inner_td:
+                distribution = inner_td.get_text(strip=True)
+            # OJO: no añadimos nada a values (ni siquiera ' ')
+            continue
         else:
             text = cell.get_text(strip=True)
             values.append(text if text not in ('', '&nbsp;') else ' ')
 
-    if len(values) >= 3 and (values[1].upper() in ['PODADO', 'REGULAR'] or values[0].upper() in ['PODADO', 'REGULAR']):
-        tipo_madera = values[0] if (values[0] != ' ' and is_first_in_category) else ' '
+    # Fila de categoría (PODADO o REGULAR)
+    if len(values) >= 4 and (values[1].upper() in ['PODADO', 'REGULAR'] or values[0].upper() in ['PODADO', 'REGULAR']):
+        tipo_madera = values[0] if values[0] != ' ' and is_first_in_category else ' '
         tipo = values[1]
         diametro_clase = values[2]
         trozos = values[3]
@@ -31,10 +33,12 @@ def format_data_row(row, is_first_in_category=False):
         second_line = ' ' + ' '.join(values[4:])
         return f"{first_line} \n{second_line} \n"
 
-    elif len(values) >= 3 and values[0] == '*' and values[1] == '*':
+    # Fila de subtotal
+    elif len(values) >= 4 and values[0] == '*' and values[1] == '*':
         trozos = values[3]
         return f"* * ... {trozos}  {distribution} \n {' '.join(values[4:])} \n"
 
+    # Fila de datos común
     else:
         first_part = ' '.join(values[:4])
         second_part = ' ' + ' '.join(values[4:])
