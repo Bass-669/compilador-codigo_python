@@ -24,28 +24,21 @@ BORDER = Border(*(Side(style='thin'),)*4)
 ALIGN_R = Alignment(horizontal='right')
 FILL_AMARILLO = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
 
-def incrementar_barra(hasta, paso=1):
-    """Función mejorada con registro de progreso"""
-    nonlocal inicio_barra
-    valor_final = inicio_barra + hasta
-    escribir_log(f"Progreso Torno {torno}: {barra['value']}% -> {valor_final}%")
-    for i in range(barra['value'], valor_final + 1, paso):
-        barra['value'] = i
-        ventana_carga.update_idletasks()
-        time.sleep(0.01)
-
 def configurar_logging():
     """Configura un sistema de logging robusto con rotación de archivos"""
     posibles_rutas = [
         os.path.join(BASE_DIR, CARPETA, "log_tornos.log"),
         os.path.join(tempfile.gettempdir(), "log_tornos.log")
     ]
+    # Configuración básica del logger
     logger = logging.getLogger('TornosLogger')
     logger.setLevel(logging.INFO)
+    # Formato del log
     formatter = logging.Formatter(
         '%(asctime)s - %(levelname)s - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
+    # Probar distintas ubicaciones
     for ruta in posibles_rutas:
         try:
             os.makedirs(os.path.dirname(ruta), exist_ok=True)
@@ -60,6 +53,7 @@ def configurar_logging():
             return logger
         except Exception as e:
             escribir_log(f" \n No se pudo configurar log en {ruta}: {e}", file=sys.stderr)
+    # Si fallan todas las rutas, crear logger de consola
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
@@ -81,204 +75,161 @@ def escribir_log(mensaje, nivel="info"):
     except Exception as e:
         escribir_log(f"Error al escribir en log: {e}", file=sys.stderr)
 
+def pedir_fecha(callback):
+    ventana = tk.Toplevel()
+    ventana.title("Fecha del reporte")
+    ventana.geometry("300x200")
+    ventana.resizable(False, False)
+    tk.Label(ventana, text="Selecciona la fecha:").pack(pady=10)
+    ent_fecha = DateEntry(ventana, date_pattern='dd/MM/yyyy')
+    ent_fecha.pack(pady=10); ent_fecha.set_date(datetime.now())
+    def confirmar():
+        f = ent_fecha.get_date()
+        callback(MESES[f.strftime("%B")], f.day, f.year)
+        ventana.destroy()
+    tk.Button(ventana, text="Aceptar", command=confirmar).pack(pady=10)
+    ventana.grab_set()
+
+def iniciar(texto, torno, mes, dia, anio):
+    mostrar_carga()
+    threading.Thread(target=lambda: ejecutar(texto, torno, mes, dia, anio), daemon=True).start()
+
+def mostrar_carga():
+    """Muestra la ventana de carga de manera persistente"""
+    global ventana_carga, barra
+    if 'ventana_carga' not in globals() or not ventana_carga.winfo_exists():
+        ventana_carga = tk.Toplevel()
+        ventana_carga.title("Procesando datos...")
+        ventana_carga.geometry("400x120")
+        ventana_carga.resizable(False, False)
+        # Evitar que se cierre accidentalmente
+        ventana_carga.protocol("WM_DELETE_WINDOW", lambda: None)
+        tk.Label(ventana_carga, 
+                text="Procesando datos...", 
+                font=("Arial", 12)).pack(pady=10)
+        barra = ttk.Progressbar(ventana_carga, mode='determinate', maximum=100)
+        barra.pack(fill='x', padx=20, pady=5)
+        # Etiqueta para mostrar el torno actual
+        global lbl_estado
+        lbl_estado = tk.Label(ventana_carga, text="", font=("Arial", 10))
+        lbl_estado.pack()
+        ventana_carga.grab_set()
+
+    barra['value'] = 0
+    ventana_carga.deiconify()
+
 def cerrar_carga():
-    if 'ventana_carga' in globals() and ventana_carga.winfo_exists():
-        ventana_carga.destroy()
+    if ventana_carga: ventana_carga.destroy()
 
-# ==============================================
-# NUEVAS FUNCIONES PARA MANEJO DE ARCHIVOS TXT
-# ==============================================
+def obtener_datos():
+    """Función principal que inicia el flujo de entrada de datos"""
+    datos_torno1 = entrada_texto.get("1.0", tk.END).strip()
+    if not datos_torno1:
+        return messagebox.showwarning("Advertencia", "Ingresa los datos del Torno 1.")
+    # Crear ventana para Torno 2
+    ventana_torno2 = tk.Toplevel()
+    ventana_torno2.title("Ingresar datos del Torno 2")
+    # Área de texto con misma configuración
+    texto_torno2 = tk.Text(ventana_torno2, width=100, height=30)
+    texto_torno2.pack(padx=10, pady=10)
+    # Marco para organizar los botones
+    marco_botones = tk.Frame(ventana_torno2)
+    marco_botones.pack(pady=10, fill='x', padx=10)
+    # Botón Regresar (izquierda)
+    btn_regresar = tk.Button(
+        marco_botones,
+        text="Regresar",
+        command=ventana_torno2.destroy,
+        width=15
+    )
+    btn_regresar.pack(side=tk.LEFT, padx=5)
+    # Botón Continuar (derecha)
+    btn_continuar = tk.Button(
+        marco_botones,
+        text="Continuar a Fecha",
+        command=lambda: continuar_a_fecha(ventana_torno2, texto_torno2, datos_torno1),
+        width=15
+    )
+    btn_continuar.pack(side=tk.RIGHT, padx=5)
+    # Poner foco en el área de texto (igual que en Torno 1)
+    texto_torno2.focus_set()
 
-def buscar_archivos_torno(fecha):
-    """
-    Busca los archivos de reporte para los tornos 3011 y 3012 en la fecha especificada.
-    Retorna una tupla con las rutas (torno1_path, torno2_path) o None si no se encuentran.
-    """
-    fecha_str = fecha.strftime("%d-%m-%Y")
-    patron_torno1 = f"Reporte_{fecha_str}_3011.txt"
-    patron_torno2 = f"Reporte_{fecha_str}_3012.txt"
-    
-    # Buscar en las posibles rutas según la estructura proporcionada
-    posibles_rutas = [
-        os.path.join(BASE_DIR, "Reportes_Tornos", "datos"),  # Ruta relativa al ejecutable
-        os.path.join(BASE_DIR, "..", "Reportes_Tornos", "datos"),  # Ruta alternativa
-        os.path.join(BASE_DIR, "..", "..", "Reportes_Tornos", "datos"),  # Otra posible ubicación
-        os.path.join(os.path.dirname(BASE_DIR), "Reportes_Tornos", "datos")  # Ruta absoluta alternativa
-    ]
-    
-    archivos_encontrados = {"3011": None, "3012": None}
-    
-    for ruta in posibles_rutas:
-        try:
-            if not os.path.isdir(ruta):
-                escribir_log(f"Directorio no encontrado: {ruta}", nivel="debug")
-                continue
-                
-            # Listar archivos en el directorio
-            for archivo in os.listdir(ruta):
-                if archivo == patron_torno1:
-                    archivos_encontrados["3011"] = os.path.join(ruta, archivo)
-                elif archivo == patron_torno2:
-                    archivos_encontrados["3012"] = os.path.join(ruta, archivo)
-                        
-            # Si ya encontramos ambos archivos, salir del bucle
-            if all(archivos_encontrados.values()):
-                break
-                
-        except Exception as e:
-            escribir_log(f"Error buscando archivos en {ruta}: {str(e)}", nivel="warning")
-    
-    # Si no encontramos en las rutas estándar, intentar búsqueda flexible
-    if not all(archivos_encontrados.values()):
-        escribir_log("No se encontraron archivos en rutas estándar, intentando búsqueda flexible...", nivel="debug")
-        for ruta in posibles_rutas:
-            try:
-                if not os.path.isdir(ruta):
-                    continue
-                    
-                # Búsqueda flexible por fecha (puede variar el prefijo o formato)
-                for archivo in os.listdir(ruta):
-                    if fecha_str in archivo and archivo.endswith(".txt"):
-                        if "3011" in archivo:
-                            archivos_encontrados["3011"] = os.path.join(ruta, archivo)
-                        elif "3012" in archivo:
-                            archivos_encontrados["3012"] = os.path.join(ruta, archivo)
-                            
-                if all(archivos_encontrados.values()):
-                    break
-                    
-            except Exception as e:
-                escribir_log(f"Error en búsqueda flexible en {ruta}: {str(e)}", nivel="warning")
-    
-    # Registrar resultados de la búsqueda
-    escribir_log(f"Resultados de búsqueda - Torno1: {archivos_encontrados['3011']}, Torno2: {archivos_encontrados['3012']}")
-    
-    return archivos_encontrados["3011"], archivos_encontrados["3012"]
+def continuar_a_fecha(ventana, widget_texto, datos_torno1):
+    """Función para manejar el paso a selección de fecha"""
+    datos_torno2 = widget_texto.get("1.0", tk.END).strip()
+    if not datos_torno2:
+        messagebox.showwarning("Advertencia", "Ingresa los datos del Torno 2.")
+        return
 
-def leer_archivo_torno(ruta_archivo):
-    """
-    Lee el contenido de un archivo de reporte de torno y lo devuelve como texto.
-    Versión modificada para aceptar el formato real de los archivos.
-    """
-    if not ruta_archivo or not os.path.exists(ruta_archivo):
-        escribir_log(f"Archivo no encontrado: {ruta_archivo}", nivel="warning")
-        return None
+    ventana.destroy()
+    pedir_fecha(lambda m,d,a: procesar_ambos_tornos(datos_torno1, datos_torno2, m, d, a))
 
+def ejecutar(txt, torno, mes, dia, anio, callback_final=None):
+    """Función de procesamiento con registro completo de log"""
     try:
-        with open(ruta_archivo, 'r', encoding='utf-8') as f:
-            contenido = f.read()
+        # Registro inicial en el log
+        escribir_log(f"Iniciando procesamiento para Torno {torno} - Fecha: {dia}/{mes}/{anio}")
+        inicio_barra = 0 if torno == 1 else 50
+        barra['value'] = inicio_barra
+        ventana_carga.update_idletasks()
+        def incrementar_barra(hasta, paso=1):
+            """Función mejorada con registro de progreso"""
+            nonlocal inicio_barra
+            valor_final = inicio_barra + hasta
+            escribir_log(f"Progreso Torno {torno}: {barra['value']}% -> {valor_final}%")
+            for i in range(barra['value'], valor_final + 1, paso):
+                barra['value'] = i
+                ventana_carga.update_idletasks()
+                time.sleep(0.01)
 
-        # Normalizar saltos de línea y limpiar espacios
-        contenido = contenido.replace('\r\n', '\n').replace('\r', '\n').strip()
+        # Paso 1: Obtener rendimientos (10%)
+        escribir_log("Obteniendo rendimientos del log...")
+        incrementar_barra(10)
+        fecha_actual = datetime(anio, MESES_NUM[mes], dia).date()
+        rendimiento_log = obtener_rendimientos_de_log(fecha_actual)
+        
+        if rendimiento_log:
+            escribir_log(f"Rendimientos obtenidos - Torno 1: {rendimiento_log.get('torno1', 'N/A')}%, "
+                       f"Torno 2: {rendimiento_log.get('torno2', 'N/A')}%")
 
-        # Verificar que el contenido tenga datos válidos (ahora más flexible)
-        if not contenido:
-            escribir_log(f"Archivo vacío: {ruta_archivo}", nivel="warning")
-            return None
+        # Paso 2: Preparar hoja (30%)
+        escribir_log("Preparando hoja del mes...")
+        incrementar_barra(20)
+        if not preparar_hoja_mes(mes, dia, anio):
+            escribir_log("Error al preparar hoja del mes", nivel="error")
+            if callback_final:
+                callback_final(False)
+            return False
 
-        # Verificar si contiene al menos una línea con "RADIATA" que indica datos válidos
-        if "RADIATA" not in contenido:
-            escribir_log(f"Archivo no contiene datos RADIATA: {ruta_archivo}", nivel="warning")
-            return None
+        # Paso 3: Procesar datos (70%)
+        escribir_log(f"Procesando datos del Torno {torno}...")
+        incrementar_barra(40)
+        bloques, porcentajes = procesar_datos(txt, torno, mes, dia, anio)
+        if bloques is None or porcentajes is None:
+            escribir_log("Error al procesar datos", nivel="error")
+            if callback_final:
+                callback_final(False)
+            return False
 
-        return contenido
+        # Paso 4: Escribir en hoja (100%)
+        escribir_log("Escribiendo datos en hoja mensual...")
+        incrementar_barra(30)
+        resultado = fecha(mes, dia, anio, torno, bloques, porcentajes, 
+                         lambda h: incrementar_barra(h), 
+                         rendimiento_log if torno == 2 else None)
+        if resultado:
+            escribir_log(f"Procesamiento del Torno {torno} completado con éxito \n")
+        else:
+            escribir_log(f"Error en el procesamiento del Torno {torno}", nivel="error")
+        if callback_final and torno == 2:
+            callback_final(resultado)
+        return resultado
 
     except Exception as e:
-        escribir_log(f"Error leyendo archivo {ruta_archivo}: {str(e)}", nivel="error")
-        return None
-
-def mostrar_carga(mensaje="Procesando..."):
-    global ventana_carga, barra, lbl_estado
-    
-    ventana_carga = tk.Toplevel()
-    ventana_carga.title("Procesando datos")
-    ventana_carga.geometry("400x150")
-    ventana_carga.resizable(False, False)
-    ventana_carga.protocol("WM_DELETE_WINDOW", lambda: None)  # Evitar cierre manual
-    
-    # Barra de progreso indeterminada
-    barra = ttk.Progressbar(ventana_carga, mode='indeterminate')
-    barra.pack(fill='x', padx=20, pady=20)
-    barra.start()  # Iniciar animación
-    
-    # Etiqueta de estado
-    lbl_estado = tk.Label(ventana_carga, text=mensaje, font=("Arial", 10))
-    lbl_estado.pack()
-    
-    # Forzar actualización de la ventana
-    ventana_carga.update_idletasks()
-    ventana_carga.grab_set()
-
-
-# ==============================================
-# MODIFICACIONES AL FLUJO PRINCIPAL
-# ==============================================
-
-def pedir_fecha():
-    # Usar ventana_fecha consistentemente para la ventana de fecha
-    ventana_fecha = tk.Toplevel(ventana_principal)
-    ventana_fecha.title("Fecha del reporte")
-    ventana_fecha.geometry("300x200")
-    ventana_fecha.resizable(False, False)
-    
-    tk.Label(ventana_fecha, text="Selecciona la fecha:").pack(pady=10)
-    ent_fecha = DateEntry(ventana_fecha, date_pattern='dd/MM/yyyy')
-    ent_fecha.pack(pady=10)
-    ent_fecha.set_date(datetime.now())
-    
-    def procesar():
-        try:
-            fecha_seleccionada = ent_fecha.get_date()
-            mes = MESES[fecha_seleccionada.strftime("%B")]
-            dia = fecha_seleccionada.day
-            anio = fecha_seleccionada.year
-            
-            mostrar_carga("Buscando archivos de reporte...")
-            
-            archivo_torno1, archivo_torno2 = buscar_archivos_torno(fecha_seleccionada)
-            
-            if not archivo_torno1 or not archivo_torno2:
-                cerrar_carga()
-                messagebox.showerror(
-                    "Error", 
-                    f"No se encontraron los archivos de reporte para la fecha {fecha_seleccionada.strftime('%d/%m/%Y')}"
-                )
-                return
-                
-            lbl_estado.config(text="Leyendo archivos...")
-            ventana_carga.update()
-            
-            datos_torno1 = leer_archivo_torno(archivo_torno1)
-            datos_torno2 = leer_archivo_torno(archivo_torno2)
-            
-            if not datos_torno1 or not datos_torno2:
-                cerrar_carga()
-                messagebox.showerror(
-                    "Error", 
-                    "Los archivos de reporte no contienen datos válidos"
-                )
-                return
-                
-            lbl_estado.config(text="Procesando datos...")
-            ventana_carga.update()
-            
-            ventana_fecha.destroy()  # Usar ventana_fecha en lugar de ventana
-            procesar_ambos_tornos(datos_torno1, datos_torno2, mes, dia, anio)
-            
-        except Exception as e:
-            cerrar_carga()
-            escribir_log(f"Error in procesar(): {str(e)}", nivel="error")
-            messagebox.showerror("Error", f"Ocurrió un error: {str(e)}")
-        finally:
-            if 'ventana_carga' in globals() and ventana_carga.winfo_exists():
-                ventana_carga.destroy()
-
-    tk.Button(ventana_fecha, text="Procesar", command=procesar).pack(pady=10)
-    ventana_fecha.grab_set()
-
-# ==============================================
-# FUNCIONES EXISTENTES (CON MODIFICACIONES MENORES)
-# ==============================================
+        escribir_log(f"Error crítico en Torno {torno}: {str(e)}", nivel="error")
+        if callback_final and torno == 2:
+            callback_final(False)
+        return False
 
 def obtener_rendimientos_de_log(fecha_ingresada):
     """Función optimizada para obtener rendimientos de una fecha específica"""
@@ -337,47 +288,67 @@ def procesar_ambos_tornos(datos_torno1, datos_torno2, mes, dia, anio):
 
     def mostrar_resultado_final(exito):
         """Muestra el mensaje final asegurando visibilidad"""
+        # Cerrar ventana de carga primero
         ventana_carga.destroy()
-        ventana_principal.deiconify()
         
+        # Forzar enfoque en la ventana principal
+        ventana.attributes('-topmost', True)  # Temporalmente siempre visible
+        ventana.lift()
+        ventana.focus_force()
+        ventana.update_idletasks()
+        
+        # Mostrar mensaje
         if exito:
-            mensaje = tk.Toplevel(ventana_principal)
+            # Messagebox con enfoque garantizado
+            mensaje = tk.Toplevel(ventana)
             mensaje.title("Proceso Completado")
             mensaje.geometry("400x150")
+            mensaje.resizable(False, False)
+            # Contenido del mensaje
             tk.Label(mensaje, 
-                   text="Éxito ✅ Valores actualizados correctamente\n"
-                        f"Fecha: {dia}/{mes}/{anio}", 
-                   pady=20).pack()
-            tk.Button(mensaje, text="Aceptar", command=ventana_principal.destroy).pack(pady=10)
+                    text="Éxito ✅ Valores actualizados correctamente para el día:\n"
+                         f"Fecha: {dia}/{mes}/{anio}", pady=20).pack()
+
+            tk.Button(mensaje, text="Aceptar", command=ventana.destroy,
+                    width=15).pack(pady=10)
+            # Configuración de enfoque
             mensaje.grab_set()
+            mensaje.focus_force()
+            mensaje.attributes('-topmost', True)
+            # Posicionamiento centrado
+            mensaje.update_idletasks()
+            x = ventana.winfo_x() + (ventana.winfo_width() - mensaje.winfo_width()) // 2
+            y = ventana.winfo_y() + (ventana.winfo_height() - mensaje.winfo_height()) // 2
+            mensaje.geometry(f"+{x}+{y}")
+            # Restaurar estado normal después de mostrar
+            ventana.attributes('-topmost', False)
         else:
-            messagebox.showerror("Error", "Ocurrió un error durante el procesamiento")
+            # Para errores usamos messagebox estándar pero con enfoque
+            ventana.bell()  # Sonido de alerta
+            messagebox.showerror(
+                "Error", 
+                "❌ Ocurrió un error durante el procesamiento\n"
+                "Revise el archivo de log para más detalles",
+                parent=ventana
+            )
+            ventana.destroy()
 
     def tarea_principal():
         try:
             # Procesar Torno 1
-            lbl_estado.config(text="Procesando Torno 1...")
-            ventana_carga.update()
-            bloques1, sumas1 = procesar_datos(datos_torno1, 1, mes, dia, anio)
-            
-            if not bloques1:
-                ventana_principal.after(0, lambda: mostrar_resultado(False))
+            if not ejecutar(datos_torno1, 1, mes, dia, anio):
+                ventana.after(0, lambda: mostrar_resultado_final(False))
                 return
 
             # Procesar Torno 2
-            lbl_estado.config(text="Procesando Torno 2...")
-            ventana_carga.update()
-            bloques2, sumas2 = procesar_datos(datos_torno2, 2, mes, dia, anio)
-            
-            ventana_principal.after(0, lambda: mostrar_resultado(bloques2 is not None))
-            
+            ejecutar(datos_torno2, 2, mes, dia, anio, 
+                    lambda exito: ventana.after(0, lambda: mostrar_resultado_final(exito)))
         except Exception as e:
-            escribir_log(f"Error en procesamiento: {str(e)}", nivel="error")
-            ventana_principal.after(0, lambda: mostrar_resultado(False))
-        finally:
-            ventana_principal.after(0, cerrar_carga)
+            escribir_log(f"Error inesperado: {str(e)}", nivel="error")
+            ventana.after(0, lambda: mostrar_resultado_final(False))
 
     threading.Thread(target=tarea_principal, daemon=True).start()
+
 
 
 def finalizar_proceso():
@@ -586,7 +557,6 @@ def sub_bloques(b):
         else: tmp.append(l)
     if tmp: subs.append(tmp)
     return subs
-
 
 def escribir_valor_bloque(hoja, col_dia, torno, valor, tipo_bloque):
     escribir_log("Inicio de escribir_valor_bloque")
@@ -867,19 +837,11 @@ def dias_en_mes(mes, anio):
     meses_31_dias = ["Enero", "Marzo", "Mayo", "Julio", "Agosto", "Octubre", "Diciembre"]
     return 31 if mes in meses_31_dias else 30
 
-# INTERFAZ PRINCIPAL
-ventana_principal = tk.Tk()
-ventana_principal.title("Sistema de Reportes de Tornos Automático")
-ventana_principal.geometry("400x200")
-
-tk.Label(ventana_principal, 
-        text="Sistema Automático de Reportes de Tornos", 
-        font=("Arial", 12)).pack(pady=20)
-
-tk.Button(ventana_principal, 
-         text="Seleccionar Fecha", 
-         command=pedir_fecha,
-         font=("Arial", 12),
-         width=20).pack(pady=10)
-
-ventana_principal.mainloop()
+# Cambiar el botón principal para usar la nueva función
+ventana = tk.Tk()
+ventana.title("Ingresar datos del Torno 1")
+entrada_texto = tk.Text(ventana, width=100, height=30)
+entrada_texto.pack(padx=10, pady=10)
+tk.Button(ventana, text="Continuar al Torno 2", command=obtener_datos).pack(pady=10)
+entrada_texto.focus_set()
+ventana.mainloop()
