@@ -19,16 +19,26 @@ def format_data_row(row):
             first_line_parts.append(text)
     
     # Manejar distribución (4ta columna) que puede tener tabla anidada
-    if len(cells) > 3 and cells[3].find('table'):
-        dist_text = cells[3].find('table').find_all('td')[-1].get_text(strip=True)
-        first_line_parts[3] = dist_text
+    if len(cells) > 3:
+        dist_cell = cells[3]
+        if dist_cell.find('table'):
+            # Extraer solo el valor numérico de la tabla anidada
+            dist_text = dist_cell.find('table').find_all('td')[-1].get_text(strip=True)
+            first_line_parts[3] = dist_text.split('&nbsp;')[0].strip()
+        elif dist_cell.get_text(strip=True) == '':
+            first_line_parts[3] = ' '
     
     # Construir primera línea con 2 espacios antes del porcentaje
-    first_line = ' '.join(first_line_parts[:3]) + '  ' + first_line_parts[3] if len(first_line_parts) > 3 else ' '.join(first_line_parts)
+    first_line = ' '.join(first_line_parts[:3])
+    if len(first_line_parts) > 3:
+        first_line += '  ' + first_line_parts[3]  # Dos espacios antes del porcentaje
     
     # Procesar segunda línea (resto de columnas)
     second_line_parts = []
     for cell in cells[4:]:
+        # Omitir celdas que contienen tablas (ya procesadas)
+        if cell.find('table'):
+            continue
         text = cell.get_text(strip=True)
         if text not in ('', '&nbsp;'):
             second_line_parts.append(text)
