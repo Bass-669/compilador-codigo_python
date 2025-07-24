@@ -2,7 +2,7 @@ from bs4 import BeautifulSoup
 import os
 import sys
 
-def format_data_row(row):
+def format_data_row(row, is_first_in_category=False):
     cells = row.find_all('td', class_=['RWReport', 'RWReportSUM'])
     if not cells or len(cells) < 5:
         return None
@@ -22,7 +22,7 @@ def format_data_row(row):
     # Determinar si es una fila de categoría (PODADO/REGULAR) o de datos
     if len(values) >= 3 and (values[1].upper() in ['PODADO', 'REGULAR'] or values[0].upper() in ['PODADO', 'REGULAR']):
         # Es una fila de categoría
-        tipo_madera = values[0] if values[0] != ' ' else 'RADIATA'
+        tipo_madera = values[0] if (values[0] != ' ' and is_first_in_category) else ' '
         tipo = values[1]
         diametro_clase = values[2]
         trozos = values[3]
@@ -35,6 +35,11 @@ def format_data_row(row):
         second_line = ' ' + ' '.join(values[5:])
         
         return f"{first_line} \n{second_line} \n"
+    elif len(values) >= 3 and values[0] == '*' and values[1] == '*':
+        # Es una fila de subtotal (* * ...)
+        trozos = values[3]
+        distribucion = values[4] if len(values) > 4 else ' '
+        return f"* * ... {trozos}  {distribucion} \n {' '.join(values[5:])} \n"
     else:
         # Es una fila de datos normal
         first_part = ' '.join(values[:4])
@@ -53,17 +58,28 @@ def process_html_file(html_file, output_file):
     
     diameter_table = h4_diametro.find_next('table')
     output_lines = []
+    current_category = None
+    is_first_in_category = True
     
     # Procesar todas las filas excepto la última (TOTAL)
     for row in diameter_table.find_all('tr')[1:-1]:
-        formatted_row = format_data_row(row)
+        # Verificar si es un cambio de categoría
+        first_cell = row.find('td', class_=['RWReport', 'RWReportSUM'])
+        if first_cell:
+            cell_text = first_cell.get_text(strip=True)
+            if cell_text and cell_text.upper() in ['PODADO', 'REGULAR']:
+                current_category = cell_text
+                is_first_in_category = True
+        
+        formatted_row = format_data_row(row, is_first_in_category)
         if formatted_row:
             output_lines.append(formatted_row)
+            is_first_in_category = False
     
     # Procesar fila de subtotal (* * ...)
     subtotal_row = diameter_table.find_all('tr')[-2]
     if '*' in subtotal_row.get_text():
-        formatted_subtotal = format_data_row(subtotal_row)
+        formatted_subtotal = format_data_row(subtotal_row, False)
         if formatted_subtotal:
             output_lines.append(formatted_subtotal)
     
