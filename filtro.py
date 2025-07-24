@@ -3,7 +3,8 @@ import os
 import sys
 
 def format_data_row(row, is_first_in_category=False):
-    cells = row.find_all('td', class_=['RWReport', 'RWReportSUM'])
+    # SOLO celdas del primer nivel (evita <td> anidados)
+    cells = row.find_all('td', class_=['RWReport', 'RWReportSUM'], recursive=False)
     if not cells or len(cells) < 5:
         return None
 
@@ -11,38 +12,33 @@ def format_data_row(row, is_first_in_category=False):
     distribution = ' '
 
     for cell in cells:
-        # Si la celda contiene una tabla (caso distribución)
         if cell.find('table'):
             inner_td = cell.find('td', class_='RWReport')
             if inner_td:
                 distribution = inner_td.get_text(strip=True)
-            # OJO: no añadimos nada a values (ni siquiera ' ')
-            continue
+            continue  # no agregar celda de distribución a values
         else:
             text = cell.get_text(strip=True)
             values.append(text if text not in ('', '&nbsp;') else ' ')
 
-    # Fila de categoría (PODADO o REGULAR)
     if len(values) >= 4 and (values[1].upper() in ['PODADO', 'REGULAR'] or values[0].upper() in ['PODADO', 'REGULAR']):
         tipo_madera = values[0] if values[0] != ' ' and is_first_in_category else ' '
         tipo = values[1]
         diametro_clase = values[2]
         trozos = values[3]
-
         first_line = f"{tipo_madera} {tipo} {diametro_clase} {trozos}  {distribution}"
         second_line = ' ' + ' '.join(values[4:])
         return f"{first_line} \n{second_line} \n"
 
-    # Fila de subtotal
     elif len(values) >= 4 and values[0] == '*' and values[1] == '*':
         trozos = values[3]
         return f"* * ... {trozos}  {distribution} \n {' '.join(values[4:])} \n"
 
-    # Fila de datos común
     else:
         first_part = ' '.join(values[:4])
         second_part = ' ' + ' '.join(values[4:])
         return f" {first_part} \n{second_part} \n"
+
 
 
 
