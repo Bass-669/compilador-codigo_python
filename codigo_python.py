@@ -595,8 +595,8 @@ def procesar_datos(entrada, torno, mes, dia, anio):
             # backup_path = os.path.join(BASE_DIR, CARPETA, "Reporte IR Tornos copia_de_seguridad.xlsx")
             # shutil.copy(RUTA_ENTRADA, backup_path)
             # escribir_log(f"Copia de seguridad creada")
-        except Exception as e:
-            escribir_log(f"No se pudo crear copia de seguridad: {str(e)}", nivel="warning")
+        # except Exception as e:
+        #     escribir_log(f"No se pudo crear copia de seguridad: {str(e)}", nivel="warning")
         return bloques_detectados, sumas_ad_por_bloque
     except PermissionError:
         error_msg = "El archivo Excel fue abierto durante la ejecución. Operación cancelada."
