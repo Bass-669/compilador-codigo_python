@@ -90,11 +90,6 @@ def pedir_fecha(callback):
     tk.Button(ventana, text="Aceptar", command=confirmar).pack(pady=10)
     ventana.grab_set()
 
-
-# ==============================================
-# NUEVAS FUNCIONES PARA MANEJO DE ARCHIVOS TXT
-# ==============================================
-
 def buscar_archivos_torno(fecha):
     """
     Busca los archivos de reporte para los tornos 3011 y 3012 en la fecha especificada.
@@ -193,11 +188,6 @@ def leer_archivo_torno(ruta_archivo):
         escribir_log(f"Error leyendo archivo {ruta_archivo}: {str(e)}", nivel="error")
         return None
 
-# ==============================================
-# NUEVAS FUNCIONES PARA MANEJO DE ARCHIVOS TXT
-# ==============================================
-
-
 def iniciar(texto, torno, mes, dia, anio):
     mostrar_carga()
     threading.Thread(target=lambda: ejecutar(texto, torno, mes, dia, anio), daemon=True).start()
@@ -228,39 +218,6 @@ def mostrar_carga():
 
 def cerrar_carga():
     if ventana_carga: ventana_carga.destroy()
-
-# def obtener_datos():
-#     """Función principal que inicia el flujo de entrada de datos"""
-#     datos_torno1 = entrada_texto.get("1.0", tk.END).strip()
-#     if not datos_torno1:
-#         return messagebox.showwarning("Advertencia", "Ingresa los datos del Torno 1.")
-#     # Crear ventana para Torno 2
-#     ventana_torno2 = tk.Toplevel()
-#     ventana_torno2.title("Ingresar datos del Torno 2")
-#     # Área de texto con misma configuración
-#     texto_torno2 = tk.Text(ventana_torno2, width=100, height=30)
-#     texto_torno2.pack(padx=10, pady=10)
-#     # Marco para organizar los botones
-#     marco_botones = tk.Frame(ventana_torno2)
-#     marco_botones.pack(pady=10, fill='x', padx=10)
-#     # Botón Regresar (izquierda)
-#     btn_regresar = tk.Button(
-#         marco_botones,
-#         text="Regresar",
-#         command=ventana_torno2.destroy,
-#         width=15
-#     )
-#     btn_regresar.pack(side=tk.LEFT, padx=5)
-#     # Botón Continuar (derecha)
-#     btn_continuar = tk.Button(
-#         marco_botones,
-#         text="Continuar a Fecha",
-#         command=lambda: continuar_a_fecha(ventana_torno2, texto_torno2, datos_torno1),
-#         width=15
-#     )
-#     btn_continuar.pack(side=tk.RIGHT, padx=5)
-#     # Poner foco en el área de texto (igual que en Torno 1)
-#     texto_torno2.focus_set()
 
 def obtener_datos():
     """Función principal que obtiene datos de archivos TXT en lugar de la interfaz"""
@@ -293,8 +250,6 @@ def obtener_datos():
     except Exception as e:
         messagebox.showerror("Error", f"Error al obtener datos: {str(e)}")
         escribir_log(f"Error en obtener_datos: {str(e)}", nivel="error")
-
-
 
 def continuar_a_fecha(ventana, widget_texto, datos_torno1):
     """Función para manejar el paso a selección de fecha"""
@@ -427,6 +382,17 @@ def obtener_rendimientos_de_log(fecha_ingresada):
 def procesar_ambos_tornos(datos_torno1, datos_torno2, mes, dia, anio):
     """Función principal con mensaje único al final"""
     mostrar_carga()
+    
+    # Crear copia de seguridad ANTES de procesar cualquier torno
+    try:
+        backup_path = os.path.join(BASE_DIR, CARPETA, "Reporte IR Tornos copia_de_seguridad.xlsx")
+        shutil.copy(RUTA_ENTRADA, backup_path)
+        escribir_log(f"Copia de seguridad creada en: {backup_path}")
+    except Exception as e:
+        escribir_log(f"No se pudo crear copia de seguridad inicial: {str(e)}", nivel="error")
+        messagebox.showerror("Error", "No se pudo crear la copia de seguridad inicial. Verifique permisos.")
+        ventana_carga.destroy()
+        return
 
     def mostrar_resultado_final(exito):
         """Muestra el mensaje final asegurando visibilidad"""
@@ -490,8 +456,6 @@ def procesar_ambos_tornos(datos_torno1, datos_torno2, mes, dia, anio):
             ventana.after(0, lambda: mostrar_resultado_final(False))
 
     threading.Thread(target=tarea_principal, daemon=True).start()
-
-
 
 def finalizar_proceso():
     """Cierra todas las ventanas y muestra el resultado final"""
@@ -626,11 +590,11 @@ def procesar_datos(entrada, torno, mes, dia, anio):
             except Exception as e:
                 escribir_log(f"Error procesando bloque: {str(e)}", nivel="error")
                 continue
-        # Copia de seguridad
-        try:
-            backup_path = os.path.join(BASE_DIR, CARPETA, "Reporte IR Tornos copia_de_seguridad.xlsx")
-            shutil.copy(RUTA_ENTRADA, backup_path)
-            escribir_log(f"Copia de seguridad creada")
+        # # Copia de seguridad
+        # try:
+            # backup_path = os.path.join(BASE_DIR, CARPETA, "Reporte IR Tornos copia_de_seguridad.xlsx")
+            # shutil.copy(RUTA_ENTRADA, backup_path)
+            # escribir_log(f"Copia de seguridad creada")
         except Exception as e:
             escribir_log(f"No se pudo crear copia de seguridad: {str(e)}", nivel="warning")
         return bloques_detectados, sumas_ad_por_bloque
@@ -765,7 +729,6 @@ def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque
                 # Validación extrema
                 torno1 = float(rendimiento_log.get('torno1', 0))
                 torno2 = float(rendimiento_log.get('torno2', 0))
-                
                 # Escritura directa con notación de coordenadas
                 hoja[f'{letra_actual}32'] = torno1/100
                 hoja[f'{letra_actual}33'] = torno2/100
@@ -843,9 +806,8 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, increm
             except:
                 messagebox.showwarning("Advertencia", "Error al cerrar el workbook")
                 escribir_log("Advertencia", "Error al cerrar el workbook")
-        # 7. Actualizar barra de progreso
-        # incrementar_barra(100)
-        # 8. Mostrar mensaje de éxito solo si todo salió bien
+
+        # 7. Mostrar mensaje de éxito solo si todo salió bien
         if exito:
             escribir_log(f"Éxito ✅ Valores actualizados correctamente")
             escribir_log(f"Fin de la ejecucucion")
@@ -979,16 +941,6 @@ def dias_en_mes(mes, anio):
     meses_31_dias = ["Enero", "Marzo", "Mayo", "Julio", "Agosto", "Octubre", "Diciembre"]
     return 31 if mes in meses_31_dias else 30
 
-# # Cambiar el botón principal para usar la nueva función
-# ventana = tk.Tk()
-# ventana.title("Ingresar datos del Torno 1")
-# entrada_texto = tk.Text(ventana, width=100, height=30)
-# entrada_texto.pack(padx=10, pady=10)
-# tk.Button(ventana, text="Continuar al Torno 2", command=obtener_datos).pack(pady=10)
-# entrada_texto.focus_set()
-# ventana.mainloop()
-
-# [Nuevo código - versión simplificada]
 if __name__ == "__main__":
     ventana = tk.Tk()
     ventana.title("Procesador de Reportes de Tornos")
@@ -1003,7 +955,7 @@ if __name__ == "__main__":
     btn_iniciar = tk.Button(
         ventana,
         text="Iniciar Proceso",
-        command=obtener_datos,  # ¡Esta función ahora manejará la lectura de TXT!
+        command=obtener_datos,
         width=20,
         height=2
     )
