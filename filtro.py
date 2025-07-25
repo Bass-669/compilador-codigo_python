@@ -2,44 +2,6 @@ from bs4 import BeautifulSoup
 import os
 import sys
 
-# def format_data_row(row, is_first_in_category=False):
-#     # SOLO celdas del primer nivel (evita <td> anidados)
-#     cells = row.find_all('td', class_=['RWReport', 'RWReportSUM'], recursive=False)
-#     if not cells or len(cells) < 5:
-#         return None
-
-#     values = []
-#     distribution = ' '
-
-#     for cell in cells:
-#         if cell.find('table'):
-#             inner_td = cell.find('td', class_='RWReport')
-#             if inner_td:
-#                 distribution = inner_td.get_text(strip=True)
-#             continue  # no agregar celda de distribución a values
-#         else:
-#             text = cell.get_text(strip=True)
-#             values.append(text if text not in ('', '&nbsp;') else ' ')
-
-#     if len(values) >= 4 and (values[1].upper() in ['PODADO', 'REGULAR'] or values[0].upper() in ['PODADO', 'REGULAR']):
-#         tipo_madera = values[0] if values[0] != ' ' and is_first_in_category else ' '
-#         tipo = values[1]
-#         diametro_clase = values[2]
-#         trozos = values[3]
-#         first_line = f"{tipo_madera} {tipo} {diametro_clase} {trozos}  {distribution}"
-#         second_line = ' ' + ' '.join(values[4:])
-#         return f"{first_line} \n{second_line} \n"
-
-#     elif len(values) >= 4 and values[0] == '*' and values[1] == '*':
-#         trozos = values[3]
-#         return f"* * ... {trozos}  {distribution} \n {' '.join(values[4:])} \n"
-
-#     else:
-#         first_part = ' '.join(values[:4])
-#         second_part = ' ' + ' '.join(values[4:])
-#         return f" {first_part} \n{second_part} \n"
-
-
 def format_data_row(row, is_first_in_category=False):
     # Solo celdas de primer nivel (evita celdas anidadas)
     cells = row.find_all('td', class_=['RWReport', 'RWReportSUM'], recursive=False)
@@ -80,47 +42,6 @@ def format_data_row(row, is_first_in_category=False):
         second_part = ' ' + ' '.join(values[4:])
         return f" {first_part} \n{second_part} \n"
 
-
-# def process_html_file(html_file, output_file):
-#     with open(html_file, 'r', encoding='utf-8') as file:
-#         html = file.read()
-    
-#     soup = BeautifulSoup(html, 'html.parser')
-#     h4_diametro = soup.find('h4', string='Diámetro')
-#     if not h4_diametro:
-#         print(f"Advertencia: No se encontró la tabla de diámetros en {html_file}")
-#         return False
-    
-#     diameter_table = h4_diametro.find_next('table')
-#     output_lines = []
-#     current_category = None
-#     is_first_in_category = True
-    
-#     # Procesar todas las filas excepto la última (TOTAL)
-#     for row in diameter_table.find_all('tr')[1:-1]:
-#         # Verificar si es un cambio de categoría
-#         first_cell = row.find('td', class_=['RWReport', 'RWReportSUM'])
-#         if first_cell:
-#             cell_text = first_cell.get_text(strip=True)
-#             if cell_text and cell_text.upper() in ['PODADO', 'REGULAR']:
-#                 current_category = cell_text
-#                 is_first_in_category = True
-        
-#         formatted_row = format_data_row(row, is_first_in_category)
-#         if formatted_row:
-#             output_lines.append(formatted_row)
-#             is_first_in_category = False
-    
-#     # Procesar fila de subtotal (* * ...)
-#     subtotal_row = diameter_table.find_all('tr')[-2]
-#     if '*' in subtotal_row.get_text():
-#         formatted_subtotal = format_data_row(subtotal_row, False)
-#         if formatted_subtotal:
-#             output_lines.append(formatted_subtotal)
-    
-#     # Escribir en el archivo de salida
-#     with open(output_file, 'w', encoding='utf-8') as f:
-#         f.write(''.join(output_lines))
 
 
 def process_html_file(html_file, output_file):
