@@ -99,12 +99,12 @@ def buscar_archivos_torno(fecha):
     patron_torno1 = f"Reporte_{fecha_str}_3011.txt"
     patron_torno2 = f"Reporte_{fecha_str}_3012.txt"
     
-    # Buscar en las posibles rutas según la estructura proporcionada
+    # Buscar en las posibles rutas
     posibles_rutas = [
-        os.path.join(BASE_DIR, "Reportes_Tornos", "datos"),  # Ruta relativa al ejecutable
-        os.path.join(BASE_DIR, "..", "Reportes_Tornos", "datos"),  # Ruta alternativa
-        os.path.join(BASE_DIR, "..", "..", "Reportes_Tornos", "datos"),  # Otra posible ubicación
-        os.path.join(os.path.dirname(BASE_DIR), "Reportes_Tornos", "datos")  # Ruta absoluta alternativa
+        os.path.join(BASE_DIR, "Reportes_Tornos", "datos"),
+        os.path.join(BASE_DIR, "..", "Reportes_Tornos", "datos"),
+        os.path.join(BASE_DIR, "..", "..", "Reportes_Tornos", "datos"),
+        os.path.join(os.path.dirname(BASE_DIR), "Reportes_Tornos", "datos")
     ]
     
     archivos_encontrados = {"3011": None, "3012": None}
@@ -122,14 +122,14 @@ def buscar_archivos_torno(fecha):
                 elif archivo == patron_torno2:
                     archivos_encontrados["3012"] = os.path.join(ruta, archivo)
                         
-            # Si ya encontramos ambos archivos, salir del bucle
+            # Si se encuentran los archivos salir del bucle
             if all(archivos_encontrados.values()):
                 break
                 
         except Exception as e:
             escribir_log(f"Error buscando archivos en {ruta}: {str(e)}", nivel="warning")
     
-    # Si no encontramos en las rutas estándar, intentar búsqueda flexible
+    # Si no se encuentran las rutas estándar, intentar búsqueda flexible
     if not all(archivos_encontrados.values()):
         escribir_log("No se encontraron archivos en rutas estándar, intentando búsqueda flexible...", nivel="debug")
         for ruta in posibles_rutas:
@@ -172,12 +172,12 @@ def leer_archivo_torno(ruta_archivo):
         # Normalizar saltos de línea y limpiar espacios
         contenido = contenido.replace('\r\n', '\n').replace('\r', '\n').strip()
 
-        # Verificar que el contenido tenga datos válidos (ahora más flexible)
+        # Verificar que el contenido tenga datos válidos
         if not contenido:
             escribir_log(f"Archivo vacío: {ruta_archivo}", nivel="warning")
             return None
 
-        # Verificar si contiene al menos una línea con "RADIATA" que indica datos válidos
+        # Verificar si contiene una línea con "RADIATA"
         if "RADIATA" not in contenido:
             escribir_log(f"Archivo no contiene datos RADIATA: {ruta_archivo}", nivel="warning")
             return None
@@ -200,14 +200,14 @@ def mostrar_carga():
         ventana_carga.title("Procesando datos...")
         ventana_carga.geometry("400x120")
         ventana_carga.resizable(False, False)
-        # Evitar que se cierre accidentalmente
+        # Evitar que se cierre accidental
         ventana_carga.protocol("WM_DELETE_WINDOW", lambda: None)
         tk.Label(ventana_carga, 
                 text="Procesando datos...", 
                 font=("Arial", 12)).pack(pady=10)
         barra = ttk.Progressbar(ventana_carga, mode='determinate', maximum=100)
         barra.pack(fill='x', padx=20, pady=5)
-        # Etiqueta para mostrar el torno actual
+        # Mostrar el torno actual
         global lbl_estado
         lbl_estado = tk.Label(ventana_carga, text="", font=("Arial", 10))
         lbl_estado.pack()
@@ -222,13 +222,11 @@ def cerrar_carga():
 def obtener_datos():
     """Función principal que obtiene datos de archivos TXT en lugar de la interfaz"""
     try:
-        # Pedir fecha primero
+        # Pedir fecha
         def procesar_con_fecha(mes, dia, anio):
             fecha_seleccionada = datetime(anio, MESES_NUM[mes], dia)
-            
             # Buscar archivos de tornos
             archivo_torno1, archivo_torno2 = buscar_archivos_torno(fecha_seleccionada)
-            
             if not archivo_torno1 or not archivo_torno2:
                 messagebox.showerror("Error", "No se encontraron los archivos de reporte para la fecha seleccionada")
                 return
@@ -236,7 +234,6 @@ def obtener_datos():
             # Leer contenidos
             datos_torno1 = leer_archivo_torno(archivo_torno1)
             datos_torno2 = leer_archivo_torno(archivo_torno2)
-            
             if not datos_torno1 or not datos_torno2:
                 messagebox.showerror("Error", "No se pudieron leer los archivos de reporte")
                 return
@@ -343,7 +340,7 @@ def obtener_rendimientos_de_log(fecha_ingresada):
         with open(log_path, 'r', encoding='utf-8') as f:
             lineas = f.readlines()
 
-        # Patrón mejorado para capturar fecha y rendimientos
+        # Patrón para capturar fecha y rendimientos
         patron = re.compile(
             r"Fecha:\s*" + re.escape(fecha_str) + 
             r".*?Torno\s*1:\s*Rendimiento:\s*(\d+\.\d+).*?" +
@@ -383,7 +380,7 @@ def procesar_ambos_tornos(datos_torno1, datos_torno2, mes, dia, anio):
     """Función principal con mensaje único al final"""
     mostrar_carga()
     
-    # Crear copia de seguridad ANTES de procesar cualquier torno
+    # Crear copia de seguridad ANTES de procesar
     try:
         backup_path = os.path.join(BASE_DIR, CARPETA, "Reporte IR Tornos copia_de_seguridad.xlsx")
         shutil.copy(RUTA_ENTRADA, backup_path)
@@ -396,18 +393,14 @@ def procesar_ambos_tornos(datos_torno1, datos_torno2, mes, dia, anio):
 
     def mostrar_resultado_final(exito):
         """Muestra el mensaje final asegurando visibilidad"""
-        # Cerrar ventana de carga primero
+        # Cerrar ventana de carga
         ventana_carga.destroy()
-        
         # Forzar enfoque en la ventana principal
-        ventana.attributes('-topmost', True)  # Temporalmente siempre visible
+        ventana.attributes('-topmost', True)
         ventana.lift()
         ventana.focus_force()
         ventana.update_idletasks()
-        
-        # Mostrar mensaje
         if exito:
-            # Messagebox con enfoque garantizado
             mensaje = tk.Toplevel(ventana)
             mensaje.title("Proceso Completado")
             mensaje.geometry("400x150")
@@ -419,11 +412,9 @@ def procesar_ambos_tornos(datos_torno1, datos_torno2, mes, dia, anio):
 
             tk.Button(mensaje, text="Aceptar", command=ventana.destroy,
                     width=15).pack(pady=10)
-            # Configuración de enfoque
             mensaje.grab_set()
             mensaje.focus_force()
             mensaje.attributes('-topmost', True)
-            # Posicionamiento centrado
             mensaje.update_idletasks()
             x = ventana.winfo_x() + (ventana.winfo_width() - mensaje.winfo_width()) // 2
             y = ventana.winfo_y() + (ventana.winfo_height() - mensaje.winfo_height()) // 2
@@ -460,15 +451,11 @@ def procesar_ambos_tornos(datos_torno1, datos_torno2, mes, dia, anio):
 def finalizar_proceso():
     """Cierra todas las ventanas y muestra el resultado final"""
     global ventana_carga
-
-    # Cerrar ventana de carga si existe
+    # Cerrar ventana de carga
     if 'ventana_carga' in globals() and ventana_carga.winfo_exists():
         ventana_carga.destroy()
-
-    # Cerrar ventana principal de entrada de datos
     ventana.destroy()
-
-    # Mostrar mensaje final (solo una vez)
+    # Mostrar mensaje final
     messagebox.showinfo("✅ Los datos de ambos tornos se han actualizado correctamente\n")
 
 def procesar_datos(entrada, torno, mes, dia, anio):
@@ -590,13 +577,7 @@ def procesar_datos(entrada, torno, mes, dia, anio):
             except Exception as e:
                 escribir_log(f"Error procesando bloque: {str(e)}", nivel="error")
                 continue
-        # # Copia de seguridad
-        # try:
-            # backup_path = os.path.join(BASE_DIR, CARPETA, "Reporte IR Tornos copia_de_seguridad.xlsx")
-            # shutil.copy(RUTA_ENTRADA, backup_path)
-            # escribir_log(f"Copia de seguridad creada")
-        # except Exception as e:
-        #     escribir_log(f"No se pudo crear copia de seguridad: {str(e)}", nivel="warning")
+
         return bloques_detectados, sumas_ad_por_bloque
     except PermissionError:
         error_msg = "El archivo Excel fue abierto durante la ejecución. Operación cancelada."
@@ -631,7 +612,6 @@ def Pasar_referencia(celda_origen):
         messagebox.showerror("Error", f"Formato de celda inválido: {celda_origen}")
         escribir_log("Error", f"Formato de celda inválido: {celda_origen}")
         raise ValueError(f"Formato de celda inválido: {celda_origen}")
-    # FORMATO REQUERIDO POR EXCEL
     referencia = f"='IR diario '!{celda_origen}"
     return referencia
 
@@ -684,7 +664,7 @@ def escribir_valor_bloque(hoja, col_dia, torno, valor, tipo_bloque):
             valor_final = float(str(valor).replace(",", "."))
     except ValueError:
         valor_final = 0.0
-    celda = hoja.cell(row=fila_valor, column=col_dia) # Escribir el valor en la celda
+    celda = hoja.cell(row=fila_valor, column=col_dia)
     celda.value = valor_final
     celda.number_format = '0'
 
@@ -693,7 +673,7 @@ def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque
     escribir_log("Inicio de escribir_valores_resumen_bloques")
     letra_actual = openpyxl.utils.get_column_letter(col_dia)
     try:
-        # 1. Escribir fórmulas para los cálculos
+        # 1. Escribir fórmulas
         # hoja.cell(row=34, column=col_dia, 
         #          value=f"=IFERROR(AVERAGE({letra_actual}32:{letra_actual}33), 0)").number_format = '0.00%'
         hoja.cell(row=38, column=col_dia, 
@@ -720,13 +700,11 @@ def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque
         # Escribir rendimientos del log si existen
         if rendimiento_log and isinstance(rendimiento_log, dict):
             try:
-                # Desproteger hoja si es necesario
                 try:
                     hoja.protection.disable()
                 except:
                     pass
-                
-                # Validación extrema
+
                 torno1 = float(rendimiento_log.get('torno1', 0))
                 torno2 = float(rendimiento_log.get('torno2', 0))
                 # Escritura directa con notación de coordenadas
@@ -734,7 +712,6 @@ def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque
                 hoja[f'{letra_actual}33'] = torno2/100
                 hoja[f'{letra_actual}32'].number_format = '0.00%'
                 hoja[f'{letra_actual}33'].number_format = '0.00%'
-                
                 # Forzar guardado
                 hoja.parent.save(RUTA_ENTRADA)
                 
@@ -818,7 +795,7 @@ def preparar_hoja_mes(mes, dia, anio):
     nombre_hoja = f"IR {mes} {anio}"
     col_dia = dia + 1
     try:
-        # Paso 1: Verificar si la hoja ya existe con openpyxl
+        # Paso 1: Verificar si la hoja ya existe
         wb_check = openpyxl.load_workbook(RUTA_ENTRADA)
         if nombre_hoja in wb_check.sheetnames:
             hoja_existente = wb_check[nombre_hoja]
@@ -878,7 +855,7 @@ def preparar_hoja_mes(mes, dia, anio):
         wb.Close(SaveChanges=True)
         excel.Quit()
         pythoncom.CoUninitialize()
-        # Paso 3: Configurar hoja con openpyxl
+        # Paso 3: Configurar hoja
         wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
         hoja = wb2[nombre_hoja]
         filas_a_limpiar = [2,3,4,7,8,9,12,13,14,17,18,19,22,23,24,27,28,31,32,33,34,37,38,39,40]
@@ -946,7 +923,7 @@ if __name__ == "__main__":
     ventana.title("Procesador de Reportes de Tornos")
     ventana.geometry("400x200")  # Ventana más pequeña y centrada
     
-    # Logo/Mensaje principal (opcional)
+    # Logo/Mensaje principal
     tk.Label(ventana, 
              text="Procesador Automático de Reportes",
              font=("Arial", 14)).pack(pady=20)
