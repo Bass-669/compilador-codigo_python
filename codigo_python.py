@@ -769,13 +769,98 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, increm
             escribir_log(f"Éxito ✅ Valores actualizados correctamente")
             escribir_log(f"Fin de la ejecucucion")
 
+# def preparar_hoja_mes(mes, dia, anio):
+#     # Crea la hoja del mes si no existe y la configura con fórmulas
+#     escribir_log("Inicio de preparar_hoja_mes")
+#     nombre_hoja = f"IR {mes} {anio}"
+#     col_dia = dia + 1
+#     try:
+#         # Paso 1: Verificar si la hoja ya existe
+#         wb_check = openpyxl.load_workbook(RUTA_ENTRADA)
+#         if nombre_hoja in wb_check.sheetnames:
+#             hoja_existente = wb_check[nombre_hoja]
+#             celdas_clave = [
+#                 hoja_existente.cell(row=3, column=col_dia).value,
+#                 hoja_existente.cell(row=4, column=col_dia).value,
+#                 hoja_existente.cell(row=8, column=col_dia).value,
+#                 hoja_existente.cell(row=9, column=col_dia).value
+#             ]
+#             if any(cell is not None and str(cell).strip() != "" for cell in celdas_clave):
+#                 escribir_log(f"El día {dia} ya tiene datos en {nombre_hoja}")
+#                 wb_check.close()
+#                 return True
+#             else:
+#                 escribir_log(f"La hoja {nombre_hoja} ya existe y se usará tal cual.")
+#                 wb_check.close()
+#                 return True
+#         wb_check.close()
+#         # Paso 2: Crear hoja nueva si no existe
+#         import win32com.client as win32, pythoncom
+#         pythoncom.CoInitialize()
+#         excel = win32.DispatchEx("Excel.Application")
+#         excel.Visible = False
+#         excel.DisplayAlerts = False
+#         wb = excel.Workbooks.Open(os.path.abspath(RUTA_ENTRADA), UpdateLinks=0)
+#         hojas = [h.Name for h in wb.Sheets]
+#         if nombre_hoja not in hojas:
+#             # Buscar hoja anterior para copiar
+#             hojas_ir = [h for h in hojas if h.startswith("IR ") and len(h.split()) == 3]
+#             def total_meses(nombre):
+#                 try:
+#                     _, mes_str, anio_str = nombre.split()
+#                     return int(anio_str) * 12 + MESES_NUM[mes_str]
+#                 except:
+#                     return -1
+#             hojas_ordenadas = sorted(hojas_ir, key=total_meses)
+#             total_nueva = int(anio) * 12 + MESES_NUM[mes]
+#             hoja_anterior = None
+#             for h in hojas_ordenadas:
+#                 if total_meses(h) < total_nueva:
+#                     hoja_anterior = h
+#                 else:
+#                     break
+#             if not hoja_anterior:
+#                 messagebox.showwarning("Orden inválido", f"No se encontró hoja anterior para '{nombre_hoja}'")
+#                 wb.Close(SaveChanges=False)
+#                 excel.Quit()
+#                 pythoncom.CoUninitialize()
+#                 return False
+#             idx_anterior = hojas.index(hoja_anterior)
+#             insert_idx = min(idx_anterior + 2, wb.Sheets.Count)
+#             wb.Sheets(hoja_anterior).Copy(After=wb.Sheets(insert_idx - 1))
+#             nueva_hoja = wb.ActiveSheet
+#             nueva_hoja.Name = nombre_hoja
+#             shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
+#             wb.Save()
+#         wb.Close(SaveChanges=True)
+#         excel.Quit()
+#         pythoncom.CoUninitialize()
+#         # Paso 3: Configurar hoja
+#         wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
+#         hoja = wb2[nombre_hoja]
+                
+#         filas_a_limpiar = [2,3,4,7,8,9,12,13,14,17,18,19,22,23,24,27,28,31,32,33,34,37,38,39,40]
+#         for fila in filas_a_limpiar:
+#             for col in range(2, 35):
+#                 celda = hoja.cell(row=fila, column=col)
+#                 if not isinstance(celda, openpyxl.cell.cell.MergedCell):
+#                     celda.value = ""
+
+#         # Cambiar título del gráfico
+#         for chart in nueva_hoja.ChartObjects():
+#             chart.Chart.HasTitle = True
+#             chart.Chart.ChartTitle.Text = f"IR Diario Tornos {mes}"
+#             chart.Chart.ChartTitle.Font.Size = 14
+#             chart.Chart.ChartTitle.Font.Bold = True
+
 def preparar_hoja_mes(mes, dia, anio):
-    # Crea la hoja del mes si no existe y la configura con fórmulas
+    # Crea la hoja del mes si no existe y la configura con fórmulas y graficos
     escribir_log("Inicio de preparar_hoja_mes")
     nombre_hoja = f"IR {mes} {anio}"
     col_dia = dia + 1
+
     try:
-        # Paso 1: Verificar si la hoja ya existe
+        # PASO 1: Verificar si la hoja ya existe y tiene datos
         wb_check = openpyxl.load_workbook(RUTA_ENTRADA)
         if nombre_hoja in wb_check.sheetnames:
             hoja_existente = wb_check[nombre_hoja]
@@ -790,68 +875,84 @@ def preparar_hoja_mes(mes, dia, anio):
                 wb_check.close()
                 return True
             else:
-                escribir_log(f"La hoja {nombre_hoja} ya existe y se usará tal cual.")
+                escribir_log(f"Hoja {nombre_hoja} existe pero está vacía para el día {dia}")
                 wb_check.close()
-                return True
-        wb_check.close()
-        # Paso 2: Crear hoja nueva si no existe
-        import win32com.client as win32, pythoncom
+        else:
+            wb_check.close()
+
+        # PASO 2: Crear hoja nueva usando win32com 
         pythoncom.CoInitialize()
         excel = win32.DispatchEx("Excel.Application")
         excel.Visible = False
         excel.DisplayAlerts = False
-        wb = excel.Workbooks.Open(os.path.abspath(RUTA_ENTRADA), UpdateLinks=0)
-        hojas = [h.Name for h in wb.Sheets]
-        if nombre_hoja not in hojas:
-            # Buscar hoja anterior para copiar
-            hojas_ir = [h for h in hojas if h.startswith("IR ") and len(h.split()) == 3]
-            def total_meses(nombre):
-                try:
-                    _, mes_str, anio_str = nombre.split()
-                    return int(anio_str) * 12 + MESES_NUM[mes_str]
-                except:
-                    return -1
-            hojas_ordenadas = sorted(hojas_ir, key=total_meses)
-            total_nueva = int(anio) * 12 + MESES_NUM[mes]
-            hoja_anterior = None
-            for h in hojas_ordenadas:
-                if total_meses(h) < total_nueva:
-                    hoja_anterior = h
-                else:
-                    break
-            if not hoja_anterior:
-                messagebox.showwarning("Orden inválido", f"No se encontró hoja anterior para '{nombre_hoja}'")
-                wb.Close(SaveChanges=False)
-                excel.Quit()
-                pythoncom.CoUninitialize()
-                return False
-            idx_anterior = hojas.index(hoja_anterior)
-            insert_idx = min(idx_anterior + 2, wb.Sheets.Count)
-            wb.Sheets(hoja_anterior).Copy(After=wb.Sheets(insert_idx - 1))
-            nueva_hoja = wb.ActiveSheet
-            nueva_hoja.Name = nombre_hoja
-            shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
-            wb.Save()
-        wb.Close(SaveChanges=True)
-        excel.Quit()
-        pythoncom.CoUninitialize()
-        # Paso 3: Configurar hoja
-        wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
-        hoja = wb2[nombre_hoja]
         
-        for chart in hoja._charts:
-            if hasattr(chart, 'title'):
-                # Crear un objeto Text con el nuevo título
-                new_title = Title(text=Text(f"IR Diario Tornos {mes}"))
-                chart.title = new_title  # Asignar el objeto Title correctamente
-                escribir_log(f"Título del gráfico actualizado a: {chart.title.text}")
+        try:
+            wb = excel.Workbooks.Open(os.path.abspath(RUTA_ENTRADA), UpdateLinks=0)
+            hojas = [h.Name for h in wb.Sheets]
+
+            if nombre_hoja not in hojas:
+                # Buscar hoja anterior para copiar (basado en orden cronológico)
+                hojas_ir = [h for h in hojas if h.startswith("IR ") and len(h.split()) == 3]
                 
+                def total_meses(nombre):
+                    try:
+                        _, mes_str, anio_str = nombre.split()
+                        return int(anio_str) * 12 + MESES_NUM[mes_str]
+                    except:
+                        return -1
+                
+                hojas_ordenadas = sorted(hojas_ir, key=total_meses)
+                total_nueva = int(anio) * 12 + MESES_NUM[mes]
+                hoja_anterior = None
+                
+                for h in hojas_ordenadas:
+                    if total_meses(h) < total_nueva:
+                        hoja_anterior = h
+                    else:
+                        break
+
+                if not hoja_anterior:
+                    messagebox.showwarning("Error", f"No hay hoja anterior para copiar en {nombre_hoja}")
+                    return False
+
+                # Copiar hoja anterior
+                idx_anterior = hojas.index(hoja_anterior)
+                insert_idx = min(idx_anterior + 2, wb.Sheets.Count)
+                wb.Sheets(hoja_anterior).Copy(After=wb.Sheets(insert_idx - 1))
+                nueva_hoja = wb.ActiveSheet
+                nueva_hoja.Name = nombre_hoja
+
+                # Modificar grafico
+                for chart in nueva_hoja.ChartObjects():
+                    chart.Chart.HasTitle = True
+                    chart.Chart.ChartTitle.Text = f"IR Diario Tornos {mes}"
+                    chart.Chart.ChartTitle.Font.Size = 14
+                    chart.Chart.ChartTitle.Font.Bold = True
+                    chart.Chart.Axes(1).HasTitle = True  # Eje X
+                    chart.Chart.Axes(2).HasTitle = True  # Eje Y
+
+                # Guardar cambios
+                wb.Save()
+                shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
+
+        finally:
+            wb.Close(SaveChanges=True)
+            excel.Quit()
+            pythoncom.CoUninitialize()
+
+        # PASO 3: Configurar fórmulas y limpieza con openpyxl
+        wb_openpyxl = openpyxl.load_workbook(RUTA_ENTRADA)
+        hoja = wb_openpyxl[nombre_hoja]
+
+        # Limpiar celdas específicas
         filas_a_limpiar = [2,3,4,7,8,9,12,13,14,17,18,19,22,23,24,27,28,31,32,33,34,37,38,39,40]
         for fila in filas_a_limpiar:
             for col in range(2, 35):
                 celda = hoja.cell(row=fila, column=col)
                 if not isinstance(celda, openpyxl.cell.cell.MergedCell):
                     celda.value = ""
+
+
         dias_mes = dias_en_mes(mes, anio)
         for col in range(2, 2 + dias_mes):
             dia_mes = col - 1
