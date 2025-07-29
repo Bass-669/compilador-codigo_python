@@ -861,7 +861,8 @@ def preparar_hoja_mes(mes, dia, anio):
 
     try:
         # --- PASO 1: Verificar si la hoja ya existe y tiene datos ---
-        with openpyxl.load_workbook(RUTA_ENTRADA) as wb_check:
+        wb_check = openpyxl.load_workbook(RUTA_ENTRADA)
+        try:
             if nombre_hoja in wb_check.sheetnames:
                 hoja_existente = wb_check[nombre_hoja]
                 celdas_clave = [
@@ -875,6 +876,8 @@ def preparar_hoja_mes(mes, dia, anio):
                     return True
                 else:
                     escribir_log(f"Hoja {nombre_hoja} existe pero está vacía para el día {dia}")
+        finally:
+            wb_check.close()
 
         # --- PASO 2: Crear hoja nueva usando win32com ---
         pythoncom.CoInitialize()
@@ -930,14 +933,14 @@ def preparar_hoja_mes(mes, dia, anio):
                 # Guardar cambios
                 wb.Save()
                 shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
-
         finally:
             wb.Close(SaveChanges=True)
             excel.Quit()
             pythoncom.CoUninitialize()
 
         # --- PASO 3: Configurar fórmulas y limpieza con openpyxl ---
-        with openpyxl.load_workbook(RUTA_ENTRADA) as wb_openpyxl:
+        wb_openpyxl = openpyxl.load_workbook(RUTA_ENTRADA)
+        try:
             hoja = wb_openpyxl[nombre_hoja]
 
             # Limpiar celdas específicas
@@ -986,6 +989,8 @@ def preparar_hoja_mes(mes, dia, anio):
                     hoja.cell(row=fila, column=col_limpiar, value=" ")
 
             wb_openpyxl.save(RUTA_ENTRADA)
+        finally:
+            wb_openpyxl.close()
 
         # --- PASO 4: Forzar recálculo completo ---
         pythoncom.CoInitialize()
