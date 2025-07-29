@@ -881,6 +881,7 @@ def preparar_hoja_mes(mes, dia, anio):
             wb_check.close()
 
         # PASO 2: Crear hoja nueva usando win32com 
+        import win32com.client as win32, pythoncom
         pythoncom.CoInitialize()
         excel = win32.DispatchEx("Excel.Application")
         excel.Visible = False
