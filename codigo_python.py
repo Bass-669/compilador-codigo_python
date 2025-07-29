@@ -922,14 +922,34 @@ def preparar_hoja_mes(mes, dia, anio):
                 nueva_hoja = wb.ActiveSheet
                 nueva_hoja.Name = nombre_hoja
 
-                # Modificar gráfico
-                for chart in nueva_hoja.ChartObjects():
-                    chart.Chart.HasTitle = True
-                    chart.Chart.ChartTitle.Text = f"IR Diario Tornos {mes}"
-                    chart.Chart.ChartTitle.Font.Size = 14
-                    chart.Chart.ChartTitle.Font.Bold = True
-                    chart.Chart.Axes(1).HasTitle = True  # Eje X
-                    chart.Chart.Axes(2).HasTitle = True  # Eje Y
+                # # Modificar gráfico
+                # for chart in nueva_hoja.ChartObjects():
+                #     chart.Chart.HasTitle = True
+                #     chart.Chart.ChartTitle.Text = f"IR Diario Tornos {mes}"
+                #     chart.Chart.ChartTitle.Font.Size = 14
+                #     chart.Chart.ChartTitle.Font.Bold = True
+                #     chart.Chart.Axes(1).HasTitle = True  # Eje X
+                #     chart.Chart.Axes(2).HasTitle = True  # Eje Y
+
+                                # Modificar gráficos (solo el primero)
+                chart_objects = nueva_hoja.ChartObjects()
+                if chart_objects.Count > 0:
+                    # Modificar solo el primer gráfico
+                    chart = chart_objects(1).Chart
+                    chart.HasTitle = True
+                    chart.ChartTitle.Text = f"IR Diario {mes} {anio}"
+                    chart.ChartTitle.Font.Size = 14
+                    chart.ChartTitle.Font.Bold = True
+                    
+                    # Eliminar texto "NONE" en ejes
+                    chart.Axes(1).HasTitle = True  # Eje X
+                    chart.Axes(1).AxisTitle.Text = "Días"
+                    chart.Axes(2).HasTitle = True  # Eje Y
+                    chart.Axes(2).AxisTitle.Text = "Porcentaje"
+                    
+                    # Si hay segundo gráfico, dejarlo sin modificar
+                    if chart_objects.Count > 1:
+                        chart_objects(2).Chart.HasTitle = False
 
                 # Guardar cambios
                 wb.Save()
