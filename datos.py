@@ -1,14 +1,9 @@
-# -*- coding: utf-8 -*-
 import logging
 import sys
 import time
 from pathlib import Path
 
-## ---------------------------------------------------------------
-## 1. CONFIGURACIÓN INICIAL
-## ---------------------------------------------------------------
-
-# Configuración rápida inicial
+# configuracion de inicio
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -16,10 +11,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger('TornosLogger')
 logger.info("Iniciando proceso...")
-
-## ---------------------------------------------------------------
-## 2. CARGA SEGURA DE DEPENDENCIAS
-## ---------------------------------------------------------------
 
 try:
     import pythoncom
@@ -32,15 +23,12 @@ except ImportError as e:
         input("Presione Enter para salir...")
     sys.exit(1)
 
-## ---------------------------------------------------------------
-## 3. CONFIGURACIÓN COMPLETA DEL LOG
-## ---------------------------------------------------------------
-
 def configurar_log_completo():
+    # Configuracion del documento log
     try:
         base_path = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).parent
         log_path = base_path / "tornos.log"
-        file_handler = logging.FileHandler(str(log_path), encoding='utf-8')  # Sin rotación
+        file_handler = logging.FileHandler(str(log_path), encoding='utf-8')
         file_handler.setFormatter(logging.Formatter(
             '%(asctime)s - %(levelname)s - %(message)s',
             datefmt='%Y-%m-%d %H:%M:%S'
@@ -51,20 +39,8 @@ def configurar_log_completo():
 
 configurar_log_completo()
 
-
 def reintentos(func, max_intentos=3, espera=5, mensaje_reintento=None):
-    """
-    Ejecuta una función con reintentos si falla por archivo bloqueado.
-    
-    Args:
-        func (callable): Función a ejecutar
-        max_intentos (int): Número máximo de reintentos
-        espera (int): Segundos entre reintentos
-        mensaje_reintento (str): Mensaje personalizado para reintentos
-        
-    Returns:
-        bool: True si tuvo éxito, False si falló después de todos los intentos
-    """
+    # Sistema de reintentos en caso de fallos
     intento = 0
     while intento < max_intentos:
         intento += 1
@@ -78,19 +54,12 @@ def reintentos(func, max_intentos=3, espera=5, mensaje_reintento=None):
                     time.sleep(espera)
                     continue
                 else:
-                    logger.error("No se pudo acceder al archivo después de varios intentos. ¿Está abierto en otro programa?\n")
+                    logger.error("No se pudo acceder al archivo después de varios intentos.\n")
             logger.error(f"Error en operación: {str(e)}", exc_info=True)
             return False
 
-
-
-## ---------------------------------------------------------------
-## 4. FUNCIONES PRINCIPALES (CORREGIDAS)
-## ---------------------------------------------------------------
-
-
 def procesar_archivo_odc():
-    """Procesamiento completo con gestión robusta de reintentos"""
+    # Procesamiento del archivo odc
     max_intentos = 20
     espera_entre_intentos = 10
     intento = 0
@@ -104,7 +73,7 @@ def procesar_archivo_odc():
         try:
             logger.info(f"Intento {intento}/{max_intentos}")
             
-            # 1. LOCALIZAR ARCHIVO
+            # 1. Encontar el archivo odc
             base_path = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).parent
             nombre_archivo = "CLNALMISOTPRD rwExport report_Peeling_Production query.odc"
             odc_path = base_path / nombre_archivo
@@ -112,22 +81,20 @@ def procesar_archivo_odc():
             if not odc_path.exists():
                 raise FileNotFoundError(f"No se encontró el archivo ODC: {nombre_archivo}")
 
-            # 2. CONFIGURAR EXCEL (nueva instancia cada intento)
+            # 2. Configuracion del Excel
             pythoncom.CoInitialize()
             excel = win32com.client.DispatchEx("Excel.Application")
             excel.Visible = False
             excel.DisplayAlerts = False
             excel.ScreenUpdating = False
             
-            # 3. ABRIR ARCHIVO
+            # 3. Abrir archivo
             logger.info("Abriendo archivo ODC...")
             workbook = excel.Workbooks.Open(
                 str(odc_path.absolute()),
                 UpdateLinks=0,
                 ReadOnly=True
             )
-            
-            # 4. ESPERA CON CONTROL (versión mejorada)
             datos_cargados = False
             start_time = time.time()
             while (time.time() - start_time) < 15:
@@ -139,16 +106,13 @@ def procesar_archivo_odc():
                     time.sleep(1)
                 except:
                     time.sleep(1)
-            
             if not datos_cargados:
                 logger.warning("Tiempo de espera agotado, continuando...")
-            
-            # 5. GUARDAR RESULTADOS (con verificación adicional)
+
+            # 5. Guardar datos
             output_path = odc_path.parent / "datos_actualizados.xlsx"
             if output_path.exists():
                 logger.warning("El archivo de salida ya existe, se sobrescribirá")
-            
-            # Intento de guardado con manejo específico
             try:
                 workbook.SaveAs(
                     str(output_path),
@@ -157,7 +121,7 @@ def procesar_archivo_odc():
                 )
                 logger.info(f"Datos exportados correctamente a: {output_path.name}")
                 
-                # 6. GENERAR REPORTE (solo si el guardado fue exitoso)
+                # 6. Generar reporte si no hay errores
                 try:
                     datos = pd.read_excel(output_path)
                     
@@ -191,7 +155,7 @@ def procesar_archivo_odc():
                                 mensaje += "Torno 2: Sin datos\n"
                         
                         logger.info(mensaje)
-                
+                # En caso de errores
                 except Exception as e:
                     logger.error(f"Error generando reporte: {str(e)}")
                 
@@ -200,7 +164,7 @@ def procesar_archivo_odc():
             except Exception as e:
                 if "locked" in str(e).lower() or "bloqueado" in str(e).lower() or "acceso" in str(e).lower():
                     logger.warning(f"Archivo bloqueado durante guardado (intento {intento}/{max_intentos})")
-                    raise  # Forzará un reintento
+                    raise
                 logger.error(f"Error al guardar: {str(e)}")
                 resultado = False
                 
@@ -216,7 +180,7 @@ def procesar_archivo_odc():
                 resultado = False
                 
         finally:
-            # LIMPIEZA DE RECURSOS (asegurada)
+
             try:
                 if workbook is not None:
                     workbook.Close(False)
@@ -225,15 +189,10 @@ def procesar_archivo_odc():
                 pythoncom.CoUninitialize()
             except Exception as e:
                 logger.warning(f"Error limpiando recursos Excel: {str(e)}")
-                # No afecta el resultado, continuamos
-    
+
     return resultado
 
-
-## ---------------------------------------------------------------
-## 5. EJECUCIÓN PRINCIPAL
-## ---------------------------------------------------------------
-
+# Ejecucion del codigo
 if __name__ == "__main__":
     logger.info("=== INICIO DEL PROCESO ===")
     
