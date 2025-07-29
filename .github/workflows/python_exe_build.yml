@@ -37,7 +37,6 @@ jobs:
 
     - name: Build EXE
       run: pyinstaller --onefile --windowed --name=procesador_excel_gui --hidden-import=openpyxl --hidden-import=tkinter --exclude-module=numpy codigo_python.py
-      # run: pyinstaller --onefile --windowed --name=procesador_excel_gui --hidden-import=openpyxl --hidden-import=tkinter --exclude-module=numpy prueba.py
 
     - name: Crear archivo LEEME
       run: echo "Este archivo fue generado automáticamente. Es seguro y no contiene malware." > dist\LEEME.txt
@@ -101,7 +100,7 @@ jobs:
 #           --collect-all pandas `
 #           --collect-all pytz `
 #           --collect-all dateutil `
-#           prueba.py
+#           datos.py
 
 #     - name: Crear archivo LEEME
 #       run: echo "Este archivo fue generado automáticamente. Es seguro y no contiene malware." > dist\LEEME.txt
