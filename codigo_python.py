@@ -838,12 +838,12 @@ def preparar_hoja_mes(mes, dia, anio):
         # Paso 3: Configurar hoja
         wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
         hoja = wb2[nombre_hoja]
-
         
-        # Cambiar titulo del grafico con el mes correspondiente
         for chart in hoja._charts:
             if hasattr(chart, 'title'):
-                chart.title.text = f"IR Diario Tornos {mes}"  # Nuevo título
+                # Crear un objeto Text con el nuevo título
+                new_title = Title(text=Text(f"IR Diario Tornos {mes}"))
+                chart.title = new_title  # Asignar el objeto Title correctamente
                 escribir_log(f"Título del gráfico actualizado a: {chart.title.text}")
                 
         filas_a_limpiar = [2,3,4,7,8,9,12,13,14,17,18,19,22,23,24,27,28,31,32,33,34,37,38,39,40]
