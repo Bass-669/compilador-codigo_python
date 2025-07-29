@@ -794,14 +794,14 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, increm
 #                 wb_check.close()
 #                 return True
 #         wb_check.close()
-#         # Paso 2: Crear hoja nueva si no existe
-#         import win32com.client as win32, pythoncom
-#         pythoncom.CoInitialize()
-#         excel = win32.DispatchEx("Excel.Application")
-#         excel.Visible = False
-#         excel.DisplayAlerts = False
-#         wb = excel.Workbooks.Open(os.path.abspath(RUTA_ENTRADA), UpdateLinks=0)
-#         hojas = [h.Name for h in wb.Sheets]
+        # # Paso 2: Crear hoja nueva si no existe
+        # import win32com.client as win32, pythoncom
+        # pythoncom.CoInitialize()
+        # excel = win32.DispatchEx("Excel.Application")
+        # excel.Visible = False
+        # excel.DisplayAlerts = False
+        # wb = excel.Workbooks.Open(os.path.abspath(RUTA_ENTRADA), UpdateLinks=0)
+        # hojas = [h.Name for h in wb.Sheets]
 #         if nombre_hoja not in hojas:
 #             # Buscar hoja anterior para copiar
 #             hojas_ir = [h for h in hojas if h.startswith("IR ") and len(h.split()) == 3]
@@ -886,6 +886,8 @@ def preparar_hoja_mes(mes, dia, anio):
         excel = win32.DispatchEx("Excel.Application")
         excel.Visible = False
         excel.DisplayAlerts = False
+        wb = excel.Workbooks.Open(os.path.abspath(RUTA_ENTRADA), UpdateLinks=0)
+        hojas = [h.Name for h in wb.Sheets]
         
         try:
             wb = excel.Workbooks.Open(os.path.abspath(RUTA_ENTRADA), UpdateLinks=0)
