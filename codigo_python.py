@@ -931,25 +931,28 @@ def preparar_hoja_mes(mes, dia, anio):
                 #     chart.Chart.Axes(1).HasTitle = True  # Eje X
                 #     chart.Chart.Axes(2).HasTitle = True  # Eje Y
 
+                # Modificación de gráficos
                 chart_objects = nueva_hoja.ChartObjects()
+                # Configurar primer gráfico
                 if chart_objects.Count > 0:
-                    chart = chart_objects(1).Chart
-                    chart.HasTitle = True
-                    chart.ChartTitle.Text = f"IR Diario {mes} {anio}"
-                    chart.ChartTitle.Font.Size = 14
-                    chart.ChartTitle.Font.Bold = True
-                    chart.Axes(1).HasTitle = True  # Eje X
-                    chart.Axes(1).AxisTitle.Text = "Días"
-                    chart.Axes(2).HasTitle = True  # Eje Y
-                    chart.Axes(2).AxisTitle.Text = "Porcentaje"
-
-                    # Si hay segundo gráfico, dejarlo sin modificar
-                    if chart_objects.Count > 1:
-                        chart_objects(2).Chart.HasTitle = False
-
-                # Guardar cambios
-                wb.Save()
-                shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
+                    chart1 = chart_objects(1).Chart
+                    chart1.HasTitle = True
+                    chart1.ChartTitle.Text = f"IR Diario {mes} {anio}"
+                    chart1.ChartTitle.Font.Size = 14
+                    chart1.ChartTitle.Font.Bold = True
+                    # Configurar ejes sin texto "NONE"
+                    chart1.Axes(1).HasTitle = False  # Eje X
+                    chart1.Axes(2).HasTitle = False  # Eje Y
+                # Configurar segundo gráfico (si existe)
+                if chart_objects.Count > 1:
+                    chart2 = chart_objects(2).Chart
+                    chart2.HasTitle = True
+                    chart2.ChartTitle.Text = f"Resumen Mensual {mes}"
+                    chart2.ChartTitle.Font.Size = 12
+                    chart2.ChartTitle.Font.Bold = True
+                    # Configurar ejes sin texto "NONE"
+                    chart2.Axes(1).HasTitle = False  # Eje X
+                    chart2.Axes(2).HasTitle = False  # Eje Y
         finally:
             wb.Close(SaveChanges=True)
             excel.Quit()
