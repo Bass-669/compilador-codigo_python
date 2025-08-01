@@ -937,22 +937,29 @@ def preparar_hoja_mes(mes, dia, anio):
                 if chart_objects.Count > 0:
                     chart1 = chart_objects(1).Chart
                     chart1.HasTitle = True
-                    chart1.ChartTitle.Text = f"IR Diario {mes} {anio}"
-                    chart1.ChartTitle.Font.Size = 14
+                    chart1.ChartTitle.Text = f"IR TORNOS {mes}"
+                    chart1.ChartTitle.Font.Size = 12
                     chart1.ChartTitle.Font.Bold = True
-                    # Configurar ejes sin texto "NONE"
-                    chart1.Axes(1).HasTitle = False  # Eje X
-                    chart1.Axes(2).HasTitle = False  # Eje Y
-                # Configurar segundo gráfico (si existe)
+                    
+                    # Solución para eliminar NONE en ejes
+                    chart1.Axes(1).HasTitle = True
+                    chart1.Axes(1).AxisTitle.Text = " "  # Espacio en blanco
+                    chart1.Axes(2).HasTitle = True
+                    chart1.Axes(2).AxisTitle.Text = " "  # Espacio en blanco
+                
+                # Configuración para el segundo gráfico (IR DIARIO)
                 if chart_objects.Count > 1:
                     chart2 = chart_objects(2).Chart
                     chart2.HasTitle = True
-                    chart2.ChartTitle.Text = f"Resumen Mensual {mes}"
+                    chart2.ChartTitle.Text = f"IR DIARIO {mes}"
                     chart2.ChartTitle.Font.Size = 12
                     chart2.ChartTitle.Font.Bold = True
-                    # Configurar ejes sin texto "NONE"
-                    chart2.Axes(1).HasTitle = False  # Eje X
-                    chart2.Axes(2).HasTitle = False  # Eje Y
+                    
+                    # Solución para eliminar NONE en ejes
+                    chart2.Axes(1).HasTitle = True
+                    chart2.Axes(1).AxisTitle.Text = " "  # Espacio en blanco
+                    chart2.Axes(2).HasTitle = True
+                    chart2.Axes(2).AxisTitle.Text = " "  # Espacio en blanco
         finally:
             wb.Close(SaveChanges=True)
             excel.Quit()
