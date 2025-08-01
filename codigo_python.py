@@ -937,7 +937,7 @@ def preparar_hoja_mes(mes, dia, anio):
                 if chart_objects.Count > 0:
                     chart1 = chart_objects(1).Chart
                     chart1.HasTitle = True
-                    chart1.ChartTitle.Text = f"IR TORNOS {mes}"
+                    chart1.ChartTitle.Text = f"IR Diario Tornos {mes}"
                     chart1.ChartTitle.Font.Size = 12
                     chart1.ChartTitle.Font.Bold = True
                     
@@ -951,7 +951,7 @@ def preparar_hoja_mes(mes, dia, anio):
                 if chart_objects.Count > 1:
                     chart2 = chart_objects(2).Chart
                     chart2.HasTitle = True
-                    chart2.ChartTitle.Text = f"IR DIARIO {mes}"
+                    chart2.ChartTitle.Text = f"IR v/s R%"
                     chart2.ChartTitle.Font.Size = 12
                     chart2.ChartTitle.Font.Bold = True
                     
