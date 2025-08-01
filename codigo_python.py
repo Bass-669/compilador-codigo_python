@@ -760,7 +760,7 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, increm
             escribir_log(f"Fin de la ejecucucion")
 
 def preparar_hoja_mes(mes, dia, anio):
-    """Crea la hoja del mes si no existe y la configura con fórmulas iniciales."""
+    # Crea la hoja del mes si no existe y la configura con fórmulas iniciales
     escribir_log("Inicio de preparar_hoja_mes")
     nombre_hoja = f"IR {mes} {anio}"
     col_dia = dia + 1
@@ -784,7 +784,7 @@ def preparar_hoja_mes(mes, dia, anio):
                 wb_check.close()
                 return True
         wb_check.close()
-        # --- PASO 2: Crear hoja nueva usando win32com ---
+        # Paso 2: Crear hoja con win32com
         import win32com.client as win32, pythoncom
         pythoncom.CoInitialize()
         excel = win32.DispatchEx("Excel.Application")
@@ -796,7 +796,7 @@ def preparar_hoja_mes(mes, dia, anio):
             hojas = [h.Name for h in wb.Sheets]
 
             if nombre_hoja not in hojas:
-                # Buscar hoja anterior para copiar (basado en orden cronológico)
+                # Buscar hoja anterior para copiar
                 hojas_ir = [h for h in hojas if h.startswith("IR ") and len(h.split()) == 3]
                 
                 def total_meses(nombre):
@@ -836,13 +836,12 @@ def preparar_hoja_mes(mes, dia, anio):
                     chart1.ChartTitle.Text = f"IR Diario Tornos {mes}"
                     chart1.ChartTitle.Font.Size = 12
                     chart1.ChartTitle.Font.Bold = True
-                    
                     # Solución para eliminar NONE en ejes
                     chart1.Axes(1).HasTitle = True
                     chart1.Axes(1).AxisTitle.Text = " "  # Espacio en blanco
                     chart1.Axes(2).HasTitle = True
                     chart1.Axes(2).AxisTitle.Text = " "  # Espacio en blanco
-                
+
                 # Configuración para el segundo gráfico (IR DIARIO)
                 if chart_objects.Count > 1:
                     chart2 = chart_objects(2).Chart
@@ -850,7 +849,6 @@ def preparar_hoja_mes(mes, dia, anio):
                     chart2.ChartTitle.Text = f"IR v/s R%"
                     chart2.ChartTitle.Font.Size = 12
                     chart2.ChartTitle.Font.Bold = True
-                    
                     # Solución para eliminar NONE en ejes
                     chart2.Axes(1).HasTitle = True
                     chart2.Axes(1).AxisTitle.Text = " "  # Espacio en blanco
@@ -861,7 +859,7 @@ def preparar_hoja_mes(mes, dia, anio):
             excel.Quit()
             pythoncom.CoUninitialize()
 
-        # --- PASO 3: Configurar fórmulas y limpieza con openpyxl ---
+        # Paso 3: Configurar fórmulas y limpieza
         wb_openpyxl = openpyxl.load_workbook(RUTA_ENTRADA)
         try:
             hoja = wb_openpyxl[nombre_hoja]
@@ -884,14 +882,14 @@ def preparar_hoja_mes(mes, dia, anio):
 
                 letra = openpyxl.utils.get_column_letter(col)
                 # Fórmulas clave
-                hoja.cell(row=23, column=col, value=f"=IFERROR(({letra}3*{letra}13+{letra}8*{letra}18)/({letra}3+{letra}8), 0)")  # IR Tornos
-                hoja.cell(row=24, column=col, value=f"=IFERROR(({letra}4*{letra}14+{letra}9*{letra}19)/({letra}4+{letra}9), 0)")  # IR Prensas
-                hoja.cell(row=28, column=col, value=f"=IFERROR(({letra}23*({letra}3+{letra}8)+{letra}24*({letra}4+{letra}9))/({letra}3+{letra}4+{letra}8+{letra}9), 0)")  # IR Total
+                hoja.cell(row=23, column=col, value=f"=IFERROR(({letra}3*{letra}13+{letra}8*{letra}18)/({letra}3+{letra}8), 0)")
+                hoja.cell(row=24, column=col, value=f"=IFERROR(({letra}4*{letra}14+{letra}9*{letra}19)/({letra}4+{letra}9), 0)")
+                hoja.cell(row=28, column=col, value=f"=IFERROR(({letra}23*({letra}3+{letra}8)+{letra}24*({letra}4+{letra}9))/({letra}3+{letra}4+{letra}8+{letra}9), 0)")
 
             # Configurar resumen mensual (columna AH)
-            hoja.cell(row=2, column=34, value=int(anio))  # Año
+            hoja.cell(row=2, column=34, value=int(anio))
             for fila in [3,4,8,9]:
-                hoja.cell(row=fila, column=34, value=f"=SUM(B{fila}:AG{fila})")  # Totales producción/scrap
+                hoja.cell(row=fila, column=34, value=f"=SUM(B{fila}:AG{fila})")
             hoja.cell(row=23, column=34, value="=IFERROR((AH3*AH13+AH8*AH18)/(AH3+AH8), 0)")
             hoja.cell(row=24, column=34, value="=IFERROR((AH4*AH14+AH9*AH19)/(AH4+AH9), 0)")
             hoja.cell(row=28, column=34, value="=IFERROR((AH23*(AH3+AH8)+AH24*(AH4+AH9))/(AH3+AH4+AH8+AH9), 0)")
@@ -915,7 +913,6 @@ def preparar_hoja_mes(mes, dia, anio):
         finally:
             wb_openpyxl.close()
 
-        # --- PASO 4: Forzar recálculo completo ---
         pythoncom.CoInitialize()
         excel = win32.DispatchEx("Excel.Application")
         excel.Visible = False
@@ -958,7 +955,7 @@ if __name__ == "__main__":
              text="Procesador Automático de Reportes",
              font=("Arial", 14)).pack(pady=20)
     
-    # Botón de acción principal
+    # Botón de inicio principal
     btn_iniciar = tk.Button(
         ventana,
         text="Iniciar Proceso",
