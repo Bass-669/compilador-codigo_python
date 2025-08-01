@@ -760,34 +760,30 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, increm
             escribir_log(f"Fin de la ejecucucion")
 
 def preparar_hoja_mes(mes, dia, anio):
-    """Prepara la hoja del mes en el archivo Excel, configurando fórmulas y gráficos."""
-    escribir_log(f"Inicio de preparar_hoja_mes para {mes}-{dia}-{anio}")
+    """Crea la hoja del mes si no existe y la configura con fórmulas iniciales."""
+    escribir_log("Inicio de preparar_hoja_mes")
     nombre_hoja = f"IR {mes} {anio}"
     col_dia = dia + 1
-    hoja_nueva = False  # Bandera para saber si la hoja es nueva
-
     try:
-        # --- PASO 1: Verificar si la hoja ya existe y tiene datos ---
+        # Paso 1: Verificar si la hoja ya existe con openpyxl
         wb_check = openpyxl.load_workbook(RUTA_ENTRADA)
-        try:
-            if nombre_hoja in wb_check.sheetnames:
-                hoja_existente = wb_check[nombre_hoja]
-                celdas_clave = [
-                    hoja_existente.cell(row=3, column=col_dia).value,
-                    hoja_existente.cell(row=4, column=col_dia).value,
-                    hoja_existente.cell(row=8, column=col_dia).value,
-                    hoja_existente.cell(row=9, column=col_dia).value
-                ]
-                if any(cell is not None and str(cell).strip() != "" for cell in celdas_clave):
-                    escribir_log(f"El día {dia} ya tiene datos en {nombre_hoja}")
-                    return True
-                else:
-                    escribir_log(f"Hoja {nombre_hoja} existe pero está vacía para el día {dia}")
-                    hoja_nueva = False
+        if nombre_hoja in wb_check.sheetnames:
+            hoja_existente = wb_check[nombre_hoja]
+            celdas_clave = [
+                hoja_existente.cell(row=3, column=col_dia).value,
+                hoja_existente.cell(row=4, column=col_dia).value,
+                hoja_existente.cell(row=8, column=col_dia).value,
+                hoja_existente.cell(row=9, column=col_dia).value
+            ]
+            if any(cell is not None and str(cell).strip() != "" for cell in celdas_clave):
+                escribir_log(f"El día {dia} ya tiene datos en {nombre_hoja}")
+                wb_check.close()
+                return True
             else:
-                hoja_nueva = True
-        finally:
-            wb_check.close()
+                escribir_log(f"La hoja {nombre_hoja} ya existe y se usará tal cual.")
+                wb_check.close()
+                return True
+        wb_check.close()
         # --- PASO 2: Crear hoja nueva usando win32com ---
         import win32com.client as win32, pythoncom
         pythoncom.CoInitialize()
