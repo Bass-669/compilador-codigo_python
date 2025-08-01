@@ -763,7 +763,8 @@ def preparar_hoja_mes(mes, dia, anio):
     """Prepara la hoja del mes en el archivo Excel, configurando fórmulas y gráficos."""
     escribir_log(f"Inicio de preparar_hoja_mes para {mes}-{dia}-{anio}")
     nombre_hoja = f"IR {mes} {anio}"
-    col_dia = dia + 1  # Las columnas empiezan en B (2) para día 1
+    col_dia = dia + 1
+    hoja_nueva = False  # Bandera para saber si la hoja es nueva
 
     try:
         # --- PASO 1: Verificar si la hoja ya existe y tiene datos ---
@@ -772,19 +773,21 @@ def preparar_hoja_mes(mes, dia, anio):
             if nombre_hoja in wb_check.sheetnames:
                 hoja_existente = wb_check[nombre_hoja]
                 celdas_clave = [
-                    hoja_existente.cell(row=3, column=col_dia).value,  # Producción Tornos
-                    hoja_existente.cell(row=4, column=col_dia).value,  # Producción Prensas
-                    hoja_existente.cell(row=8, column=col_dia).value,  # Scrap Tornos
-                    hoja_existente.cell(row=9, column=col_dia).value   # Scrap Prensas
+                    hoja_existente.cell(row=3, column=col_dia).value,
+                    hoja_existente.cell(row=4, column=col_dia).value,
+                    hoja_existente.cell(row=8, column=col_dia).value,
+                    hoja_existente.cell(row=9, column=col_dia).value
                 ]
                 if any(cell is not None and str(cell).strip() != "" for cell in celdas_clave):
                     escribir_log(f"El día {dia} ya tiene datos en {nombre_hoja}")
                     return True
                 else:
                     escribir_log(f"Hoja {nombre_hoja} existe pero está vacía para el día {dia}")
+                    hoja_nueva = False
+            else:
+                hoja_nueva = True
         finally:
             wb_check.close()
-
         # --- PASO 2: Crear hoja nueva usando win32com ---
         import win32com.client as win32, pythoncom
         pythoncom.CoInitialize()
