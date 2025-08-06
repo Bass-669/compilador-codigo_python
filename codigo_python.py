@@ -25,7 +25,7 @@ ALIGN_R = Alignment(horizontal='right')
 FILL_AMARILLO = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
 
 def configurar_logging():
-    # Configuracion de un sistema de logging 
+    # Configuracion de un sistema de logging
     posibles_rutas = [
         os.path.join(BASE_DIR, CARPETA, "log_tornos.log"),
         os.path.join(tempfile.gettempdir(), "log_tornos.log")
