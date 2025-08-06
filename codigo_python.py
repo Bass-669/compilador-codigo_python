@@ -759,6 +759,7 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, increm
             escribir_log(f"Éxito ✅ Valores actualizados correctamente")
             escribir_log(f"Fin de la ejecucucion")
 
+
 def preparar_hoja_mes(mes, dia, anio):
     # Crea la hoja del mes si no existe y la configura con fórmulas iniciales
     escribir_log("Inicio de preparar_hoja_mes")
