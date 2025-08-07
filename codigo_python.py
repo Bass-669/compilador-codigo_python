@@ -696,7 +696,7 @@ def escribir_valores_resumen_bloques(hoja, col_dia, torno, valores_ae_por_bloque
 def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, incrementar_barra, rendimiento_log=None):
     escribir_log("Inicio de fecha")
     # Escribe los datos en la hoja del mes fechas, datos y las referencias
-    nombre_hoja = f"IR {mes} {anio}"
+    nombre_hoja = f"IR {mes} {anio}".strip()
     col_dia = dia + 1
     wb = None
     exito = False
@@ -795,13 +795,16 @@ def preparar_hoja_mes(mes, dia, anio):
             hojas = [h.Name for h in wb.Sheets]
         
             # Verificar si ya existe la hoja con el nombre deseado
-            if nombre_hoja in hojas:
-                escribir_log(f"La hoja '{nombre_hoja}' ya existe. No se creará una nueva.")
+            nombre_hoja_normalizado = nombre_hoja.strip().lower()
+            hojas_normalizadas = [h.strip().lower() for h in hojas]
+            
+            if nombre_hoja_normalizado in hojas_normalizadas:
+                escribir_log(f"La hoja '{nombre_hoja}' ya existe (detectada con normalización). No se creará una nueva.")
                 wb.Close(SaveChanges=False)
                 excel.Quit()
                 pythoncom.CoUninitialize()
                 return True
-        
+
             # Buscar hoja anterior para copiar
             hojas_ir = [h for h in hojas if h.startswith("IR ") and len(h.split()) == 3]
         
