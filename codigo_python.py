@@ -771,11 +771,6 @@ def preparar_hoja_mes(mes, dia, anio):
             wb_check.close()
             return True
 
-            else:
-                escribir_log(f"La hoja {nombre_hoja} ya existe.")
-                wb_check.close()
-                return True
-        wb_check.close()
         # Paso 2: Crear hoja con win32com
         import win32com.client as win32, pythoncom
         pythoncom.CoInitialize()
