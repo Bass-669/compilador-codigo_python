@@ -793,72 +793,87 @@ def preparar_hoja_mes(mes, dia, anio):
         try:
             wb = excel.Workbooks.Open(os.path.abspath(RUTA_ENTRADA), UpdateLinks=0)
             hojas = [h.Name for h in wb.Sheets]
-
-            if nombre_hoja not in hojas:
-                # Buscar hoja anterior para copiar
-                hojas_ir = [h for h in hojas if h.startswith("IR ") and len(h.split()) == 3]
-                
-                def total_meses(nombre):
-                    try:
-                        _, mes_str, anio_str = nombre.split()
-                        return int(anio_str) * 12 + MESES_NUM[mes_str]
-                    except:
-                        return -1
-                
-                hojas_ordenadas = sorted(hojas_ir, key=total_meses)
-                total_nueva = int(anio) * 12 + MESES_NUM[mes]
-                hoja_anterior = None
-                
-                for h in hojas_ordenadas:
-                    if total_meses(h) < total_nueva:
-                        hoja_anterior = h
-                    else:
-                        break
-
-                if not hoja_anterior:
-                    messagebox.showwarning("Error", f"No hay hoja anterior para copiar en {nombre_hoja}")
-                    return False
-
-                # Copiar hoja anterior
-                idx_anterior = hojas.index(hoja_anterior)
-                insert_idx = min(idx_anterior + 2, wb.Sheets.Count)
-                wb.Sheets(hoja_anterior).Copy(After=wb.Sheets(insert_idx - 1))
-                nueva_hoja = wb.ActiveSheet
-                nueva_hoja.Name = nombre_hoja
-
-                # Modificación de gráficos
-                chart_objects = nueva_hoja.ChartObjects()
-                
-                # Configurar primer gráfico (IR Diario)
-                if chart_objects.Count > 0:
-                    chart1 = chart_objects(1).Chart
-                    chart1.HasTitle = True
-                    chart1.ChartTitle.Text = f"IR Diario Tornos {mes} {anio}"  # Añadir el año
-                    chart1.ChartTitle.Font.Size = 12
-                    chart1.ChartTitle.Font.Bold = True
-                    # Eliminar "None" en ejes
-                    chart1.Axes(1).HasTitle = True
-                    chart1.Axes(1).AxisTitle.Text = " "
-                    chart1.Axes(2).HasTitle = True
-                    chart1.Axes(2).AxisTitle.Text = " "
-                
-                # Configurar segundo gráfico (IR vs R%)
-                if chart_objects.Count > 1:
-                    chart2 = chart_objects(2).Chart
-                    chart2.HasTitle = True
-                    chart2.ChartTitle.Text = f"IR v/s R% {mes} {anio}"  # Añadir mes y año
-                    chart2.ChartTitle.Font.Size = 12
-                    chart2.ChartTitle.Font.Bold = True
-                    # Eliminar "None" en ejes
-                    chart2.Axes(1).HasTitle = True
-                    chart2.Axes(1).AxisTitle.Text = " "
-                    chart2.Axes(2).HasTitle = True
-                    chart2.Axes(2).AxisTitle.Text = " "
-
+        
+            # Verificar si ya existe la hoja con el nombre deseado
+            if nombre_hoja in hojas:
+                escribir_log(f"La hoja '{nombre_hoja}' ya existe. No se creará una nueva.")
+                wb.Close(SaveChanges=False)
+                excel.Quit()
+                pythoncom.CoUninitialize()
+                return True
+        
+            # Buscar hoja anterior para copiar
+            hojas_ir = [h for h in hojas if h.startswith("IR ") and len(h.split()) == 3]
+        
+            def total_meses(nombre):
+                try:
+                    _, mes_str, anio_str = nombre.split()
+                    return int(anio_str) * 12 + MESES_NUM[mes_str]
+                except:
+                    return -1
+        
+            hojas_ordenadas = sorted(hojas_ir, key=total_meses)
+            total_nueva = int(anio) * 12 + MESES_NUM[mes]
+            hoja_anterior = None
+        
+            for h in hojas_ordenadas:
+                if total_meses(h) < total_nueva:
+                    hoja_anterior = h
+                else:
+                    break
+        
+            if not hoja_anterior:
+                wb.Close(SaveChanges=False)
+                excel.Quit()
+                pythoncom.CoUninitialize()
+                messagebox.showwarning("Error", f"No hay hoja anterior para copiar en {nombre_hoja}")
+                return False
+        
+            # Copiar hoja anterior
+            idx_anterior = hojas.index(hoja_anterior)
+            insert_idx = min(idx_anterior + 2, wb.Sheets.Count)
+            wb.Sheets(hoja_anterior).Copy(After=wb.Sheets(insert_idx - 1))
+            nueva_hoja = wb.ActiveSheet
+        
+            # Establecer el nombre de la nueva hoja
+            nueva_hoja.Name = nombre_hoja
+            escribir_log(f"Hoja '{nombre_hoja}' creada copiando desde '{hoja_anterior}'")
+        
+            # Modificación de gráficos
+            chart_objects = nueva_hoja.ChartObjects()
+        
+            # Configurar primer gráfico (IR Diario)
+            if chart_objects.Count > 0:
+                chart1 = chart_objects(1).Chart
+                chart1.HasTitle = True
+                chart1.ChartTitle.Text = f"IR Diario Tornos {mes} {anio}"
+                chart1.ChartTitle.Font.Size = 12
+                chart1.ChartTitle.Font.Bold = True
+                chart1.Axes(1).HasTitle = True
+                chart1.Axes(1).AxisTitle.Text = " "
+                chart1.Axes(2).HasTitle = True
+                chart1.Axes(2).AxisTitle.Text = " "
+        
+            # Configurar segundo gráfico (IR vs R%)
+            if chart_objects.Count > 1:
+                chart2 = chart_objects(2).Chart
+                chart2.HasTitle = True
+                chart2.ChartTitle.Text = f"IR v/s R% {mes} {anio}"
+                chart2.ChartTitle.Font.Size = 12
+                chart2.ChartTitle.Font.Bold = True
+                chart2.Axes(1).HasTitle = True
+                chart2.Axes(1).AxisTitle.Text = " "
+                chart2.Axes(2).HasTitle = True
+                chart2.Axes(2).AxisTitle.Text = " "
+        
         finally:
-            wb.Close(SaveChanges=True)
+            try:
+                wb.Close(SaveChanges=True)
+            except Exception as e:
+                escribir_log(f"Error al cerrar el libro Excel: {str(e)}", nivel="warning")
             excel.Quit()
             pythoncom.CoUninitialize()
+
 
         # Paso 3: Configurar fórmulas y limpieza
         wb_openpyxl = openpyxl.load_workbook(RUTA_ENTRADA)
