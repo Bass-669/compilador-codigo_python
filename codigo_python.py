@@ -792,21 +792,18 @@ def preparar_hoja_mes(mes, dia, anio):
         
         try:
             wb = excel.Workbooks.Open(os.path.abspath(RUTA_ENTRADA), UpdateLinks=0)
-            hojas = [h.Name for h in wb.Sheets]
+            hojas_existentes = [h.Name for h in wb.Sheets]
         
-            # Verificar si ya existe la hoja con el nombre deseado
-            nombre_hoja_normalizado = nombre_hoja.strip().lower()
-            hojas_normalizadas = [h.strip().lower() for h in hojas]
-            
-            if nombre_hoja_normalizado in hojas_normalizadas:
-                escribir_log(f"La hoja '{nombre_hoja}' ya existe (detectada con normalización). No se creará una nueva.")
+            # Si ya existe una hoja con el nombre exacto, no crear nada
+            if nombre_hoja in hojas_existentes:
+                escribir_log(f"La hoja '{nombre_hoja}' ya existe. No se creará una nueva.")
                 wb.Close(SaveChanges=False)
                 excel.Quit()
                 pythoncom.CoUninitialize()
                 return True
-
+        
             # Buscar hoja anterior para copiar
-            hojas_ir = [h for h in hojas if h.startswith("IR ") and len(h.split()) == 3]
+            hojas_ir = [h for h in hojas_existentes if h.startswith("IR ") and len(h.split()) == 3]
         
             def total_meses(nombre):
                 try:
@@ -833,19 +830,24 @@ def preparar_hoja_mes(mes, dia, anio):
                 return False
         
             # Copiar hoja anterior
-            idx_anterior = hojas.index(hoja_anterior)
-            insert_idx = min(idx_anterior + 2, wb.Sheets.Count)
-            wb.Sheets(hoja_anterior).Copy(After=wb.Sheets(insert_idx - 1))
+            wb.Sheets(hoja_anterior).Copy(After=wb.Sheets(wb.Sheets.Count))
             nueva_hoja = wb.ActiveSheet
         
-            # Establecer el nombre de la nueva hoja
+            # Verifica que el nombre deseado no está en uso por seguridad
+            nombres_actuales = [s.Name for s in wb.Sheets]
+            if nombre_hoja in nombres_actuales:
+                escribir_log(f"No se pudo renombrar: ya existe la hoja '{nombre_hoja}'", nivel="error")
+                wb.Close(SaveChanges=False)
+                excel.Quit()
+                pythoncom.CoUninitialize()
+                return False
+        
             nueva_hoja.Name = nombre_hoja
             escribir_log(f"Hoja '{nombre_hoja}' creada copiando desde '{hoja_anterior}'")
         
             # Modificación de gráficos
             chart_objects = nueva_hoja.ChartObjects()
         
-            # Configurar primer gráfico (IR Diario)
             if chart_objects.Count > 0:
                 chart1 = chart_objects(1).Chart
                 chart1.HasTitle = True
@@ -857,7 +859,6 @@ def preparar_hoja_mes(mes, dia, anio):
                 chart1.Axes(2).HasTitle = True
                 chart1.Axes(2).AxisTitle.Text = " "
         
-            # Configurar segundo gráfico (IR vs R%)
             if chart_objects.Count > 1:
                 chart2 = chart_objects(2).Chart
                 chart2.HasTitle = True
@@ -876,7 +877,6 @@ def preparar_hoja_mes(mes, dia, anio):
                 escribir_log(f"Error al cerrar el libro Excel: {str(e)}", nivel="warning")
             excel.Quit()
             pythoncom.CoUninitialize()
-
 
         # Paso 3: Configurar fórmulas y limpieza
         wb_openpyxl = openpyxl.load_workbook(RUTA_ENTRADA)
