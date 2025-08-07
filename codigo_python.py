@@ -763,10 +763,9 @@ def preparar_hoja_mes(mes, dia, anio):
     import re
     escribir_log("Inicio de preparar_hoja_mes")
     nombre_hoja = f"IR {mes} {anio}"
-    col_dia = dia + 1
 
     try:
-        # Paso 1: Verificar si la hoja ya existe con openpyxl
+        # Paso 1: Verificar con openpyxl si ya existe
         wb_check = openpyxl.load_workbook(RUTA_ENTRADA)
         if nombre_hoja in wb_check.sheetnames:
             escribir_log(f"La hoja '{nombre_hoja}' ya existe. No se creará una nueva.")
@@ -774,23 +773,29 @@ def preparar_hoja_mes(mes, dia, anio):
             return True
         wb_check.close()
 
-        # Paso 2: Crear hoja con win32com solo si no existe
+        # Paso 2: Crear hoja con win32com
         pythoncom.CoInitialize()
         excel = win32.DispatchEx("Excel.Application")
         excel.Visible = False
         excel.DisplayAlerts = False
         wb = excel.Workbooks.Open(os.path.abspath(RUTA_ENTRADA), UpdateLinks=0)
-        hojas = [s.Name for s in wb.Sheets]
 
-        # Verifica si la hoja ya existe en Excel (por seguridad doble)
-        if nombre_hoja in hojas:
+        # Validar con win32com si ya existe la hoja (verificación fuerte)
+        hoja_existente = None
+        for hoja in wb.Sheets:
+            if hoja.Name == nombre_hoja:
+                hoja_existente = hoja
+                break
+
+        if hoja_existente is not None:
             escribir_log(f"La hoja '{nombre_hoja}' ya existe. No se creará una nueva.")
             wb.Close(SaveChanges=False)
             excel.Quit()
             pythoncom.CoUninitialize()
             return True
 
-        # Filtrar solo hojas con formato correcto: IR Mes Año
+        # Buscar hoja anterior válida para copiar
+        hojas = [h.Name for h in wb.Sheets]
         hojas_ir = [h for h in hojas if re.match(r"^IR\s+\w+\s+\d{4}$", h)]
 
         def total_meses(nombre):
@@ -817,22 +822,15 @@ def preparar_hoja_mes(mes, dia, anio):
             messagebox.showwarning("Error", f"No hay hoja anterior para copiar en {nombre_hoja}")
             return False
 
-        # Copiar hoja anterior y renombrar
+        # Copiar hoja anterior al final
         wb.Sheets(hoja_anterior).Copy(After=wb.Sheets(wb.Sheets.Count))
         nueva_hoja = wb.ActiveSheet
+        nueva_hoja.Name = nombre_hoja
 
-        # Validar que no exista nombre duplicado antes de renombrar
-        if nombre_hoja in [s.Name for s in wb.Sheets]:
-            escribir_log(f"❌ No se puede renombrar, ya existe una hoja llamada '{nombre_hoja}'", nivel="error")
-            nueva_hoja.Name = f"{nombre_hoja} copia"
-        else:
-            nueva_hoja.Name = nombre_hoja
+        escribir_log(f"Hoja '{nombre_hoja}' creada copiando desde '{hoja_anterior}'")
 
-        escribir_log(f"Hoja '{nueva_hoja.Name}' creada copiando desde '{hoja_anterior}'")
-
-        # Configurar títulos de gráficos
+        # Ajustar gráficos
         chart_objects = nueva_hoja.ChartObjects()
-
         if chart_objects.Count > 0:
             chart1 = chart_objects(1).Chart
             chart1.HasTitle = True
@@ -864,6 +862,7 @@ def preparar_hoja_mes(mes, dia, anio):
         escribir_log(f"Error en preparar_hoja_mes: {str(e)}", nivel="error")
         messagebox.showerror("Error crítico", f"No se pudo preparar la hoja del mes:\n{str(e)}")
         return False
+
 
 
         # Paso 3: Configurar fórmulas y limpieza
