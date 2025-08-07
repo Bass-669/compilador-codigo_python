@@ -830,31 +830,33 @@ def preparar_hoja_mes(mes, dia, anio):
 
                 # Modificación de gráficos
                 chart_objects = nueva_hoja.ChartObjects()
-                # Configurar primer gráfico
+                
+                # Configurar primer gráfico (IR Diario)
                 if chart_objects.Count > 0:
                     chart1 = chart_objects(1).Chart
                     chart1.HasTitle = True
-                    chart1.ChartTitle.Text = f"IR Diario Tornos {mes}"
+                    chart1.ChartTitle.Text = f"IR Diario Tornos {mes} {anio}"  # Añadir el año
                     chart1.ChartTitle.Font.Size = 12
                     chart1.ChartTitle.Font.Bold = True
-                    # Solución para eliminar NONE en ejes
+                    # Eliminar "None" en ejes
                     chart1.Axes(1).HasTitle = True
-                    chart1.Axes(1).AxisTitle.Text = " "  # Espacio en blanco
+                    chart1.Axes(1).AxisTitle.Text = " "
                     chart1.Axes(2).HasTitle = True
-                    chart1.Axes(2).AxisTitle.Text = " "  # Espacio en blanco
-
-                # Configuración para el segundo gráfico (IR DIARIO)
+                    chart1.Axes(2).AxisTitle.Text = " "
+                
+                # Configurar segundo gráfico (IR vs R%)
                 if chart_objects.Count > 1:
                     chart2 = chart_objects(2).Chart
                     chart2.HasTitle = True
-                    chart2.ChartTitle.Text = f"IR v/s R%"
+                    chart2.ChartTitle.Text = f"IR v/s R% {mes} {anio}"  # Añadir mes y año
                     chart2.ChartTitle.Font.Size = 12
                     chart2.ChartTitle.Font.Bold = True
-                    # Solución para eliminar NONE en ejes
+                    # Eliminar "None" en ejes
                     chart2.Axes(1).HasTitle = True
-                    chart2.Axes(1).AxisTitle.Text = " "  # Espacio en blanco
+                    chart2.Axes(1).AxisTitle.Text = " "
                     chart2.Axes(2).HasTitle = True
-                    chart2.Axes(2).AxisTitle.Text = " "  # Espacio en blanco
+                    chart2.Axes(2).AxisTitle.Text = " "
+
         finally:
             wb.Close(SaveChanges=True)
             excel.Quit()
