@@ -767,17 +767,10 @@ def preparar_hoja_mes(mes, dia, anio):
         # Paso 1: Verificar si la hoja ya existe con openpyxl
         wb_check = openpyxl.load_workbook(RUTA_ENTRADA)
         if nombre_hoja in wb_check.sheetnames:
-            hoja_existente = wb_check[nombre_hoja]
-            celdas_clave = [
-                hoja_existente.cell(row=3, column=col_dia).value,
-                hoja_existente.cell(row=4, column=col_dia).value,
-                hoja_existente.cell(row=8, column=col_dia).value,
-                hoja_existente.cell(row=9, column=col_dia).value
-            ]
-            if any(cell is not None and str(cell).strip() != "" for cell in celdas_clave):
-                escribir_log(f"El día {dia} ya tiene datos en {nombre_hoja}")
-                wb_check.close()
-                return True
+            escribir_log(f"La hoja {nombre_hoja} ya existe. No se necesita crear una nueva.")
+            wb_check.close()
+            return True
+
             else:
                 escribir_log(f"La hoja {nombre_hoja} ya existe.")
                 wb_check.close()
