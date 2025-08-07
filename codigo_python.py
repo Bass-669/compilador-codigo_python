@@ -143,7 +143,7 @@ def buscar_archivos_torno(fecha):
                 escribir_log(f"Error en búsqueda flexible en {ruta}: {str(e)}", nivel="warning")
     
     # Registrar resultados de la búsqueda
-    escribir_log(f"Resultados de búsqueda - Torno1: {archivos_encontrados['3011']}, Torno2: {archivos_encontrados['3012']}")
+    escribir_log(f"Resultados de búsqueda - Torno1: encontrado, Torno2: encontrado")
     return archivos_encontrados["3011"], archivos_encontrados["3012"]
 
 def leer_archivo_torno(ruta_archivo):
@@ -181,7 +181,7 @@ def iniciar(texto, torno, mes, dia, anio):
     threading.Thread(target=lambda: ejecutar(texto, torno, mes, dia, anio), daemon=True).start()
 
 def mostrar_carga():
-    """Muestra la ventana de carga de manera persistente"""
+    # Muestra la ventana de carga
     global ventana_carga, barra
     if 'ventana_carga' not in globals() or not ventana_carga.winfo_exists():
         ventana_carga = tk.Toplevel()
@@ -369,7 +369,7 @@ def procesar_ambos_tornos(datos_torno1, datos_torno2, mes, dia, anio):
     try:
         backup_path = os.path.join(BASE_DIR, CARPETA, "Reporte IR Tornos copia_de_seguridad.xlsx")
         shutil.copy(RUTA_ENTRADA, backup_path)
-        escribir_log(f"Copia de seguridad creada en: {backup_path}")
+        escribir_log(f"Copia de seguridad creada")
     except Exception as e:
         escribir_log(f"No se pudo crear copia de seguridad inicial: {str(e)}", nivel="error")
         messagebox.showerror("Error", "No se pudo crear la copia de seguridad inicial. Verifique permisos.")
@@ -781,7 +781,7 @@ def preparar_hoja_mes(mes, dia, anio):
                 wb_check.close()
                 return True
             else:
-                escribir_log(f"La hoja {nombre_hoja} ya existe y se usará tal cual.")
+                escribir_log(f"La hoja {nombre_hoja} ya existe.")
                 wb_check.close()
                 return True
         wb_check.close()
