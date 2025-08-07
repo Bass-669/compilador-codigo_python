@@ -264,7 +264,6 @@ def ejecutar(txt, torno, mes, dia, anio, callback_final=None):
                 time.sleep(0.01)
 
         # Paso 1: Obtener rendimientos (10%)
-        escribir_log("Obteniendo rendimientos del log...")
         incrementar_barra(10)
         fecha_actual = datetime(anio, MESES_NUM[mes], dia).date()
         rendimiento_log = obtener_rendimientos_de_log(fecha_actual)
@@ -293,7 +292,6 @@ def ejecutar(txt, torno, mes, dia, anio, callback_final=None):
             return False
 
         # Paso 4: Escribir en hoja (100%)
-        escribir_log("Escribiendo datos en hoja mensual...")
         incrementar_barra(30)
         resultado = fecha(mes, dia, anio, torno, bloques, porcentajes, 
                          lambda h: incrementar_barra(h), 
@@ -930,7 +928,7 @@ def preparar_hoja_mes(mes, dia, anio):
             excel.Quit()
             pythoncom.CoUninitialize()
 
-        escribir_log(f"Hoja {nombre_hoja} preparada exitosamente")
+        escribir_log(f"Hoja {nombre_hoja} creada exitosamente")
         return True
 
     except Exception as e:
