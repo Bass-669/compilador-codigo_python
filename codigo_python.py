@@ -1108,8 +1108,127 @@ def hoja_existe_y_es_valida(nombre_hoja, dia):
         escribir_log(f"Error al verificar hoja: {str(e)}", nivel="error")
         return True  # Asumir que existe para evitar sobrescritura
 
+# def crear_hoja_mes(mes, anio):
+#     """Versión final que resuelve el problema de copiado"""
+#     excel = None
+#     wb = None
+#     try:
+#         nombre_hoja = f"IR {mes} {anio}"
+#         escribir_log(f"Iniciando creación de {nombre_hoja}")
+
+#         # 1. Inicialización COM
+#         pythoncom.CoInitialize()
+#         excel = win32.DispatchEx("Excel.Application")
+#         excel.Visible = False
+#         excel.DisplayAlerts = False
+#         excel.AskToUpdateLinks = False
+#         excel.AutomationSecurity = 1  # Deshabilitar macros/alertas
+
+#         # 2. Abrir archivo con permisos completos
+#         try:
+#             wb = excel.Workbooks.Open(
+#                 os.path.abspath(RUTA_ENTRADA),
+#                 UpdateLinks=0,
+#                 ReadOnly=False,
+#                 IgnoreReadOnlyRecommended=True,
+#                 CorruptLoad=1  # Modo de recuperación si es necesario
+#             )
+#         except Exception as e:
+#             escribir_log(f"Error abriendo archivo: {str(e)}", nivel="error")
+#             return False
+
+#         # 3. Verificar hojas existentes
+#         hojas_antes = [sheet.Name for sheet in wb.Sheets]
+#         if nombre_hoja in hojas_antes:
+#             escribir_log(f"Hoja {nombre_hoja} ya existe")
+#             return True
+
+#         # 4. Seleccionar plantilla (excluyendo 'IR diario')
+#         def obtener_fecha(nombre):
+#             try:
+#                 partes = nombre.split()
+#                 if len(partes) == 3 and partes[0] == "IR":
+#                     return (int(partes[2]), MESES_NUM.get(partes[1], 0))
+#             except:
+#                 pass
+#             return (0, 0)
+
+#         hojas_validas = [s for s in hojas_antes if s.startswith("IR ") and s != nombre_hoja and not s.endswith("diario ")]
+#         if not hojas_validas:
+#             escribir_log("No hay hojas válidas para copiar", nivel="error")
+#             return False
+
+#         hoja_origen = max(hojas_validas, key=obtener_fecha)
+#         escribir_log(f"Copiando desde {hoja_origen}")
+
+#         # 5. Método de copiado alternativo robusto
+#         try:
+#             # Crear hoja temporal vacía
+#             temp_name = f"TEMP_{int(time.time())}"
+#             wb.Sheets.Add(After=wb.Sheets(wb.Sheets.Count)).Name = temp_name
+#             temp_sheet = wb.Sheets(temp_name)
+            
+#             # Copiar contenido celda por celda
+#             origen = wb.Sheets(hoja_origen)
+#             origen.UsedRange.Copy(temp_sheet.Range("A1"))
+            
+#             # Copiar formatos
+#             origen.Cells.Copy()
+#             temp_sheet.Range("A1").PasteSpecial(Paste=-4122)  # xlPasteFormats
+#             excel.CutCopyMode = False
+            
+#             # Renombrar
+#             temp_sheet.Name = nombre_hoja
+            
+#             # Verificar creación
+#             if nombre_hoja not in [s.Name for s in wb.Sheets]:
+#                 raise Exception("Fallo al renombrar hoja temporal")
+            
+#             # Copiar propiedades de página
+#             try:
+#                 origen.PageSetup.Copy(temp_sheet.PageSetup, 1)  # xlCopyAll
+#             except:
+#                 escribir_log("⚠️ No se pudieron copiar configuraciones de página", nivel="warning")
+            
+#             wb.Save()
+#             escribir_log(f"✅ {nombre_hoja} creada exitosamente")
+#             return True
+            
+#         except Exception as e:
+#             escribir_log(f"❌ Error en copiado alternativo: {str(e)}", nivel="error")
+#             # Limpieza
+#             try:
+#                 if temp_name in [s.Name for s in wb.Sheets]:
+#                     wb.Sheets(temp_name).Delete()
+#                 if nombre_hoja in [s.Name for s in wb.Sheets]:
+#                     wb.Sheets(nombre_hoja).Delete()
+#                 wb.Save()
+#             except:
+#                 pass
+#             return False
+            
+#     except Exception as e:
+#         escribir_log(f"💥 Error global: {str(e)}", nivel="error")
+#         return False
+#     finally:
+#         try:
+#             if wb is not None:
+#                 wb.Close(SaveChanges=True)
+#         except:
+#             pass
+#         try:
+#             if excel is not None:
+#                 excel.Quit()
+#         except:
+#             pass
+#         try:
+#             pythoncom.CoUninitialize()
+#         except:
+#             pass
+
+
 def crear_hoja_mes(mes, anio):
-    """Versión final que resuelve el problema de copiado"""
+    """Versión que copia gráficos y configuraciones completas"""
     excel = None
     wb = None
     try:
@@ -1122,16 +1241,15 @@ def crear_hoja_mes(mes, anio):
         excel.Visible = False
         excel.DisplayAlerts = False
         excel.AskToUpdateLinks = False
-        excel.AutomationSecurity = 1  # Deshabilitar macros/alertas
+        excel.AutomationSecurity = 1
 
-        # 2. Abrir archivo con permisos completos
+        # 2. Abrir archivo
         try:
             wb = excel.Workbooks.Open(
                 os.path.abspath(RUTA_ENTRADA),
                 UpdateLinks=0,
                 ReadOnly=False,
-                IgnoreReadOnlyRecommended=True,
-                CorruptLoad=1  # Modo de recuperación si es necesario
+                IgnoreReadOnlyRecommended=True
             )
         except Exception as e:
             escribir_log(f"Error abriendo archivo: {str(e)}", nivel="error")
@@ -1143,7 +1261,7 @@ def crear_hoja_mes(mes, anio):
             escribir_log(f"Hoja {nombre_hoja} ya existe")
             return True
 
-        # 4. Seleccionar plantilla (excluyendo 'IR diario')
+        # 4. Seleccionar plantilla
         def obtener_fecha(nombre):
             try:
                 partes = nombre.split()
@@ -1161,47 +1279,81 @@ def crear_hoja_mes(mes, anio):
         hoja_origen = max(hojas_validas, key=obtener_fecha)
         escribir_log(f"Copiando desde {hoja_origen}")
 
-        # 5. Método de copiado alternativo robusto
+        # 5. Método de copiado completo
         try:
-            # Crear hoja temporal vacía
-            temp_name = f"TEMP_{int(time.time())}"
-            wb.Sheets.Add(After=wb.Sheets(wb.Sheets.Count)).Name = temp_name
-            temp_sheet = wb.Sheets(temp_name)
-            
-            # Copiar contenido celda por celda
-            origen = wb.Sheets(hoja_origen)
-            origen.UsedRange.Copy(temp_sheet.Range("A1"))
-            
-            # Copiar formatos
-            origen.Cells.Copy()
-            temp_sheet.Range("A1").PasteSpecial(Paste=-4122)  # xlPasteFormats
-            excel.CutCopyMode = False
-            
-            # Renombrar
-            temp_sheet.Name = nombre_hoja
-            
-            # Verificar creación
-            if nombre_hoja not in [s.Name for s in wb.Sheets]:
-                raise Exception("Fallo al renombrar hoja temporal")
-            
-            # Copiar propiedades de página
+            # Método 1: Intentar copia directa con espera extendida
             try:
-                origen.PageSetup.Copy(temp_sheet.PageSetup, 1)  # xlCopyAll
-            except:
-                escribir_log("⚠️ No se pudieron copiar configuraciones de página", nivel="warning")
-            
-            wb.Save()
-            escribir_log(f"✅ {nombre_hoja} creada exitosamente")
-            return True
-            
+                wb.Sheets(hoja_origen).Copy(After=wb.Sheets(wb.Sheets.Count))
+                
+                # Espera activa con verificación
+                for _ in range(10):  # 10 segundos máximo
+                    time.sleep(1)
+                    if wb.Sheets.Count > len(hojas_antes):
+                        break
+                else:
+                    raise Exception("No aumentó el número de hojas")
+                
+                # Identificar nueva hoja
+                nueva_hoja = None
+                for i in range(wb.Sheets.Count, 0, -1):
+                    if wb.Sheets(i).Name not in hojas_antes:
+                        nueva_hoja = wb.Sheets(i)
+                        break
+                
+                if not nueva_hoja:
+                    raise Exception("No se detectó nueva hoja")
+                
+                nueva_hoja.Name = nombre_hoja
+                wb.Save()
+                escribir_log(f"✅ {nombre_hoja} creada (método directo)")
+                return True
+            except Exception as e_primario:
+                escribir_log(f"⚠️ Método directo falló: {str(e_primario)}", nivel="warning")
+                
+                # Método 2: Alternativa completa para versiones problemáticas
+                escribir_log("🔧 Intentando método alternativo completo...")
+                
+                # Crear hoja temporal
+                temp_name = f"TEMP_{int(time.time())}"
+                temp_sheet = wb.Sheets.Add(After=wb.Sheets(wb.Sheets.Count))
+                temp_sheet.Name = temp_name
+                
+                # Copiar todo el contenido
+                wb.Sheets(hoja_origen).Cells.Copy(temp_sheet.Cells)
+                
+                # Copiar gráficos
+                for chart in wb.Sheets(hoja_origen).ChartObjects():
+                    chart.Copy()
+                    temp_sheet.Paste()
+                
+                # Copiar configuraciones de página
+                try:
+                    wb.Sheets(hoja_origen).PageSetup.Copy(temp_sheet.PageSetup, 1)
+                except Exception as e_page:
+                    escribir_log(f"⚠️ No se copiaron configuraciones de página: {str(e_page)}", nivel="warning")
+                
+                # Copiar formatos especiales
+                try:
+                    wb.Sheets(hoja_origen).Cells.Copy()
+                    temp_sheet.Cells.PasteSpecial(Paste=-4122)  # xlPasteFormats
+                    excel.CutCopyMode = False
+                except Exception as e_format:
+                    escribir_log(f"⚠️ Error copiando formatos: {str(e_format)}", nivel="warning")
+                
+                # Renombrar
+                temp_sheet.Name = nombre_hoja
+                wb.Save()
+                escribir_log(f"✅ {nombre_hoja} creada (método alternativo)")
+                return True
+                
         except Exception as e:
-            escribir_log(f"❌ Error en copiado alternativo: {str(e)}", nivel="error")
+            escribir_log(f"❌ Error en copiado: {str(e)}", nivel="error")
             # Limpieza
             try:
-                if temp_name in [s.Name for s in wb.Sheets]:
-                    wb.Sheets(temp_name).Delete()
                 if nombre_hoja in [s.Name for s in wb.Sheets]:
                     wb.Sheets(nombre_hoja).Delete()
+                if 'temp_name' in locals() and temp_name in [s.Name for s in wb.Sheets]:
+                    wb.Sheets(temp_name).Delete()
                 wb.Save()
             except:
                 pass
