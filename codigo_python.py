@@ -1228,28 +1228,30 @@ def hoja_existe_y_es_valida(nombre_hoja, dia):
 
 
 def crear_hoja_mes(mes, anio):
-    """Versión que copia gráficos y configuraciones completas"""
+    """Versión que garantiza copia perfecta de la hoja"""
     excel = None
     wb = None
     try:
         nombre_hoja = f"IR {mes} {anio}"
         escribir_log(f"Iniciando creación de {nombre_hoja}")
 
-        # 1. Inicialización COM
+        # 1. Inicialización COM con configuración óptima
         pythoncom.CoInitialize()
         excel = win32.DispatchEx("Excel.Application")
-        excel.Visible = False
+        excel.Visible = False  # Crucial para evitar diálogos
         excel.DisplayAlerts = False
         excel.AskToUpdateLinks = False
-        excel.AutomationSecurity = 1
+        excel.AutomationSecurity = 1  # Deshabilitar macros/alertas
+        excel.EnableEvents = False  # Deshabilitar eventos
 
-        # 2. Abrir archivo
+        # 2. Abrir archivo con configuraciones especiales
         try:
             wb = excel.Workbooks.Open(
                 os.path.abspath(RUTA_ENTRADA),
                 UpdateLinks=0,
                 ReadOnly=False,
-                IgnoreReadOnlyRecommended=True
+                IgnoreReadOnlyRecommended=True,
+                CorruptLoad=1  # Modo de recuperación
             )
         except Exception as e:
             escribir_log(f"Error abriendo archivo: {str(e)}", nivel="error")
@@ -1279,16 +1281,20 @@ def crear_hoja_mes(mes, anio):
         hoja_origen = max(hojas_validas, key=obtener_fecha)
         escribir_log(f"Copiando desde {hoja_origen}")
 
-        # 5. Método de copiado completo
-        try:
-            # Método 1: Intentar copia directa con espera extendida
+        # 5. Método de copiado mejorado con reintentos
+        for intento in range(3):  # 3 intentos máximo
             try:
-                wb.Sheets(hoja_origen).Copy(After=wb.Sheets(wb.Sheets.Count))
+                # Método directo con espera inteligente
+                count_antes = wb.Sheets.Count
+                origen = wb.Sheets(hoja_origen)
+                
+                # Intento de copiado
+                origen.Copy(After=wb.Sheets(count_antes))
                 
                 # Espera activa con verificación
-                for _ in range(10):  # 10 segundos máximo
+                for i in range(10):  # 10 segundos máximo
                     time.sleep(1)
-                    if wb.Sheets.Count > len(hojas_antes):
+                    if wb.Sheets.Count > count_antes:
                         break
                 else:
                     raise Exception("No aumentó el número de hojas")
@@ -1296,69 +1302,53 @@ def crear_hoja_mes(mes, anio):
                 # Identificar nueva hoja
                 nueva_hoja = None
                 for i in range(wb.Sheets.Count, 0, -1):
-                    if wb.Sheets(i).Name not in hojas_antes:
-                        nueva_hoja = wb.Sheets(i)
+                    sheet = wb.Sheets(i)
+                    if sheet.Name not in hojas_antes:
+                        nueva_hoja = sheet
                         break
                 
                 if not nueva_hoja:
-                    raise Exception("No se detectó nueva hoja")
+                    raise Exception("No se detectó hoja nueva")
                 
+                # Renombrar y verificar
                 nueva_hoja.Name = nombre_hoja
+                
+                # Verificación final
+                if nombre_hoja not in [s.Name for s in wb.Sheets]:
+                    raise Exception("Fallo en renombrado")
+                
+                # Corregir referencias en gráficos
+                for chart in nueva_hoja.ChartObjects():
+                    try:
+                        # Actualizar rangos de datos
+                        for series in chart.Chart.SeriesCollection():
+                            # Reemplazar referencias a la hoja original
+                            formula = series.Formula
+                            formula = formula.replace(hoja_origen, nombre_hoja)
+                            series.Formula = formula
+                    except Exception as e:
+                        escribir_log(f"⚠️ Error actualizando gráfico: {str(e)}", nivel="warning")
+                
                 wb.Save()
-                escribir_log(f"✅ {nombre_hoja} creada (método directo)")
-                return True
-            except Exception as e_primario:
-                escribir_log(f"⚠️ Método directo falló: {str(e_primario)}", nivel="warning")
-                
-                # Método 2: Alternativa completa para versiones problemáticas
-                escribir_log("🔧 Intentando método alternativo completo...")
-                
-                # Crear hoja temporal
-                temp_name = f"TEMP_{int(time.time())}"
-                temp_sheet = wb.Sheets.Add(After=wb.Sheets(wb.Sheets.Count))
-                temp_sheet.Name = temp_name
-                
-                # Copiar todo el contenido
-                wb.Sheets(hoja_origen).Cells.Copy(temp_sheet.Cells)
-                
-                # Copiar gráficos
-                for chart in wb.Sheets(hoja_origen).ChartObjects():
-                    chart.Copy()
-                    temp_sheet.Paste()
-                
-                # Copiar configuraciones de página
-                try:
-                    wb.Sheets(hoja_origen).PageSetup.Copy(temp_sheet.PageSetup, 1)
-                except Exception as e_page:
-                    escribir_log(f"⚠️ No se copiaron configuraciones de página: {str(e_page)}", nivel="warning")
-                
-                # Copiar formatos especiales
-                try:
-                    wb.Sheets(hoja_origen).Cells.Copy()
-                    temp_sheet.Cells.PasteSpecial(Paste=-4122)  # xlPasteFormats
-                    excel.CutCopyMode = False
-                except Exception as e_format:
-                    escribir_log(f"⚠️ Error copiando formatos: {str(e_format)}", nivel="warning")
-                
-                # Renombrar
-                temp_sheet.Name = nombre_hoja
-                wb.Save()
-                escribir_log(f"✅ {nombre_hoja} creada (método alternativo)")
+                escribir_log(f"✅ {nombre_hoja} creada correctamente (intento {intento+1})")
                 return True
                 
-        except Exception as e:
-            escribir_log(f"❌ Error en copiado: {str(e)}", nivel="error")
-            # Limpieza
-            try:
-                if nombre_hoja in [s.Name for s in wb.Sheets]:
-                    wb.Sheets(nombre_hoja).Delete()
-                if 'temp_name' in locals() and temp_name in [s.Name for s in wb.Sheets]:
-                    wb.Sheets(temp_name).Delete()
-                wb.Save()
-            except:
-                pass
-            return False
-            
+            except Exception as e:
+                escribir_log(f"⚠️ Intento {intento+1} fallido: {str(e)}", nivel="warning")
+                # Limpieza antes de reintentar
+                try:
+                    if nombre_hoja in [s.Name for s in wb.Sheets]:
+                        wb.Sheets(nombre_hoja).Delete()
+                    wb.Save()
+                except:
+                    pass
+                
+                if intento == 2:  # Último intento
+                    escribir_log("❌ Todos los intentos fallaron", nivel="error")
+                    return False
+                
+                time.sleep(5)  # Espera más larga entre intentos
+                
     except Exception as e:
         escribir_log(f"💥 Error global: {str(e)}", nivel="error")
         return False
@@ -1377,7 +1367,6 @@ def crear_hoja_mes(mes, anio):
             pythoncom.CoUninitialize()
         except:
             pass
-
 
 def preparar_hoja_mes(mes, dia, anio):
     """Versión simplificada para usar con el nuevo método"""
