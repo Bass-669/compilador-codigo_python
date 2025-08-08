@@ -1109,134 +1109,158 @@ def hoja_existe_y_es_valida(nombre_hoja, dia):
         return True  # Asumir que existe para evitar sobrescritura
 
 def crear_hoja_mes(mes, anio):
-    """Versión final que resuelve el problema de activación de hoja"""
+    """Versión con logs detallados para diagnóstico"""
     excel = None
     wb = None
+    nombre_temporal = None
     try:
         nombre_hoja = f"IR {mes} {anio}"
-        escribir_log(f"Creando {nombre_hoja}")
+        escribir_log(f"[INICIO] Creación de hoja {nombre_hoja}", nivel="debug")
 
         # 1. Inicialización COM
+        escribir_log("[ETAPA 1] Inicializando COM...", nivel="debug")
         pythoncom.CoInitialize()
         excel = win32.DispatchEx("Excel.Application")
         excel.Visible = False
         excel.DisplayAlerts = False
         excel.AskToUpdateLinks = False
+        escribir_log("✅ COM inicializado correctamente", nivel="debug")
 
-        # 2. Abrir archivo con múltiples intentos
+        # 2. Abrir archivo
+        escribir_log(f"[ETAPA 2] Abriendo archivo {RUTA_ENTRADA}...", nivel="debug")
         for intento in range(3):
             try:
                 wb = excel.Workbooks.Open(os.path.abspath(RUTA_ENTRADA), UpdateLinks=0)
+                escribir_log(f"✅ Archivo abierto (intento {intento+1})", nivel="debug")
                 break
             except Exception as e:
                 if intento == 2:
-                    escribir_log(f"Error abriendo archivo: {str(e)}", nivel="error")
+                    escribir_log(f"❌ Error abriendo archivo: {str(e)}", nivel="error")
                     return False
                 time.sleep(2)
 
-        # 3. Verificar si la hoja ya existe
+        # 3. Verificar hojas existentes
+        escribir_log("[ETAPA 3] Verificando hojas existentes...", nivel="debug")
         try:
-            for sheet in wb.Sheets:
-                if sheet.Name == nombre_hoja:
-                    escribir_log(f"Hoja {nombre_hoja} ya existe")
-                    wb.Close(SaveChanges=False)
-                    excel.Quit()
-                    pythoncom.CoUninitialize()
-                    return True
+            hojas_existentes = [sheet.Name for sheet in wb.Sheets]
+            escribir_log(f"Hojas actuales: {', '.join(hojas_existentes)}", nivel="debug")
+            
+            if nombre_hoja in hojas_existentes:
+                escribir_log(f"ℹ️ Hoja {nombre_hoja} ya existe", nivel="info")
+                wb.Close(SaveChanges=False)
+                excel.Quit()
+                pythoncom.CoUninitialize()
+                return True
         except Exception as e:
-            escribir_log(f"Error verificando existencia: {str(e)}", nivel="error")
+            escribir_log(f"❌ Error verificando hojas: {str(e)}", nivel="error")
             return False
 
-        # 4. Encontrar hoja anterior más reciente
+        # 4. Buscar hoja anterior
+        escribir_log("[ETAPA 4] Buscando hoja anterior...", nivel="debug")
         def obtener_fecha(nombre):
             try:
                 partes = nombre.split()
-                return (int(partes[2]), MESES_NUM.get(partes[1], 0)) if len(partes) == 3 else (0, 0)
-            except:
-                return (0, 0)
+                if len(partes) == 3 and partes[0] == "IR":
+                    return (int(partes[2]), MESES_NUM.get(partes[1], 0))
+            except Exception as e:
+                escribir_log(f"⚠️ Error procesando nombre {nombre}: {str(e)}", nivel="warning")
+            return (0, 0)
 
-        hojas = [s.Name for s in wb.Sheets if s.Name.startswith("IR ") and s.Name != nombre_hoja]
-        if not hojas:
-            escribir_log("No hay hojas anteriores válidas", nivel="error")
+        hojas_validas = [s for s in hojas_existentes if s.startswith("IR ") and s != nombre_hoja]
+        escribir_log(f"Hojas válidas encontradas: {hojas_validas}", nivel="debug")
+        
+        if not hojas_validas:
+            escribir_log("❌ No hay hojas válidas para copiar", nivel="error")
             wb.Close(SaveChanges=False)
             excel.Quit()
             pythoncom.CoUninitialize()
             return False
 
-        hoja_origen = max(hojas, key=obtener_fecha)
-        escribir_log(f"Copiando desde {hoja_origen}")
+        hoja_origen = max(hojas_validas, key=obtener_fecha)
+        escribir_log(f"🔧 Usando {hoja_origen} como plantilla", nivel="info")
 
-        # 5. Operación de copiado con método alternativo
+        # 5. Operación de copiado
+        escribir_log("[ETAPA 5] Iniciando copiado de hoja...", nivel="debug")
         try:
-            # Método 1: Intentar copiar directamente
-            try:
-                wb.Sheets(hoja_origen).Copy(After=wb.Sheets(wb.Sheets.Count))
-                time.sleep(3)  # Espera extendida
-            except:
-                # Método 2: Alternativa para versiones problemáticas de Excel
+            # Método 1: Copiado directo
+            escribir_log("⌛ Intentando método de copiado directo...", nivel="debug")
+            wb.Sheets(hoja_origen).Copy(After=wb.Sheets(wb.Sheets.Count))
+            time.sleep(3)
+            
+            # Verificar activación
+            escribir_log("🔍 Verificando hoja activa...", nivel="debug")
+            nueva_hoja = excel.ActiveSheet
+            escribir_log(f"Hoja activa actual: {nueva_hoja.Name}", nivel="debug")
+            
+            if nueva_hoja.Name == hoja_origen:
+                # Método 2: Alternativo si falla el primero
+                escribir_log("⚠️ Falló método directo, intentando alternativa...", nivel="warning")
                 wb.Sheets(hoja_origen).Select()
                 excel.ActiveSheet.Copy(After=wb.Sheets(wb.Sheets.Count))
-                time.sleep(5)  # Espera más larga
+                time.sleep(5)
+                nueva_hoja = excel.ActiveSheet
+                escribir_log(f"Hoja activa después de alternativa: {nueva_hoja.Name}", nivel="debug")
 
-            # Verificar activación
-            nueva_hoja = None
-            for _ in range(10):
-                try:
-                    nueva_hoja = excel.ActiveSheet
-                    if nueva_hoja.Name != hoja_origen:
-                        break
-                except:
-                    pass
-                time.sleep(1)
-            else:
-                raise Exception("No se pudo activar la nueva hoja")
-
-            # 6. Renombrar con verificación
+            # 6. Renombrar
+            escribir_log("[ETAPA 6] Renombrando hoja...", nivel="debug")
             nombre_temporal = f"TEMP_{int(time.time())}"
-            nueva_hoja.Name = nombre_temporal  # Nombre temporal primero
+            nueva_hoja.Name = nombre_temporal
+            escribir_log(f"🔄 Nombre temporal asignado: {nombre_temporal}", nivel="debug")
             time.sleep(1)
-            nueva_hoja.Name = nombre_hoja     # Nombre definitivo después
             
+            nueva_hoja.Name = nombre_hoja
+            escribir_log(f"✏️ Nombre definitivo asignado: {nombre_hoja}", nivel="debug")
+
             # 7. Verificación final
-            if nombre_hoja not in [s.Name for s in wb.Sheets]:
-                raise Exception("La hoja no aparece después de renombrar")
+            escribir_log("[ETAPA 7] Verificación final...", nivel="debug")
+            hojas_finales = [sheet.Name for sheet in wb.Sheets]
+            escribir_log(f"Hojas actuales: {', '.join(hojas_finales)}", nivel="debug")
             
+            if nombre_hoja not in hojas_finales:
+                raise Exception(f"La hoja {nombre_hoja} no aparece en la lista final")
+            
+            # 8. Guardar cambios
+            escribir_log("💾 Guardando cambios...", nivel="debug")
             wb.Save()
-            escribir_log(f"Hoja {nombre_hoja} creada exitosamente")
+            escribir_log(f"✅ Hoja {nombre_hoja} creada exitosamente", nivel="info")
             return True
             
         except Exception as e:
-            escribir_log(f"Error crítico en copiado: {str(e)}", nivel="error")
+            escribir_log(f"❌ Error crítico en copiado: {str(e)}", nivel="error")
             # Limpieza de emergencia
             try:
-                if nombre_hoja in [s.Name for s in wb.Sheets]:
+                hojas_actuales = [sheet.Name for sheet in wb.Sheets]
+                if nombre_hoja in hojas_actuales:
+                    escribir_log("⚠️ Eliminando hoja mal creada...", nivel="warning")
                     wb.Sheets(nombre_hoja).Delete()
-                elif nombre_temporal in [s.Name for s in wb.Sheets]:
+                if nombre_temporal and nombre_temporal in hojas_actuales:
+                    escribir_log("⚠️ Eliminando hoja temporal...", nivel="warning")
                     wb.Sheets(nombre_temporal).Delete()
                 wb.Save()
-            except:
-                pass
+            except Exception as cleanup_error:
+                escribir_log(f"⚠️ Error en limpieza: {str(cleanup_error)}", nivel="warning")
             return False
             
     except Exception as e:
-        escribir_log(f"Error global: {str(e)}", nivel="error")
+        escribir_log(f"❌ Error global: {str(e)}", nivel="error")
         return False
     finally:
-        # Limpieza garantizada
+        escribir_log("[FINAL] Limpiando recursos...", nivel="debug")
         try:
             if wb is not None:
                 wb.Close(SaveChanges=True)
-        except:
-            pass
+        except Exception as e:
+            escribir_log(f"⚠️ Error cerrando workbook: {str(e)}", nivel="warning")
         try:
             if excel is not None:
                 excel.Quit()
-        except:
-            pass
+        except Exception as e:
+            escribir_log(f"⚠️ Error cerrando Excel: {str(e)}", nivel="warning")
         try:
             pythoncom.CoUninitialize()
-        except:
-            pass
+        except Exception as e:
+            escribir_log(f"⚠️ Error en CoUninitialize: {str(e)}", nivel="warning")
+        escribir_log("🔚 Proceso finalizado", nivel="debug")
 
 
 def preparar_hoja_mes(mes, dia, anio):
