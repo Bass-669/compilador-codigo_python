@@ -943,16 +943,12 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, increm
 #         return False
 
 def preparar_hoja_mes(mes, dia, anio):
-    import win32com.client as win32, pythoncom
-    import shutil, os
-    from openpyxl.styles import Font, Alignment
-
+    # Crea la hoja del mes si no existe y la configura con fórmulas
     escribir_log("Inicio de preparar_hoja_mes")
     nombre_hoja = f"IR {mes} {anio}"
     col_dia = dia + 1
-
     try:
-        # Verificar si la hoja ya existe y tiene datos para el día
+        # Paso 1: Verificar si la hoja ya existe
         wb_check = openpyxl.load_workbook(RUTA_ENTRADA)
         if nombre_hoja in wb_check.sheetnames:
             hoja_existente = wb_check[nombre_hoja]
@@ -967,19 +963,20 @@ def preparar_hoja_mes(mes, dia, anio):
                 wb_check.close()
                 return True
             else:
-                escribir_log(f"La hoja {nombre_hoja} existe pero se limpiará y configurará.")
+                escribir_log(f"La hoja {nombre_hoja} ya existe y se usará tal cual.")
                 wb_check.close()
-        else:
-            wb_check.close()
-            # Crear hoja nueva
-            pythoncom.CoInitialize()
-            excel = win32.DispatchEx("Excel.Application")
-            excel.Visible = False
-            excel.DisplayAlerts = False
-            wb = excel.Workbooks.Open(os.path.abspath(RUTA_ENTRADA), UpdateLinks=0)
-            hojas = [h.Name for h in wb.Sheets]
-
-            # Buscar hoja anterior
+                return True
+        wb_check.close()
+        # Paso 2: Crear hoja nueva si no existe
+        import win32com.client as win32, pythoncom
+        pythoncom.CoInitialize()
+        excel = win32.DispatchEx("Excel.Application")
+        excel.Visible = False
+        excel.DisplayAlerts = False
+        wb = excel.Workbooks.Open(os.path.abspath(RUTA_ENTRADA), UpdateLinks=0)
+        hojas = [h.Name for h in wb.Sheets]
+        if nombre_hoja not in hojas:
+            # Buscar hoja anterior para copiar
             hojas_ir = [h for h in hojas if h.startswith("IR ") and len(h.split()) == 3]
             def total_meses(nombre):
                 try:
@@ -995,72 +992,58 @@ def preparar_hoja_mes(mes, dia, anio):
                     hoja_anterior = h
                 else:
                     break
-
             if not hoja_anterior:
                 messagebox.showwarning("Orden inválido", f"No se encontró hoja anterior para '{nombre_hoja}'")
                 wb.Close(SaveChanges=False)
                 excel.Quit()
                 pythoncom.CoUninitialize()
                 return False
-
-            wb.Sheets(hoja_anterior).Copy(After=wb.Sheets(wb.Sheets.Count))
+            idx_anterior = hojas.index(hoja_anterior)
+            insert_idx = min(idx_anterior + 2, wb.Sheets.Count)
+            wb.Sheets(hoja_anterior).Copy(After=wb.Sheets(insert_idx - 1))
             nueva_hoja = wb.ActiveSheet
             nueva_hoja.Name = nombre_hoja
-            escribir_log(f"Hoja '{nombre_hoja}' creada copiando desde '{hoja_anterior}'")
+            shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
             wb.Save()
-            wb.Close()
-            excel.Quit()
-            pythoncom.CoUninitialize()
-
-        # Paso 3: Configurar y limpiar hoja (si fue creada o estaba vacía)
+        wb.Close(SaveChanges=True)
+        excel.Quit()
+        pythoncom.CoUninitialize()
+        # Paso 3: Configurar hoja
         wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
         hoja = wb2[nombre_hoja]
-
-        # Limpieza
         filas_a_limpiar = [2,3,4,7,8,9,12,13,14,17,18,19,22,23,24,27,28,31,32,33,34,37,38,39,40]
         for fila in filas_a_limpiar:
             for col in range(2, 35):
                 celda = hoja.cell(row=fila, column=col)
                 if not isinstance(celda, openpyxl.cell.cell.MergedCell):
                     celda.value = ""
-
-        # Fechas en celdas clave
         dias_mes = dias_en_mes(mes, anio)
         for col in range(2, 2 + dias_mes):
             dia_mes = col - 1
             fecha = f"{dia_mes:02d}/{MESES_NUM[mes]:02d}/{anio}"
             for fila in [2,7,12,17,22,27,31,37]:
                 hoja.cell(row=fila, column=col, value=fecha)
-
-        # Fórmulas de cálculo por día
         for col in range(2, 2 + dias_mes):
             letra = openpyxl.utils.get_column_letter(col)
             hoja.cell(row=23, column=col, value=f"=IFERROR(({letra}3*{letra}13+{letra}8*{letra}18)/({letra}3+{letra}8), 0)")
             hoja.cell(row=24, column=col, value=f"=IFERROR(({letra}4*{letra}14+{letra}9*{letra}19)/({letra}4+{letra}9), 0)")
             hoja.cell(row=28, column=col, value=f"=IFERROR(({letra}23*({letra}3+{letra}8)+{letra}24*({letra}4+{letra}9))/({letra}3+{letra}4+{letra}8+{letra}9), 0)")
-
-        # Fórmulas y formato final
         hoja.cell(row=32, column=34, value="R%").font = Font(bold=True)
         hoja.cell(row=38, column=34, value="IR%").font = Font(bold=True)
         hoja.cell(row=32, column=34).alignment = hoja.cell(row=38, column=34).alignment = Alignment(horizontal='center', vertical='center')
-
         for fila in [49,50,51]:
             for col_limpiar in [27,28,29,30]:
                 hoja.cell(row=fila, column=col_limpiar, value=" ")
-
         hoja.cell(row=2, column=34, value=int(anio))
         for fila in [3,4,8,9]:
             hoja.cell(row=fila, column=34, value=f"=SUM(B{fila}:AG{fila})")
-
         hoja.cell(row=23, column=34, value="=(AH3*AH13+AH8*AH18)/(AH3+AH8)")
         hoja.cell(row=24, column=34, value="=(AH4*AH14+AH9*AH19)/(AH4+AH9)")
         hoja.cell(row=28, column=34, value="=(AH23*(AH3+AH8)+AH24*(AH4+AH9))/(AH3+AH4+AH8+AH9)")
         hoja.cell(row=39, column=34, value="=AH33/AH28").number_format = '0.00%'
         hoja.cell(row=40, column=34, value="=AH34/AH28").number_format = '0.00%'
-
         wb2.save(RUTA_ENTRADA)
         wb2.close()
-
         # Recalcular fórmulas
         pythoncom.CoInitialize()
         excel = win32.DispatchEx("Excel.Application")
@@ -1072,9 +1055,7 @@ def preparar_hoja_mes(mes, dia, anio):
         wb_calc.Close()
         excel.Quit()
         pythoncom.CoUninitialize()
-
         return True
-
     except Exception as e:
         messagebox.showerror("Error crítico", f"No se pudo completar la operación:\n{str(e)}")
         return False
