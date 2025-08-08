@@ -7,6 +7,8 @@ import threading
 import tempfile
 import logging
 from logging.handlers import RotatingFileHandler
+import pythoncom
+import win32com.client as win32
 
 BASE_DIR = os.path.dirname(sys.executable if getattr(sys, 'frozen', False) else os.path.abspath(__file__))
 CARPETA, ARCHIVO = "reportes", "Reporte IR Tornos.xlsx"
