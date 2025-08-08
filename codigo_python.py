@@ -1109,32 +1109,32 @@ def hoja_existe_y_es_valida(nombre_hoja, dia):
         return True  # Asumir que existe para evitar sobrescritura
 
 def crear_hoja_mes(mes, anio):
-    """Versión ultra-robusta que garantiza la creación correcta"""
+    """Versión final que resuelve el problema de activación de hoja"""
     excel = None
     wb = None
     try:
         nombre_hoja = f"IR {mes} {anio}"
-        escribir_log(f"Iniciando creación de {nombre_hoja}")
+        escribir_log(f"Creando {nombre_hoja}")
 
-        # Inicialización COM
+        # 1. Inicialización COM
         pythoncom.CoInitialize()
         excel = win32.DispatchEx("Excel.Application")
         excel.Visible = False
         excel.DisplayAlerts = False
         excel.AskToUpdateLinks = False
 
-        # Abrir archivo con reintentos
+        # 2. Abrir archivo con múltiples intentos
         for intento in range(3):
             try:
                 wb = excel.Workbooks.Open(os.path.abspath(RUTA_ENTRADA), UpdateLinks=0)
                 break
             except Exception as e:
                 if intento == 2:
-                    escribir_log(f"Fallo al abrir archivo: {str(e)}", nivel="error")
+                    escribir_log(f"Error abriendo archivo: {str(e)}", nivel="error")
                     return False
                 time.sleep(2)
 
-        # Verificar si hoja ya existe
+        # 3. Verificar si la hoja ya existe
         try:
             for sheet in wb.Sheets:
                 if sheet.Name == nombre_hoja:
@@ -1144,37 +1144,43 @@ def crear_hoja_mes(mes, anio):
                     pythoncom.CoUninitialize()
                     return True
         except Exception as e:
-            escribir_log(f"Error verificando hojas: {str(e)}", nivel="error")
+            escribir_log(f"Error verificando existencia: {str(e)}", nivel="error")
             return False
 
-        # Buscar hoja anterior más reciente
+        # 4. Encontrar hoja anterior más reciente
         def obtener_fecha(nombre):
             try:
                 partes = nombre.split()
-                if len(partes) == 3 and partes[0] == "IR":
-                    return (int(partes[2]), MESES_NUM.get(partes[1], 0))
-                return (0, 0)
+                return (int(partes[2]), MESES_NUM.get(partes[1], 0)) if len(partes) == 3 else (0, 0)
             except:
                 return (0, 0)
 
-        hojas_validas = [s.Name for s in wb.Sheets if s.Name.startswith("IR ") and s.Name != nombre_hoja]
-        if not hojas_validas:
-            escribir_log("No hay hojas válidas para copiar", nivel="error")
+        hojas = [s.Name for s in wb.Sheets if s.Name.startswith("IR ") and s.Name != nombre_hoja]
+        if not hojas:
+            escribir_log("No hay hojas anteriores válidas", nivel="error")
             wb.Close(SaveChanges=False)
             excel.Quit()
             pythoncom.CoUninitialize()
             return False
 
-        hoja_origen = max(hojas_validas, key=obtener_fecha)
-        escribir_log(f"Usando {hoja_origen} como plantilla")
+        hoja_origen = max(hojas, key=obtener_fecha)
+        escribir_log(f"Copiando desde {hoja_origen}")
 
-        # Operación de copiado con verificación
+        # 5. Operación de copiado con método alternativo
         try:
-            # Seleccionar y copiar
-            wb.Sheets(hoja_origen).Copy(After=wb.Sheets(wb.Sheets.Count))
-            
-            # Espera extendida con verificación
-            for _ in range(10):  # 10 intentos con espera de 1 segundo
+            # Método 1: Intentar copiar directamente
+            try:
+                wb.Sheets(hoja_origen).Copy(After=wb.Sheets(wb.Sheets.Count))
+                time.sleep(3)  # Espera extendida
+            except:
+                # Método 2: Alternativa para versiones problemáticas de Excel
+                wb.Sheets(hoja_origen).Select()
+                excel.ActiveSheet.Copy(After=wb.Sheets(wb.Sheets.Count))
+                time.sleep(5)  # Espera más larga
+
+            # Verificar activación
+            nueva_hoja = None
+            for _ in range(10):
                 try:
                     nueva_hoja = excel.ActiveSheet
                     if nueva_hoja.Name != hoja_origen:
@@ -1183,33 +1189,37 @@ def crear_hoja_mes(mes, anio):
                     pass
                 time.sleep(1)
             else:
-                raise Exception("No se activó la nueva hoja")
+                raise Exception("No se pudo activar la nueva hoja")
 
-            # Renombrar
-            nueva_hoja.Name = nombre_hoja
+            # 6. Renombrar con verificación
+            nombre_temporal = f"TEMP_{int(time.time())}"
+            nueva_hoja.Name = nombre_temporal  # Nombre temporal primero
+            time.sleep(1)
+            nueva_hoja.Name = nombre_hoja     # Nombre definitivo después
             
-            # Verificación final
+            # 7. Verificación final
             if nombre_hoja not in [s.Name for s in wb.Sheets]:
-                raise Exception("Verificación post-copiado falló")
+                raise Exception("La hoja no aparece después de renombrar")
             
-            # Guardar cambios
             wb.Save()
             escribir_log(f"Hoja {nombre_hoja} creada exitosamente")
             return True
             
         except Exception as e:
-            escribir_log(f"Error en copiado: {str(e)}", nivel="error")
+            escribir_log(f"Error crítico en copiado: {str(e)}", nivel="error")
             # Limpieza de emergencia
             try:
                 if nombre_hoja in [s.Name for s in wb.Sheets]:
                     wb.Sheets(nombre_hoja).Delete()
-                    wb.Save()
+                elif nombre_temporal in [s.Name for s in wb.Sheets]:
+                    wb.Sheets(nombre_temporal).Delete()
+                wb.Save()
             except:
                 pass
             return False
             
     except Exception as e:
-        escribir_log(f"Error crítico: {str(e)}", nivel="error")
+        escribir_log(f"Error global: {str(e)}", nivel="error")
         return False
     finally:
         # Limpieza garantizada
@@ -1230,19 +1240,15 @@ def crear_hoja_mes(mes, anio):
 
 
 def preparar_hoja_mes(mes, dia, anio):
-    """Versión simplificada y robusta"""
+    """Versión simplificada y más confiable"""
     nombre_hoja = f"IR {mes} {anio}"
     
-    # Verificación de hoja existente (sin context manager)
+    # Verificación básica de existencia
     try:
         wb = openpyxl.load_workbook(RUTA_ENTRADA)
         if nombre_hoja in wb.sheetnames:
-            hoja = wb[nombre_hoja]
-            # Verificación básica de contenido
-            if hoja.cell(row=2, column=2).value != f"01/{MESES_NUM[mes]:02d}/{anio}":
-                escribir_log(f"Usando hoja existente válida: {nombre_hoja}")
-                wb.close()
-                return True
+            wb.close()
+            return True
         wb.close()
     except Exception as e:
         escribir_log(f"Error en verificación: {str(e)}", nivel="warning")
@@ -1252,22 +1258,20 @@ def preparar_hoja_mes(mes, dia, anio):
         messagebox.showerror("Error", "No se pudo crear la hoja del mes")
         return False
     
-    # Configuración inicial
+    # Configuración mínima necesaria
     try:
         wb = openpyxl.load_workbook(RUTA_ENTRADA)
         hoja = wb[nombre_hoja]
         
-        # Limpieza más conservadora
-        celdas_a_limpiar = [
-            (3, 2), (3, 3), (3, 4),  # Ejemplo de celdas clave
-            (8, 2), (8, 3), (8, 4),   # Ajustar según necesidad
-            (13, 2), (13, 3),
-            (18, 2), (18, 3)
-        ]
-        
-        for fila, col in celdas_a_limpiar:
-            if not isinstance(hoja.cell(row=fila, column=col), openpyxl.cell.cell.MergedCell):
-                hoja.cell(row=fila, column=col, value="")
+        # Limpiar solo celdas esenciales
+        for fila in [3, 4, 8, 9]:  # Filas clave de datos
+            for col in range(2, 32):  # Columnas relevantes
+                try:
+                    celda = hoja.cell(row=fila, column=col)
+                    if not isinstance(celda, openpyxl.cell.cell.MergedCell):
+                        celda.value = ""
+                except:
+                    continue
         
         wb.save(RUTA_ENTRADA)
         wb.close()
