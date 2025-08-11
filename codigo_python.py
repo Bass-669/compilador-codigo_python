@@ -1245,105 +1245,92 @@ from datetime import datetime
 
 
 def crear_hoja_mes(mes, anio):
-    """Versión corregida sin modificar Calculation"""
+    """Crea una copia exacta de la hoja anterior y la limpia"""
     nombre_hoja = f"IR {mes} {anio}"
-    escribir_log(f"[CREAR_HOJA] Iniciando creación robusta de {nombre_hoja}")
+    escribir_log(f"[CREAR_HOJA] Iniciando creación de {nombre_hoja}")
 
     excel = None
     wb = None
     
     try:
-        # 1. Configuración COM optimizada (sin Calculation)
+        # 1. Iniciar Excel
         pythoncom.CoInitialize()
         excel = win32.DispatchEx("Excel.Application")
-        excel.Visible = False
+        excel.Visible = False  # ¡Importante para evitar diálogos!
         excel.DisplayAlerts = False
-        excel.EnableEvents = False
-        excel.ScreenUpdating = False  # Mantenemos esto porque es crítico
-        
-        # 2. Abrir archivo con opciones avanzadas
-        wb = excel.Workbooks.Open(
-            os.path.abspath(RUTA_ENTRADA),
-            UpdateLinks=0,
-            ReadOnly=False,
-            IgnoreReadOnlyRecommended=True
-        )
-        
-        # 3. Verificación de existencia
+        excel.ScreenUpdating = False  # Mejor rendimiento
+
+        # 2. Abrir archivo
+        wb = excel.Workbooks.Open(os.path.abspath(RUTA_ENTRADA))
+
+        # 3. Verificar si ya existe
         if nombre_hoja in [s.Name for s in wb.Sheets]:
             return True
 
-        # 4. Selección de hoja origen (versión simplificada)
-        def es_hoja_valida(nombre):
-            try:
-                _, m, a = nombre.split()
-                return m in MESES_NUM and int(a) <= int(anio)
-            except:
-                return False
-                
-        hojas_validas = [h for h in wb.Sheets if es_hoja_valida(h.Name)]
-        if not hojas_validas:
-            raise ValueError("No hay hojas válidas para copiar")
-            
-        hoja_origen = max(
-            hojas_validas,
-            key=lambda x: (int(x.Name.split()[2]), MESES_NUM[x.Name.split()[1]])
-        )
-
-        # 5. Protocolo de copia mejorado
-        escribir_log(f"[CREAR_HOJA] Copiando desde {hoja_origen.Name}...")
-        
-        # Método alternativo de copia que funciona en más versiones
-        hoja_origen.Copy(After=wb.Sheets(wb.Sheets.Count))
-        time.sleep(2)  # Espera generosa
-        
-        # Buscar la hoja recién copiada
-        nueva_hoja = None
-        for sheet in wb.Sheets:
-            if sheet.Name.startswith(hoja_origen.Name):
-                nueva_hoja = sheet
+        # 4. Buscar la última hoja mensual (orden natural)
+        meses_ordenados = sorted(MESES_NUM.items(), key=lambda x: x[1])
+        for nombre_mes, _ in reversed(meses_ordenados):
+            hoja_anterior = f"IR {nombre_mes} {anio}" if MESES_NUM[nombre_mes] < MESES_NUM[mes] else f"IR {nombre_mes} {int(anio)-1}"
+            if hoja_anterior in [s.Name for s in wb.Sheets]:
                 break
-                
-        if not nueva_hoja:
-            raise Exception("No se detectó la nueva hoja")
+        else:
+            raise Exception("No se encontró hoja anterior válida")
 
-        # 6. Renombrado seguro con reintentos
-        for intento in range(3):
+        # 5. COPIADO REAL COMO USUARIO MANUAL
+        escribir_log(f"[CREAR_HOJA] Copiando {hoja_anterior}...")
+        
+        # Activar actualización para la copia
+        excel.ScreenUpdating = True  
+        wb.Sheets(hoja_anterior).Copy(After=wb.Sheets(wb.Sheets.Count))
+        excel.ScreenUpdating = False
+        
+        # 6. Renombrar la NUEVA hoja (siempre la última)
+        nueva_hoja = wb.Sheets(wb.Sheets.Count)
+        for intento in range(3):  # Reintentos por si está bloqueada
             try:
                 nueva_hoja.Name = nombre_hoja
                 break
-            except Exception as e:
-                if intento == 2:
-                    raise
+            except:
                 time.sleep(1)
-                excel.ScreenUpdating = True  # Activar temporalmente
-                time.sleep(1)
-                excel.ScreenUpdating = False
 
-        # 7. Forzar actualización de gráficos
-        excel.ScreenUpdating = True
-        for chart in nueva_hoja.ChartObjects():
-            try:
-                chart.Chart.Refresh()
-            except Exception as e:
-                escribir_log(f"Error actualizando gráfico: {str(e)}", nivel="warning")
+        # 7. LIMPIEZA SOLO DE LA COPIA NUEVA
+        excel.ScreenUpdating = True  # Necesario para limpieza
         
+        # Limpiar datos pero mantener formatos y gráficos
+        rango_limpiar = [
+            ("B2:AH40", ""),  # Datos principales
+            ("B3:B4", 0),     # Valores podados
+            ("B8:B9", 0),     # Valores regulares
+            ("B13:B14", ""),  # Referencias podadas
+            ("B18:B19", "")   # Referencias regulares
+        ]
+        
+        for rango, valor in rango_limpiar:
+            nueva_hoja.Range(rango).Value = valor
+        
+        # Mantener fórmulas en celdas clave
+        nueva_hoja.Range("B23").Formula = "=IFERROR((B3*B13+B8*B18)/(B3+B8),0)"
+        nueva_hoja.Range("B24").Formula = "=IFERROR((B4*B14+B9*B19)/(B4+B9),0)"
+        
+        # 8. Actualizar gráficos
+        for chart in nueva_hoja.ChartObjects():
+            chart.Chart.Refresh()
+            chart.Chart.SetSourceData(nueva_hoja.Range("B2:AH40"))  # Ajustar rango de datos
+
+        # 9. Guardar
         wb.Save()
         return True
 
     except Exception as e:
-        escribir_log(f"[CREAR_HOJA] Error crítico: {str(e)}", nivel="error")
+        escribir_log(f"[CREAR_HOJA] Error: {str(e)}", nivel="error")
         return False
         
     finally:
         # Limpieza garantizada
         try:
-            if wb:
-                wb.Close(SaveChanges=True)
-            if excel:
-                excel.Quit()
-        except:
-            pass
+            if wb: wb.Close(SaveChanges=True)
+            if excel: excel.Quit()
+        except: pass
         pythoncom.CoUninitialize()
         time.sleep(1)
 
