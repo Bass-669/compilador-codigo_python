@@ -1245,29 +1245,24 @@ from datetime import datetime
 
 
 def crear_hoja_mes(mes, anio):
-    """Versión con logging extendido para diagnóstico de problemas"""
+    """Versión mejorada que garantiza la copia completa de hojas con gráficos"""
     nombre_hoja = f"IR {mes} {anio}"
-    escribir_log(f"[CREAR_HOJA] Iniciando creación de hoja {nombre_hoja}")
-    
+    escribir_log(f"[CREAR_HOJA] Iniciando creación robusta de {nombre_hoja}")
+
     excel = None
     wb = None
     
     try:
-        # 1. Inicialización COM
-        escribir_log("[CREAR_HOJA] Inicializando COM...")
+        # 1. Configuración COM optimizada
         pythoncom.CoInitialize()
-        
-        # 2. Crear instancia Excel
-        escribir_log("[CREAR_HOJA] Creando instancia Excel...")
         excel = win32.DispatchEx("Excel.Application")
-        excel.Visible = False
-        excel.DisplayAlerts = False
-        excel.EnableEvents = False
-        excel.ScreenUpdating = False
-        escribir_log("[CREAR_HOJA] Configuración Excel completada")
+        excel.Visible = False  # ¡CRÍTICO! Evitar interacciones
+        excel.DisplayAlerts = False  # No mostrar diálogos
+        excel.EnableEvents = False  # Deshabilitar eventos
+        excel.ScreenUpdating = False  # Máximo rendimiento
+        excel.Calculation = -4135  # xlCalculationManual
         
-        # 3. Abrir archivo
-        escribir_log(f"[CREAR_HOJA] Abriendo archivo: {RUTA_ENTRADA}")
+        # 2. Abrir archivo con opciones avanzadas
         wb = excel.Workbooks.Open(
             os.path.abspath(RUTA_ENTRADA),
             UpdateLinks=0,
@@ -1275,144 +1270,82 @@ def crear_hoja_mes(mes, anio):
             IgnoreReadOnlyRecommended=True,
             CorruptLoad=1
         )
-        escribir_log("[CREAR_HOJA] Archivo abierto correctamente")
         
-        # 4. Verificar hojas existentes
-        hojas_existentes = [s.Name for s in wb.Sheets]
-        escribir_log(f"[CREAR_HOJA] Hojas existentes: {', '.join(hojas_existentes)}")
-        
-        if nombre_hoja in hojas_existentes:
-            escribir_log(f"[CREAR_HOJA] La hoja {nombre_hoja} ya existe")
+        # 3. Verificación de existencia
+        if nombre_hoja in [s.Name for s in wb.Sheets]:
             return True
+
+        # 4. Selección inteligente de hoja origen
+        def es_hoja_mensual(nombre):
+            partes = nombre.split()
+            return len(partes) == 3 and partes[0] == "IR" and partes[1] in MESES_NUM
             
-        # 5. Buscar hoja origen adecuada
-        escribir_log("[CREAR_HOJA] Buscando hoja origen...")
-        hojas_ir = [h for h in wb.Sheets if h.Name.startswith("IR ") and "diario" not in h.Name.lower()]
+        hojas_validas = [h for h in wb.Sheets if es_hoja_mensual(h.Name)]
+        hoja_origen = max(
+            (h for h in hojas_validas if MESES_NUM[h.Name.split()[1]] <= MESES_NUM[mes]),
+            key=lambda x: MESES_NUM[x.Name.split()[1]]
+        )
+
+        # 5. Protocolo de copia robusta
+        escribir_log(f"[CREAR_HOJA] Copiando desde {hoja_origen.Name}...")
         
-        def mes_score(nombre):
-            try:
-                _, m, a = nombre.split()
-                return int(a)*12 + MESES_NUM[m]
-            except Exception as e:
-                escribir_log(f"[CREAR_HOJA] Error calculando score para {nombre}: {str(e)}", nivel="warning")
-                return 0
-                
-        total_nueva = int(anio)*12 + MESES_NUM[mes]
-        hoja_origen = None
-        
-        for h in sorted(hojas_ir, key=lambda x: mes_score(x.Name), reverse=True):
-            if mes_score(h.Name) < total_nueva:
-                hoja_origen = h
-                break
-                
-        if not hoja_origen:
-            escribir_log("[CREAR_HOJA] No se encontró hoja origen válida", nivel="error")
-            return False
-            
-        escribir_log(f"[CREAR_HOJA] Hoja origen seleccionada: {hoja_origen.Name}")
-        
-        # 6. Copiar hoja
-        cuenta_original = wb.Sheets.Count
-        escribir_log(f"[CREAR_HOJA] Contando hojas antes de copiar: {cuenta_original}")
-        
-        try:
-            escribir_log("[CREAR_HOJA] Intentando copiar hoja...")
-            hoja_origen.Copy(After=wb.Sheets(cuenta_original))
-            escribir_log("[CREAR_HOJA] Comando de copia ejecutado")
-        except Exception as e:
-            escribir_log(f"[CREAR_HOJA] Error al copiar: {str(e)}", nivel="error")
-            raise
-            
-        # 7. Esperar hoja copiada
-        escribir_log("[CREAR_HOJA] Esperando aparición de nueva hoja...")
-        for i in range(30):
-            time.sleep(0.5)
-            current_count = wb.Sheets.Count
-            escribir_log(f"[CREAR_HOJA] Intento {i+1}: Hojas actuales = {current_count}")
-            
-            if current_count > cuenta_original:
-                nueva_hoja = wb.Sheets(current_count)
-                escribir_log(f"[CREAR_HOJA] Nueva hoja encontrada: {nueva_hoja.Name}")
-                break
-        else:
-            raise TimeoutError("No apareció la hoja copiada después de 15 segundos")
-            
-        # 8. Renombrar
-        try:
-            escribir_log(f"[CREAR_HOJA] Renombrando hoja a {nombre_hoja}...")
-            nueva_hoja.Name = nombre_hoja
-            escribir_log("[CREAR_HOJA] Hoja renombrada exitosamente")
-        except Exception as e:
-            escribir_log(f"[CREAR_HOJA] Error al renombrar: {str(e)}", nivel="error")
-            raise
-            
-        # 9. Actualizar gráficos
-        escribir_log("[CREAR_HOJA] Actualizando gráficos...")
+        # Paso crítico: Activar temporariamente ScreenUpdating para la copia
         excel.ScreenUpdating = True
-        chart_count = nueva_hoja.ChartObjects().Count
-        escribir_log(f"[CREAR_HOJA] La hoja tiene {chart_count} gráficos")
+        hoja_origen.Copy(After=wb.Sheets(wb.Sheets.Count))
+        excel.ScreenUpdating = False
         
-        for i, chart in enumerate(nueva_hoja.ChartObjects(), 1):
+        # Espera activa con verificación de nombres
+        nueva_hoja = None
+        for _ in range(30):  # 30 intentos de 0.5 segundos (15 seg total)
+            time.sleep(0.5)
+            for sheet in wb.Sheets:
+                if sheet.Name.startswith(f"{hoja_origen.Name} (2)"):  # Nombre temporal
+                    nueva_hoja = sheet
+                    break
+            if nueva_hoja:
+                break
+        
+        if not nueva_hoja:
+            raise Exception("No se detectó la nueva hoja después de copiar")
+
+        # 6. Renombrado seguro
+        for intento in range(3):
             try:
-                chart.Chart.Refresh()
-                escribir_log(f"[CREAR_HOJA] Gráfico {i} actualizado")
+                nueva_hoja.Name = nombre_hoja
+                break
             except Exception as e:
-                escribir_log(f"[CREAR_HOJA] Error actualizando gráfico {i}: {str(e)}", nivel="warning")
-                
-        # 10. Cálculos finales
-        escribir_log("[CREAR_HOJA] Forzando recálculo...")
+                if intento == 2:
+                    raise
+                time.sleep(1)
+
+        # 7. Reconstrucción de conexiones de gráficos
+        excel.ScreenUpdating = True  # Necesario para gráficos
+        for chart in nueva_hoja.ChartObjects():
+            chart.Chart.Refresh()
+            chart.Chart.ChartWizard()  # Reconstruir estructura
+            
+        # 8. Cálculo completo y guardado
         excel.CalculateUntilAsyncQueriesDone()
-        
-        # 11. Guardar
-        escribir_log("[CREAR_HOJA] Guardando libro...")
         wb.Save()
-        escribir_log("[CREAR_HOJA] Libro guardado exitosamente")
-        
+
         return True
-        
+
     except Exception as e:
         escribir_log(f"[CREAR_HOJA] Error crítico: {str(e)}", nivel="error")
-        # Intento de guardar diagnóstico
-        try:
-            if wb:
-                temp_path = os.path.join(tempfile.gettempdir(), f"ERROR_{nombre_hoja}_backup.xlsx")
-                wb.SaveAs(temp_path)
-                escribir_log(f"[CREAR_HOJA] Se guardó copia de diagnóstico en {temp_path}")
-        except Exception as backup_error:
-            escribir_log(f"[CREAR_HOJA] Error al guardar diagnóstico: {str(backup_error)}", nivel="warning")
-        
         return False
         
     finally:
-        escribir_log("[CREAR_HOJA] Iniciando limpieza...")
+        # Limpieza garantizada
         try:
             if wb:
-                escribir_log("[CREAR_HOJA] Cerrando libro...")
-                wb.Close(SaveChanges=False)
-        except Exception as e:
-            escribir_log(f"[CREAR_HOJA] Error al cerrar libro: {str(e)}", nivel="warning")
-            
-        try:
+                wb.Close(SaveChanges=True)
             if excel:
-                escribir_log("[CREAR_HOJA] Cerrando Excel...")
                 excel.Quit()
-        except Exception as e:
-            escribir_log(f"[CREAR_HOJA] Error al cerrar Excel: {str(e)}", nivel="warning")
-            
-        try:
-            escribir_log("[CREAR_HOJA] Liberando COM...")
-            pythoncom.CoUninitialize()
-        except Exception as e:
-            escribir_log(f"[CREAR_HOJA] Error al liberar COM: {str(e)}", nivel="warning")
-            
-        # Limpieza de objetos
-        if 'wb' in locals():
-            del wb
-        if 'excel' in locals():
-            del excel
-            
-        escribir_log("[CREAR_HOJA] Proceso de limpieza completado")
-        time.sleep(1)  # Espera adicional para liberación de recursos
+        except:
+            pass
+        pythoncom.CoUninitialize()
+        time.sleep(1)  # Espera de seguridad
+
 
 
 
