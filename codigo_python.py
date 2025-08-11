@@ -1245,99 +1245,94 @@ from datetime import datetime
 
 
 def crear_hoja_mes(mes, anio):
-    """Duplicar la última hoja 'IR ...' válida y renombrarla a 'IR <mes> <anio>'."""
+    """Versión mejorada para manejar gráficos y problemas de sincronización"""
     nombre_hoja = f"IR {mes} {anio}"
-    escribir_log(f"[CREAR_HOJA] Iniciando creación de {nombre_hoja}")
     excel = None
     wb = None
-    nueva_hoja = None
-
+    
     try:
-        import win32com.client as win32, pythoncom
+        # 1. Inicialización robusta
         pythoncom.CoInitialize()
         excel = win32.DispatchEx("Excel.Application")
         excel.Visible = False
         excel.DisplayAlerts = False
-        escribir_log("[CREAR_HOJA] Excel iniciado correctamente")
-
+        excel.EnableEvents = False
+        excel.ScreenUpdating = False
+        
+        # 2. Abrir archivo con opciones avanzadas
         wb = excel.Workbooks.Open(
             os.path.abspath(RUTA_ENTRADA),
             UpdateLinks=0,
             ReadOnly=False,
-            IgnoreReadOnlyRecommended=True
+            IgnoreReadOnlyRecommended=True,
+            CorruptLoad=1
         )
-
-        hojas_existentes = [s.Name for s in wb.Sheets]
-        if nombre_hoja in hojas_existentes:
-            escribir_log(f"[CREAR_HOJA] La hoja '{nombre_hoja}' ya existe, no se creará.")
+        
+        # 3. Verificar si ya existe
+        if nombre_hoja in [s.Name for s in wb.Sheets]:
             return True
-
-        # Filtrar hojas válidas IR
-        hojas_validas = [h for h in hojas_existentes if h.startswith("IR ") and len(h.split()) == 3 and "diario" not in h.lower()]
-        if not hojas_validas:
-            escribir_log("[CREAR_HOJA] No hay hojas válidas para copiar", nivel="error")
-            return False
-
-        def score_hoja(h):
+            
+        # 4. Buscar mejor hoja origen (similar al código antiguo)
+        hojas = [h for h in wb.Sheets if h.Name.startswith("IR ")]
+        def mes_score(nombre):
             try:
-                _, mes_str, anio_str = h.split()
-                return int(anio_str) * 12 + MESES_NUM.get(mes_str, 0)
+                _, m, a = nombre.split()
+                return int(a)*12 + MESES_NUM[m]
             except:
-                return -1
-
-        total_nueva = int(anio) * 12 + MESES_NUM[mes]
-        hoja_origen = None
-        for h in sorted(hojas_validas, key=score_hoja):
-            if score_hoja(h) < total_nueva:
-                hoja_origen = h
-
+                return 0
+                
+        hoja_origen = max(
+            [h for h in hojas if mes_score(h.Name) < int(anio)*12 + MESES_NUM[mes]],
+            key=mes_score,
+            default=None
+        )
+        
         if not hoja_origen:
-            escribir_log(f"[CREAR_HOJA] No hay hoja anterior para {nombre_hoja}", nivel="error")
-            return False
-
-        escribir_log(f"[CREAR_HOJA] Copiando desde '{hoja_origen}'")
-        cuenta_antes = wb.Sheets.Count
-        wb.Sheets(hoja_origen).Copy(After=wb.Sheets(cuenta_antes))
-
-        # Esperar aparición
-        for _ in range(20):
-            time.sleep(0.3)
-            if wb.Sheets.Count > cuenta_antes:
+            raise ValueError("No se encontró hoja origen válida")
+        
+        # 5. Copiar con manejo de errores
+        cuenta_original = wb.Sheets.Count
+        hoja_origen.Copy(After=wb.Sheets(cuenta_original))
+        
+        # Espera activa con timeout
+        for _ in range(30):
+            time.sleep(0.1)
+            if wb.Sheets.Count > cuenta_original:
                 break
         else:
-            raise Exception("No apareció la nueva hoja tras copiar")
-
-        nueva_hoja = wb.Sheets(wb.Sheets.Count)
-
-        # Renombrar con seguridad
-        for intento in range(3):
-            try:
-                nueva_hoja.Name = nombre_hoja
-                escribir_log(f"[CREAR_HOJA] Hoja renombrada a '{nombre_hoja}'")
-                break
-            except Exception as e:
-                escribir_log(f"[CREAR_HOJA] Error renombrando (intento {intento+1}): {e}", nivel="warning")
-                time.sleep(0.5)
-        else:
-            raise Exception(f"No se pudo renombrar la hoja a '{nombre_hoja}'")
-
+            raise TimeoutError("No apareció la hoja copiada")
+            
+        # 6. Configurar nueva hoja
+        nueva_hoja = wb.Sheets(cuenta_original + 1)
+        nueva_hoja.Name = nombre_hoja
+        
+        # 7. Actualizar gráficos
+        excel.ScreenUpdating = True
+        for chart in nueva_hoja.ChartObjects():
+            chart.Chart.Refresh()
+        excel.CalculateUntilAsyncQueriesDone()
+        
+        # 8. Guardar
         wb.Save()
-        escribir_log(f"[CREAR_HOJA] Hoja '{nombre_hoja}' creada correctamente")
         return True
-
+        
     except Exception as e:
-        escribir_log(f"[CREAR_HOJA] Error: {e}", nivel="error")
+        escribir_log(f"Error creando hoja: {str(e)}", nivel="error")
         return False
     finally:
+        # 9. Limpieza robusta
         try:
-            if wb: wb.Close(SaveChanges=True)
-        except: pass
-        try:
-            if excel: excel.Quit()
-        except: pass
-        try:
+            if wb:
+                wb.Save()
+                wb.Close(False)
+            if excel:
+                excel.Quit()
+        except Exception as e:
+            escribir_log(f"Error en limpieza: {str(e)}", nivel="warning")
+        finally:
             pythoncom.CoUninitialize()
-        except: pass
+            del wb, excel
+            time.sleep(1)
 
 
 def preparar_hoja_mes(mes, dia, anio):
