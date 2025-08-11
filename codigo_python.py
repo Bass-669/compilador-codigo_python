@@ -1071,142 +1071,127 @@ def fecha(mes, dia, anio, torno, bloques_detectados, sumas_ad_por_bloque, increm
 
 
 
-def preparar_hoja_mes(mes, dia, anio):
-    """Crea la hoja del mes si no existe y la configura con fórmulas iniciales."""
-    escribir_log("Inicio de preparar_hoja_mes")
-    nombre_hoja = f"IR {mes} {anio}"
-    col_dia = dia + 1
-    try:
-        # Paso 1: Verificar si la hoja ya existe con openpyxl
-        wb_check = openpyxl.load_workbook(RUTA_ENTRADA)
-        if nombre_hoja in wb_check.sheetnames:
-            hoja_existente = wb_check[nombre_hoja]
-            celdas_clave = [
-                hoja_existente.cell(row=3, column=col_dia).value,
-                hoja_existente.cell(row=4, column=col_dia).value,
-                hoja_existente.cell(row=8, column=col_dia).value,
-                hoja_existente.cell(row=9, column=col_dia).value
-            ]
-            if any(cell is not None and str(cell).strip() != "" for cell in celdas_clave):
-                escribir_log(f"El día {dia} ya tiene datos en {nombre_hoja}")
-                wb_check.close()
-                return True
-            else:
-                escribir_log(f"La hoja {nombre_hoja} ya existe y se usará tal cual.")
-                wb_check.close()
-                return True
-        wb_check.close()
-        # Paso 2: Crear hoja nueva si no existe
-        import win32com.client as win32, pythoncom
-        pythoncom.CoInitialize()
-        excel = win32.DispatchEx("Excel.Application")
-        excel.Visible = False
-        excel.DisplayAlerts = False
-        wb = excel.Workbooks.Open(os.path.abspath(RUTA_ENTRADA), UpdateLinks=0)
-        hojas = [h.Name for h in wb.Sheets]
-        if nombre_hoja not in hojas:
-            # Buscar hoja anterior para copiar
-            hojas_ir = [h for h in hojas if h.startswith("IR ") and len(h.split()) == 3]
-            def total_meses(nombre):
-                try:
-                    _, mes_str, anio_str = nombre.split()
-                    return int(anio_str) * 12 + MESES_NUM[mes_str]
-                except:
-                    return -1
-            hojas_ordenadas = sorted(hojas_ir, key=total_meses)
-            total_nueva = int(anio) * 12 + MESES_NUM[mes]
-            hoja_anterior = None
-            for h in hojas_ordenadas:
-                if total_meses(h) < total_nueva:
-                    hoja_anterior = h
-                else:
-                    break
-            if not hoja_anterior:
-                messagebox.showwarning("Orden inválido", f"No se encontró hoja anterior para '{nombre_hoja}'")
-                wb.Close(SaveChanges=False)
-                excel.Quit()
-                pythoncom.CoUninitialize()
-                return False
-            idx_anterior = hojas.index(hoja_anterior)
-            insert_idx = min(idx_anterior + 2, wb.Sheets.Count)
-            wb.Sheets(hoja_anterior).Copy(After=wb.Sheets(insert_idx - 1))
-            nueva_hoja = wb.ActiveSheet
-            nueva_hoja.Name = nombre_hoja
-            shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
-            wb.Save()
-        wb.Close(SaveChanges=True)
-        excel.Quit()
-        pythoncom.CoUninitialize()
-        # Paso 3: Configurar hoja con openpyxl
-        wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
-        hoja = wb2[nombre_hoja]
-        filas_a_limpiar = [2,3,4,7,8,9,12,13,14,17,18,19,22,23,24,27,28,31,32,33,34,37,38,39,40]
-        for fila in filas_a_limpiar:
-            for col in range(2, 35):
-                celda = hoja.cell(row=fila, column=col)
-                if not isinstance(celda, openpyxl.cell.cell.MergedCell):
-                    celda.value = ""
-        dias_mes = dias_en_mes(mes, anio)
-        for col in range(2, 2 + dias_mes):
-            dia_mes = col - 1
-            fecha = f"{dia_mes:02d}/{MESES_NUM[mes]:02d}/{anio}"
-            for fila in [2,7,12,17,22,27,31,37]:
-                hoja.cell(row=fila, column=col, value=fecha)
-        for col in range(2, 2 + dias_mes):
-            letra = openpyxl.utils.get_column_letter(col)
-            hoja.cell(row=23, column=col, value=f"=IFERROR(({letra}3*{letra}13+{letra}8*{letra}18)/({letra}3+{letra}8), 0)")
-            hoja.cell(row=24, column=col, value=f"=IFERROR(({letra}4*{letra}14+{letra}9*{letra}19)/({letra}4+{letra}9), 0)")
-            hoja.cell(row=28, column=col, value=f"=IFERROR(({letra}23*({letra}3+{letra}8)+{letra}24*({letra}4+{letra}9))/({letra}3+{letra}4+{letra}8+{letra}9), 0)")
-        hoja.cell(row=32, column=34, value="R%").font = Font(bold=True)
-        hoja.cell(row=38, column=34, value="IR%").font = Font(bold=True)
-        hoja.cell(row=32, column=34).alignment = hoja.cell(row=38, column=34).alignment = Alignment(horizontal='center', vertical='center')
-        for fila in [49,50,51]:
-            for col_limpiar in [27,28,29,30]:
-                hoja.cell(row=fila, column=col_limpiar, value=" ")
-        hoja.cell(row=2, column=34, value=int(anio))
-        for fila in [3,4,8,9]:
-            hoja.cell(row=fila, column=34, value=f"=SUM(B{fila}:AG{fila})")
-        hoja.cell(row=23, column=34, value="=(AH3*AH13+AH8*AH18)/(AH3+AH8)")
-        hoja.cell(row=24, column=34, value="=(AH4*AH14+AH9*AH19)/(AH4+AH9)")
-        hoja.cell(row=28, column=34, value="=(AH23*(AH3+AH8)+AH24*(AH4+AH9))/(AH3+AH4+AH8+AH9)")
-        hoja.cell(row=39, column=34, value="=AH33/AH28").number_format = '0.00%'
-        hoja.cell(row=40, column=34, value="=AH34/AH28").number_format = '0.00%'
-        wb2.save(RUTA_ENTRADA)
-        wb2.close()
-        # Recalcular fórmulas
-        pythoncom.CoInitialize()
-        excel = win32.DispatchEx("Excel.Application")
-        excel.Visible = False
-        excel.DisplayAlerts = False
-        wb_calc = excel.Workbooks.Open(os.path.abspath(RUTA_ENTRADA), UpdateLinks=0)
-        excel.CalculateFull()
-        wb_calc.Save()
-        wb_calc.Close()
-        excel.Quit()
-        pythoncom.CoUninitialize()
-        return True
-    except Exception as e:
-        messagebox.showerror("Error crítico", f"No se pudo completar la operación:\n{str(e)}")
-        return False
-
-def dias_en_mes(mes, anio):
-    escribir_log("Inicio de dias_en_mes")
-    """Devuelve el número de días en un mes, considerando años bisiestos para febrero"""
-    if mes == "Febrero":
-        # Año bisiesto si es divisible por 4, pero no por 100, a menos que también sea divisible por 400
-        if (anio % 4 == 0 and anio % 100 != 0) or (anio % 400 == 0):
-            return 29
-        return 28
-    meses_31_dias = ["Enero", "Marzo", "Mayo", "Julio", "Agosto", "Octubre", "Diciembre"]
-    return 31 if mes in meses_31_dias else 30
-
-
-
-
+# def preparar_hoja_mes(mes, dia, anio):
+#     """Crea la hoja del mes si no existe y la configura con fórmulas iniciales."""
+#     escribir_log("Inicio de preparar_hoja_mes")
+#     nombre_hoja = f"IR {mes} {anio}"
+#     col_dia = dia + 1
+#     try:
+#         # Paso 1: Verificar si la hoja ya existe con openpyxl
+#         wb_check = openpyxl.load_workbook(RUTA_ENTRADA)
+#         if nombre_hoja in wb_check.sheetnames:
+#             hoja_existente = wb_check[nombre_hoja]
+#             celdas_clave = [
+#                 hoja_existente.cell(row=3, column=col_dia).value,
+#                 hoja_existente.cell(row=4, column=col_dia).value,
+#                 hoja_existente.cell(row=8, column=col_dia).value,
+#                 hoja_existente.cell(row=9, column=col_dia).value
+#             ]
+#             if any(cell is not None and str(cell).strip() != "" for cell in celdas_clave):
+#                 escribir_log(f"El día {dia} ya tiene datos en {nombre_hoja}")
+#                 wb_check.close()
+#                 return True
+#             else:
+#                 escribir_log(f"La hoja {nombre_hoja} ya existe y se usará tal cual.")
+#                 wb_check.close()
+#                 return True
+#         wb_check.close()
+#         # Paso 2: Crear hoja nueva si no existe
+#         import win32com.client as win32, pythoncom
+#         pythoncom.CoInitialize()
+#         excel = win32.DispatchEx("Excel.Application")
+#         excel.Visible = False
+#         excel.DisplayAlerts = False
+#         wb = excel.Workbooks.Open(os.path.abspath(RUTA_ENTRADA), UpdateLinks=0)
+#         hojas = [h.Name for h in wb.Sheets]
+#         if nombre_hoja not in hojas:
+#             # Buscar hoja anterior para copiar
+#             hojas_ir = [h for h in hojas if h.startswith("IR ") and len(h.split()) == 3]
+#             def total_meses(nombre):
+#                 try:
+#                     _, mes_str, anio_str = nombre.split()
+#                     return int(anio_str) * 12 + MESES_NUM[mes_str]
+#                 except:
+#                     return -1
+#             hojas_ordenadas = sorted(hojas_ir, key=total_meses)
+#             total_nueva = int(anio) * 12 + MESES_NUM[mes]
+#             hoja_anterior = None
+#             for h in hojas_ordenadas:
+#                 if total_meses(h) < total_nueva:
+#                     hoja_anterior = h
+#                 else:
+#                     break
+#             if not hoja_anterior:
+#                 messagebox.showwarning("Orden inválido", f"No se encontró hoja anterior para '{nombre_hoja}'")
+#                 wb.Close(SaveChanges=False)
+#                 excel.Quit()
+#                 pythoncom.CoUninitialize()
+#                 return False
+#             idx_anterior = hojas.index(hoja_anterior)
+#             insert_idx = min(idx_anterior + 2, wb.Sheets.Count)
+#             wb.Sheets(hoja_anterior).Copy(After=wb.Sheets(insert_idx - 1))
+#             nueva_hoja = wb.ActiveSheet
+#             nueva_hoja.Name = nombre_hoja
+#             shutil.copy(RUTA_ENTRADA, os.path.join(BASE_DIR, ARCHIVO))
+#             wb.Save()
+#         wb.Close(SaveChanges=True)
+#         excel.Quit()
+#         pythoncom.CoUninitialize()
+#         # Paso 3: Configurar hoja con openpyxl
+#         wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
+#         hoja = wb2[nombre_hoja]
+#         filas_a_limpiar = [2,3,4,7,8,9,12,13,14,17,18,19,22,23,24,27,28,31,32,33,34,37,38,39,40]
+#         for fila in filas_a_limpiar:
+#             for col in range(2, 35):
+#                 celda = hoja.cell(row=fila, column=col)
+#                 if not isinstance(celda, openpyxl.cell.cell.MergedCell):
+#                     celda.value = ""
+#         dias_mes = dias_en_mes(mes, anio)
+#         for col in range(2, 2 + dias_mes):
+#             dia_mes = col - 1
+#             fecha = f"{dia_mes:02d}/{MESES_NUM[mes]:02d}/{anio}"
+#             for fila in [2,7,12,17,22,27,31,37]:
+#                 hoja.cell(row=fila, column=col, value=fecha)
+#         for col in range(2, 2 + dias_mes):
+#             letra = openpyxl.utils.get_column_letter(col)
+#             hoja.cell(row=23, column=col, value=f"=IFERROR(({letra}3*{letra}13+{letra}8*{letra}18)/({letra}3+{letra}8), 0)")
+#             hoja.cell(row=24, column=col, value=f"=IFERROR(({letra}4*{letra}14+{letra}9*{letra}19)/({letra}4+{letra}9), 0)")
+#             hoja.cell(row=28, column=col, value=f"=IFERROR(({letra}23*({letra}3+{letra}8)+{letra}24*({letra}4+{letra}9))/({letra}3+{letra}4+{letra}8+{letra}9), 0)")
+#         hoja.cell(row=32, column=34, value="R%").font = Font(bold=True)
+#         hoja.cell(row=38, column=34, value="IR%").font = Font(bold=True)
+#         hoja.cell(row=32, column=34).alignment = hoja.cell(row=38, column=34).alignment = Alignment(horizontal='center', vertical='center')
+#         for fila in [49,50,51]:
+#             for col_limpiar in [27,28,29,30]:
+#                 hoja.cell(row=fila, column=col_limpiar, value=" ")
+#         hoja.cell(row=2, column=34, value=int(anio))
+#         for fila in [3,4,8,9]:
+#             hoja.cell(row=fila, column=34, value=f"=SUM(B{fila}:AG{fila})")
+#         hoja.cell(row=23, column=34, value="=(AH3*AH13+AH8*AH18)/(AH3+AH8)")
+#         hoja.cell(row=24, column=34, value="=(AH4*AH14+AH9*AH19)/(AH4+AH9)")
+#         hoja.cell(row=28, column=34, value="=(AH23*(AH3+AH8)+AH24*(AH4+AH9))/(AH3+AH4+AH8+AH9)")
+#         hoja.cell(row=39, column=34, value="=AH33/AH28").number_format = '0.00%'
+#         hoja.cell(row=40, column=34, value="=AH34/AH28").number_format = '0.00%'
+#         wb2.save(RUTA_ENTRADA)
+#         wb2.close()
+#         # Recalcular fórmulas
+#         pythoncom.CoInitialize()
+#         excel = win32.DispatchEx("Excel.Application")
+#         excel.Visible = False
+#         excel.DisplayAlerts = False
+#         wb_calc = excel.Workbooks.Open(os.path.abspath(RUTA_ENTRADA), UpdateLinks=0)
+#         excel.CalculateFull()
+#         wb_calc.Save()
+#         wb_calc.Close()
+#         excel.Quit()
+#         pythoncom.CoUninitialize()
+#         return True
+#     except Exception as e:
+#         messagebox.showerror("Error crítico", f"No se pudo completar la operación:\n{str(e)}")
+#         return False
 
 # def dias_en_mes(mes, anio):
 #     escribir_log("Inicio de dias_en_mes")
-#     # Devuelve el número de días en un mes, considerando años bisiestos
+#     """Devuelve el número de días en un mes, considerando años bisiestos para febrero"""
 #     if mes == "Febrero":
 #         # Año bisiesto si es divisible por 4, pero no por 100, a menos que también sea divisible por 400
 #         if (anio % 4 == 0 and anio % 100 != 0) or (anio % 400 == 0):
@@ -1217,222 +1202,238 @@ def dias_en_mes(mes, anio):
 
 
 
-# # --- NUEVAS FUNCIONES ---
-# def hoja_existe_y_es_valida(nombre_hoja, dia):
-#     """Función mejorada para verificar si una hoja existe y tiene datos"""
-#     try:
-#         wb = openpyxl.load_workbook(RUTA_ENTRADA)
-#         if nombre_hoja not in wb.sheetnames:
-#             wb.close()
-#             return False
+
+
+
+
+
+# --- NUEVAS FUNCIONES ---
+def hoja_existe_y_es_valida(nombre_hoja, dia):
+    """Función mejorada para verificar si una hoja existe y tiene datos"""
+    try:
+        wb = openpyxl.load_workbook(RUTA_ENTRADA)
+        if nombre_hoja not in wb.sheetnames:
+            wb.close()
+            return False
         
-#         hoja = wb[nombre_hoja]
-#         # Verificar más celdas y con mayor tolerancia
-#         celdas_verificar = [
-#             (3, dia+1), (4, dia+1), (8, dia+1), (9, dia+1),  # Datos específicos
-#             (2, 2), (7, 2), (12, 2), (17, 2)  # Encabezados
-#         ]
+        hoja = wb[nombre_hoja]
+        # Verificar más celdas y con mayor tolerancia
+        celdas_verificar = [
+            (3, dia+1), (4, dia+1), (8, dia+1), (9, dia+1),  # Datos específicos
+            (2, 2), (7, 2), (12, 2), (17, 2)  # Encabezados
+        ]
         
-#         tiene_datos = any(
-#             hoja.cell(row=fila, column=col).value is not None 
-#             and str(hoja.cell(row=fila, column=col).value).strip() != ""
-#             for fila, col in celdas_verificar
-#         )
+        tiene_datos = any(
+            hoja.cell(row=fila, column=col).value is not None 
+            and str(hoja.cell(row=fila, column=col).value).strip() != ""
+            for fila, col in celdas_verificar
+        )
         
-#         wb.close()
-#         return tiene_datos
-#     except Exception as e:
-#         escribir_log(f"Error al verificar hoja: {str(e)}", nivel="error")
-#         return True  # Asumir que existe para evitar sobrescritura
+        wb.close()
+        return tiene_datos
+    except Exception as e:
+        escribir_log(f"Error al verificar hoja: {str(e)}", nivel="error")
+        return True  # Asumir que existe para evitar sobrescritura
 
 
 
-# import win32com.client as win32
-# import pythoncom
-# import os
-# from datetime import datetime
+import win32com.client as win32
+import pythoncom
+import os
+from datetime import datetime
 
 
 
-# def crear_hoja_mes(mes, anio):
-#     """Crear/duplicar la última hoja 'IR ...' válida y renombrarla a 'IR <mes> <anio>'."""
-#     nombre_hoja = f"IR {mes} {anio}"
-#     escribir_log(f"Iniciando creación de {nombre_hoja}")
-#     excel = None
-#     wb = None
-#     nueva_hoja = None
+def crear_hoja_mes(mes, anio):
+    """Crear/duplicar la última hoja 'IR ...' válida y renombrarla a 'IR <mes> <anio>'."""
+    nombre_hoja = f"IR {mes} {anio}"
+    escribir_log(f"Iniciando creación de {nombre_hoja}")
+    excel = None
+    wb = None
+    nueva_hoja = None
 
-#     try:
-#         pythoncom.CoInitialize()
-#         excel = win32.DispatchEx("Excel.Application")
-#         excel.Visible = False
-#         excel.DisplayAlerts = False
-#         excel.AskToUpdateLinks = False
-#         excel.EnableEvents = False
-#         excel.AutomationSecurity = 1
+    try:
+        pythoncom.CoInitialize()
+        excel = win32.DispatchEx("Excel.Application")
+        excel.Visible = False
+        excel.DisplayAlerts = False
+        excel.AskToUpdateLinks = False
+        excel.EnableEvents = False
+        excel.AutomationSecurity = 1
 
-#         wb = excel.Workbooks.Open(
-#             os.path.abspath(RUTA_ENTRADA),
-#             UpdateLinks=0,
-#             ReadOnly=False,
-#             IgnoreReadOnlyRecommended=True
-#         )
+        wb = excel.Workbooks.Open(
+            os.path.abspath(RUTA_ENTRADA),
+            UpdateLinks=0,
+            ReadOnly=False,
+            IgnoreReadOnlyRecommended=True
+        )
 
-#         hojas_antes = [s.Name for s in wb.Sheets]
-#         if nombre_hoja in hojas_antes:
-#             escribir_log(f"La hoja '{nombre_hoja}' ya existe. No se creará una nueva.")
-#             return True
+        hojas_antes = [s.Name for s in wb.Sheets]
+        if nombre_hoja in hojas_antes:
+            escribir_log(f"La hoja '{nombre_hoja}' ya existe. No se creará una nueva.")
+            return True
 
-#         hojas_validas = [h for h in hojas_antes
-#                          if h.startswith("IR ") and h != nombre_hoja and "diario" not in h.lower()]
+        hojas_validas = [h for h in hojas_antes
+                         if h.startswith("IR ") and h != nombre_hoja and "diario" not in h.lower()]
 
-#         if not hojas_validas:
-#             messagebox.showwarning("Error", "No hay hojas 'IR' válidas desde las que copiar.")
-#             escribir_log("No hay hojas válidas para copiar", nivel="error")
-#             return False
+        if not hojas_validas:
+            messagebox.showwarning("Error", "No hay hojas 'IR' válidas desde las que copiar.")
+            escribir_log("No hay hojas válidas para copiar", nivel="error")
+            return False
 
-#         def score_hoja(nombre):
-#             partes = nombre.split()
-#             if len(partes) == 3 and partes[0] == "IR":
-#                 return int(partes[2]) * 12 + MESES_NUM.get(partes[1], 0)
-#             return -1
+        def score_hoja(nombre):
+            partes = nombre.split()
+            if len(partes) == 3 and partes[0] == "IR":
+                return int(partes[2]) * 12 + MESES_NUM.get(partes[1], 0)
+            return -1
 
-#         hoja_origen = max(hojas_validas, key=score_hoja)
-#         escribir_log(f"Copiando desde hoja origen: {hoja_origen}")
+        hoja_origen = max(hojas_validas, key=score_hoja)
+        escribir_log(f"Copiando desde hoja origen: {hoja_origen}")
 
-#         origen = wb.Sheets(hoja_origen)
-#         cuenta_antes = wb.Sheets.Count
+        origen = wb.Sheets(hoja_origen)
+        cuenta_antes = wb.Sheets.Count
 
-#         # Intento de copia dentro del mismo libro (al final)
-#         origen.Copy(After=wb.Sheets(wb.Sheets.Count))
+        # Intento de copia dentro del mismo libro (al final)
+        origen.Copy(After=wb.Sheets(wb.Sheets.Count))
 
-#         # Espera activa corta para detectar la nueva hoja
-#         for _ in range(20):  # hasta ~10s (20 * 0.5)
-#             time.sleep(0.5)
-#             if wb.Sheets.Count > cuenta_antes:
-#                 break
-#         else:
-#             raise Exception("La copia no se detectó (no aumentó el número de hojas).")
+        # Espera activa corta para detectar la nueva hoja
+        for _ in range(20):  # hasta ~10s (20 * 0.5)
+            time.sleep(0.5)
+            if wb.Sheets.Count > cuenta_antes:
+                break
+        else:
+            raise Exception("La copia no se detectó (no aumentó el número de hojas).")
 
-#         # Identificar la hoja recién creada (comparando nombres)
-#         for i in range(wb.Sheets.Count, 0, -1):
-#             s = wb.Sheets(i)
-#             if s.Name not in hojas_antes:
-#                 nueva_hoja = s
-#                 break
-#         if nueva_hoja is None:
-#             nueva_hoja = wb.Sheets(wb.Sheets.Count)  # fallback
+        # Identificar la hoja recién creada (comparando nombres)
+        for i in range(wb.Sheets.Count, 0, -1):
+            s = wb.Sheets(i)
+            if s.Name not in hojas_antes:
+                nueva_hoja = s
+                break
+        if nueva_hoja is None:
+            nueva_hoja = wb.Sheets(wb.Sheets.Count)  # fallback
 
-#         # Renombrado seguro con reintentos
-#         for intento in range(4):
-#             try:
-#                 nueva_hoja.Name = nombre_hoja
-#                 break
-#             except Exception as e:
-#                 escribir_log(f"Error renombrando hoja (intento {intento+1}): {e}", nivel="warning")
-#                 # Si existe una hoja con ese nombre (conflicto), intentar eliminarla (DisplayAlerts=False evitará confirmación).
-#                 if nombre_hoja in [sh.Name for sh in wb.Sheets]:
-#                     try:
-#                         wb.Sheets(nombre_hoja).Delete()
-#                         time.sleep(0.3)
-#                         continue
-#                     except Exception:
-#                         # si no se puede eliminar, probar renombrar con nombre temporal
-#                         pass
-#                 # intentar renombrar a nombre temporal y luego al final al nombre objetivo
-#                 try:
-#                     tmp_name = f"{nombre_hoja}_tmp_{int(time.time())}"
-#                     nueva_hoja.Name = tmp_name
-#                     time.sleep(0.2)
-#                     wb.Sheets(tmp_name).Name = nombre_hoja
-#                     break
-#                 except Exception:
-#                     time.sleep(0.5)
-#                     continue
-#         else:
-#             raise Exception("No fue posible renombrar la hoja copiada.")
+        # Renombrado seguro con reintentos
+        for intento in range(4):
+            try:
+                nueva_hoja.Name = nombre_hoja
+                break
+            except Exception as e:
+                escribir_log(f"Error renombrando hoja (intento {intento+1}): {e}", nivel="warning")
+                # Si existe una hoja con ese nombre (conflicto), intentar eliminarla (DisplayAlerts=False evitará confirmación).
+                if nombre_hoja in [sh.Name for sh in wb.Sheets]:
+                    try:
+                        wb.Sheets(nombre_hoja).Delete()
+                        time.sleep(0.3)
+                        continue
+                    except Exception:
+                        # si no se puede eliminar, probar renombrar con nombre temporal
+                        pass
+                # intentar renombrar a nombre temporal y luego al final al nombre objetivo
+                try:
+                    tmp_name = f"{nombre_hoja}_tmp_{int(time.time())}"
+                    nueva_hoja.Name = tmp_name
+                    time.sleep(0.2)
+                    wb.Sheets(tmp_name).Name = nombre_hoja
+                    break
+                except Exception:
+                    time.sleep(0.5)
+                    continue
+        else:
+            raise Exception("No fue posible renombrar la hoja copiada.")
 
-#         # Guardar y terminar
-#         wb.Save()
-#         escribir_log(f"Hoja '{nombre_hoja}' creada correctamente.")
-#         return True
+        # Guardar y terminar
+        wb.Save()
+        escribir_log(f"Hoja '{nombre_hoja}' creada correctamente.")
+        return True
 
-#     except Exception as e:
-#         escribir_log(f"Error en crear_hoja_mes: {str(e)}", nivel="error")
-#         # Intento de limpieza: si quedó una hoja temporal sin renombrar, intentar eliminarla
-#         try:
-#             if wb is not None:
-#                 for s in list(wb.Sheets):
-#                     if getattr(s, "Name", "").startswith(f"{nombre_hoja}_tmp_"):
-#                         s.Delete()
-#                 wb.Save()
-#         except Exception:
-#             pass
-#         return False
+    except Exception as e:
+        escribir_log(f"Error en crear_hoja_mes: {str(e)}", nivel="error")
+        # Intento de limpieza: si quedó una hoja temporal sin renombrar, intentar eliminarla
+        try:
+            if wb is not None:
+                for s in list(wb.Sheets):
+                    if getattr(s, "Name", "").startswith(f"{nombre_hoja}_tmp_"):
+                        s.Delete()
+                wb.Save()
+        except Exception:
+            pass
+        return False
 
-#     finally:
-#         try:
-#             if wb is not None:
-#                 wb.Close(SaveChanges=True)
-#         except Exception:
-#             pass
-#         try:
-#             if excel is not None:
-#                 excel.Quit()
-#         except Exception:
-#             pass
-#         try:
-#             pythoncom.CoUninitialize()
-#         except Exception:
-#             pass
+    finally:
+        try:
+            if wb is not None:
+                wb.Close(SaveChanges=True)
+        except Exception:
+            pass
+        try:
+            if excel is not None:
+                excel.Quit()
+        except Exception:
+            pass
+        try:
+            pythoncom.CoUninitialize()
+        except Exception:
+            pass
 
 
-# def preparar_hoja_mes(mes, dia, anio):
-#     """Versión simplificada para usar con el nuevo método"""
-#     nombre_hoja = f"IR {mes} {anio}"
+def preparar_hoja_mes(mes, dia, anio):
+    """Versión simplificada para usar con el nuevo método"""
+    nombre_hoja = f"IR {mes} {anio}"
     
-#     # Verificación básica
-#     try:
-#         wb = openpyxl.load_workbook(RUTA_ENTRADA)
-#         if nombre_hoja in wb.sheetnames:
-#             wb.close()
-#             return True
-#         wb.close()
-#     except Exception as e:
-#         escribir_log(f"Error en verificación: {str(e)}", nivel="warning")
+    # Verificación básica
+    try:
+        wb = openpyxl.load_workbook(RUTA_ENTRADA)
+        if nombre_hoja in wb.sheetnames:
+            wb.close()
+            return True
+        wb.close()
+    except Exception as e:
+        escribir_log(f"Error en verificación: {str(e)}", nivel="warning")
     
-#     # Creación de nueva hoja
-#     if not crear_hoja_mes(mes, anio):
-#         messagebox.showerror("Error", "No se pudo crear la hoja del mes")
-#         return False
+    # Creación de nueva hoja
+    if not crear_hoja_mes(mes, anio):
+        messagebox.showerror("Error", "No se pudo crear la hoja del mes")
+        return False
     
-#     # Configuración mínima necesaria
-#     try:
-#         wb = openpyxl.load_workbook(RUTA_ENTRADA)
-#         hoja = wb[nombre_hoja]
+    # Configuración mínima necesaria
+    try:
+        wb = openpyxl.load_workbook(RUTA_ENTRADA)
+        hoja = wb[nombre_hoja]
         
-#         # Limpieza selectiva
-#         for fila in [3, 4, 8, 9, 13, 14, 18, 19]:  # Solo celdas críticas
-#             for col in range(2, 32):
-#                 try:
-#                     celda = hoja.cell(row=fila, column=col)
-#                     if not isinstance(celda, openpyxl.cell.cell.MergedCell):
-#                         celda.value = ""
-#                 except:
-#                     continue
+        # Limpieza selectiva
+        for fila in [3, 4, 8, 9, 13, 14, 18, 19]:  # Solo celdas críticas
+            for col in range(2, 32):
+                try:
+                    celda = hoja.cell(row=fila, column=col)
+                    if not isinstance(celda, openpyxl.cell.cell.MergedCell):
+                        celda.value = ""
+                except:
+                    continue
         
-#         wb.save(RUTA_ENTRADA)
-#         wb.close()
-#         return True
+        wb.save(RUTA_ENTRADA)
+        wb.close()
+        return True
         
-#     except Exception as e:
-#         escribir_log(f"Error en configuración: {str(e)}", nivel="error")
-#         try:
-#             wb.close()
-#         except:
-#             pass
-#         return False
+    except Exception as e:
+        escribir_log(f"Error en configuración: {str(e)}", nivel="error")
+        try:
+            wb.close()
+        except:
+            pass
+        return False
 
+
+def dias_en_mes(mes, anio):
+    escribir_log("Inicio de dias_en_mes")
+    # Devuelve el número de días en un mes, considerando años bisiestos
+    if mes == "Febrero":
+        # Año bisiesto si es divisible por 4, pero no por 100, a menos que también sea divisible por 400
+        if (anio % 4 == 0 and anio % 100 != 0) or (anio % 400 == 0):
+            return 29
+        return 28
+    meses_31_dias = ["Enero", "Marzo", "Mayo", "Julio", "Agosto", "Octubre", "Diciembre"]
+    return 31 if mes in meses_31_dias else 30
 
 
 
