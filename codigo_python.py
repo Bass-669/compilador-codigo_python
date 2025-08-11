@@ -1227,146 +1227,129 @@ def hoja_existe_y_es_valida(nombre_hoja, dia):
 #             pass
 
 
+import win32com.client as win32
+import pythoncom
+import os
+from datetime import datetime
+
 def crear_hoja_mes(mes, anio):
-    """Versión que garantiza copia perfecta de la hoja"""
+    """
+    Crea una nueva hoja para el mes/año especificado copiando la estructura de la última hoja IR existente.
+    Usa win32com para interactuar con Excel.
+    
+    Args:
+        mes (str): Nombre del mes (ej. "Agosto")
+        anio (int): Año (ej. 2025)
+        
+    Returns:
+        bool: True si tuvo éxito, False si falló
+    """
     excel = None
     wb = None
+    
     try:
-        nombre_hoja = f"IR {mes} {anio}"
-        escribir_log(f"Iniciando creación de {nombre_hoja}")
-
-        # 1. Inicialización COM con configuración óptima
+        # Inicializar COM
         pythoncom.CoInitialize()
-        excel = win32.DispatchEx("Excel.Application")
-        excel.Visible = False  # Crucial para evitar diálogos
-        excel.DisplayAlerts = False
-        excel.AskToUpdateLinks = False
-        excel.AutomationSecurity = 1  # Deshabilitar macros/alertas
-        excel.EnableEvents = False  # Deshabilitar eventos
-
-        # 2. Abrir archivo con configuraciones especiales
-        try:
-            wb = excel.Workbooks.Open(
-                os.path.abspath(RUTA_ENTRADA),
-                UpdateLinks=0,
-                ReadOnly=False,
-                IgnoreReadOnlyRecommended=True,
-                CorruptLoad=1  # Modo de recuperación
-            )
-        except Exception as e:
-            escribir_log(f"Error abriendo archivo: {str(e)}", nivel="error")
-            return False
-
-        # 3. Verificar hojas existentes
-        hojas_antes = [sheet.Name for sheet in wb.Sheets]
-        if nombre_hoja in hojas_antes:
-            escribir_log(f"Hoja {nombre_hoja} ya existe")
-            return True
-
-        # 4. Seleccionar plantilla
-        def obtener_fecha(nombre):
-            try:
-                partes = nombre.split()
-                if len(partes) == 3 and partes[0] == "IR":
-                    return (int(partes[2]), MESES_NUM.get(partes[1], 0))
-            except:
-                pass
-            return (0, 0)
-
-        hojas_validas = [s for s in hojas_antes if s.startswith("IR ") and s != nombre_hoja and not s.endswith("diario ")]
-        if not hojas_validas:
-            escribir_log("No hay hojas válidas para copiar", nivel="error")
-            return False
-
-        hoja_origen = max(hojas_validas, key=obtener_fecha)
-        escribir_log(f"Copiando desde {hoja_origen}")
-
-        # 5. Método de copiado mejorado con reintentos
-        for intento in range(3):  # 3 intentos máximo
-            try:
-                # Método directo con espera inteligente
-                count_antes = wb.Sheets.Count
-                origen = wb.Sheets(hoja_origen)
-                
-                # Intento de copiado
-                origen.Copy(After=wb.Sheets(count_antes))
-                
-                # Espera activa con verificación
-                for i in range(10):  # 10 segundos máximo
-                    time.sleep(1)
-                    if wb.Sheets.Count > count_antes:
-                        break
-                else:
-                    raise Exception("No aumentó el número de hojas")
-                
-                # Identificar nueva hoja
-                nueva_hoja = None
-                for i in range(wb.Sheets.Count, 0, -1):
-                    sheet = wb.Sheets(i)
-                    if sheet.Name not in hojas_antes:
-                        nueva_hoja = sheet
-                        break
-                
-                if not nueva_hoja:
-                    raise Exception("No se detectó hoja nueva")
-                
-                # Renombrar y verificar
-                nueva_hoja.Name = nombre_hoja
-                
-                # Verificación final
-                if nombre_hoja not in [s.Name for s in wb.Sheets]:
-                    raise Exception("Fallo en renombrado")
-                
-                # Corregir referencias en gráficos
-                for chart in nueva_hoja.ChartObjects():
-                    try:
-                        # Actualizar rangos de datos
-                        for series in chart.Chart.SeriesCollection():
-                            # Reemplazar referencias a la hoja original
-                            formula = series.Formula
-                            formula = formula.replace(hoja_origen, nombre_hoja)
-                            series.Formula = formula
-                    except Exception as e:
-                        escribir_log(f"⚠️ Error actualizando gráfico: {str(e)}", nivel="warning")
-                
-                wb.Save()
-                escribir_log(f"✅ {nombre_hoja} creada correctamente (intento {intento+1})")
+        
+        # Crear instancia de Excel
+        excel = win32.Dispatch("Excel.Application")
+        excel.Visible = False  # Ocultar Excel
+        excel.DisplayAlerts = False  # Deshabilitar alertas
+        excel.AskToUpdateLinks = False  # No preguntar por actualización de links
+        
+        # Abrir el archivo
+        wb = excel.Workbooks.Open(os.path.abspath(RUTA_ENTRADA))
+        
+        nombre_hoja_nueva = f"IR {mes} {anio}"
+        
+        # Verificar si la hoja ya existe
+        for sheet in wb.Sheets:
+            if sheet.Name == nombre_hoja_nueva:
+                escribir_log(f"La hoja {nombre_hoja_nueva} ya existe")
+                wb.Close(SaveChanges=False)
+                excel.Quit()
                 return True
-                
-            except Exception as e:
-                escribir_log(f"⚠️ Intento {intento+1} fallido: {str(e)}", nivel="warning")
-                # Limpieza antes de reintentar
-                try:
-                    if nombre_hoja in [s.Name for s in wb.Sheets]:
-                        wb.Sheets(nombre_hoja).Delete()
-                    wb.Save()
-                except:
-                    pass
-                
-                if intento == 2:  # Último intento
-                    escribir_log("❌ Todos los intentos fallaron", nivel="error")
-                    return False
-                
-                time.sleep(5)  # Espera más larga entre intentos
-                
+        
+        # Buscar la última hoja IR para copiar (excluyendo 'IR diario')
+        hojas_ir = []
+        for sheet in wb.Sheets:
+            if sheet.Name.startswith("IR ") and sheet.Name != "IR diario ":
+                hojas_ir.append(sheet.Name)
+        
+        if not hojas_ir:
+            raise Exception("No se encontraron hojas IR para copiar")
+        
+        # Ordenar hojas por fecha (más reciente primero)
+        def obtener_fecha_hoja(nombre):
+            try:
+                _, mes_hoja, anio_hoja = nombre.split()
+                return (int(anio_hoja), MESES_NUM.get(mes_hoja, 0))
+            except:
+                return (0, 0)
+        
+        hojas_ir_ordenadas = sorted(hojas_ir, key=obtener_fecha_hoja, reverse=True)
+        hoja_a_copiar = hojas_ir_ordenadas[0]  # La más reciente
+        
+        # Copiar la hoja
+        sheet_origen = wb.Sheets(hoja_a_copiar)
+        sheet_origen.Copy(After=wb.Sheets(wb.Sheets.Count))
+        nueva_hoja = wb.ActiveSheet
+        nueva_hoja.Name = nombre_hoja_nueva
+        
+        # Limpiar datos pero mantener fórmulas y formatos
+        rangos_a_limpiar = [
+            "B3:AF4",  # Datos Torno 1
+            "B8:AF9",  # Datos Torno 2
+            "B13:AF14", # Referencias Torno 1
+            "B18:AF19", # Referencias Torno 2
+            "B23:AF24", # IR Diario
+            "B32:AF34"  # Rendimientos
+        ]
+        
+        for rango in rangos_a_limpiar:
+            nueva_hoja.Range(rango).ClearContents()
+        
+        # Configurar fechas para todos los días del mes
+        dias_mes = dias_en_mes(mes, anio)
+        for dia in range(1, dias_mes + 1):
+            col = dia + 1  # Las fechas empiezan en columna B (2)
+            fecha_str = f"{dia:02d}/{MESES_NUM[mes]:02d}/{anio}"
+            
+            # Celdas donde va la fecha
+            for fila in [2, 7, 12, 17, 22, 27, 31, 37]:
+                nueva_hoja.Cells(fila, col).Value = fecha_str
+        
+        # Guardar cambios
+        wb.Save()
+
+        escribir_log(f"Hoja {nombre_hoja_nueva} creada exitosamente")
+        return True
+        
     except Exception as e:
-        escribir_log(f"💥 Error global: {str(e)}", nivel="error")
-        return False
-    finally:
+        escribir_log(f"Error al crear hoja: {str(e)}", nivel="error")
+        
+        # Limpieza de recursos
         try:
             if wb is not None:
-                wb.Close(SaveChanges=True)
+                wb.Close(SaveChanges=False)
         except:
             pass
+            
         try:
             if excel is not None:
                 excel.Quit()
         except:
             pass
+            
+        return False
+        
+    finally:
         try:
             pythoncom.CoUninitialize()
         except:
             pass
+
+
 
 def preparar_hoja_mes(mes, dia, anio):
     """Versión simplificada para usar con el nuevo método"""
