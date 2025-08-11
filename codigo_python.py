@@ -1244,23 +1244,29 @@ from datetime import datetime
 
 
 
+import pythoncom
+import win32com.client as win32
+import time
+import os
+
 def crear_hoja_mes(mes, anio):
-    """Versión definitiva que garantiza copia correcta"""
+    """Copia exacta de hoja con gráficos para Excel 2016"""
     nombre_hoja = f"IR {mes} {anio}"
-    escribir_log(f"[CREAR_HOJA] Creando {nombre_hoja}")
+    escribir_log(f"[CREAR_HOJA] Iniciando creación de {nombre_hoja}")
 
     excel = None
     wb = None
     
     try:
-        # 1. Configuración robusta
+        # 1. Configuración específica para Excel 2016
         pythoncom.CoInitialize()
         excel = win32.DispatchEx("Excel.Application")
         excel.Visible = False
         excel.DisplayAlerts = False
-        excel.ScreenUpdating = False
+        excel.AskToUpdateLinks = False
+        excel.EnableEvents = False
 
-        # 2. Abrir con acceso exclusivo
+        # 2. Abrir archivo en modo exclusivo
         wb = excel.Workbooks.Open(
             os.path.abspath(RUTA_ENTRADA),
             UpdateLinks=0,
@@ -1271,72 +1277,130 @@ def crear_hoja_mes(mes, anio):
 
         # 3. Verificar existencia
         if nombre_hoja in [s.Name for s in wb.Sheets]:
+            escribir_log(f"[CREAR_HOJA] La hoja {nombre_hoja} ya existe")
             return True
 
-        # 4. Selección PRECISA de hoja anterior
+        # 4. Selección precisa de hoja anterior
         meses_ordenados = sorted(
-            [(m, num) for m, num in MESES_NUM.items() if m != mes],
-            key=lambda x: (x[1] <= MESES_NUM[mes], x[1]),
+            [(m, num) for m, num in MESES_NUM.items()],
+            key=lambda x: x[1],
             reverse=True
         )
         
+        hoja_origen = None
         for nombre_m, num_m in meses_ordenados:
-            hoja_candidata = f"IR {nombre_m} {anio if num_m < MESES_NUM[mes] else int(anio)-1}"
-            if hoja_candidata in [s.Name for s in wb.Sheets]:
-                hoja_origen = hoja_candidata
-                break
-        else:
-            raise Exception("No hay hoja anterior válida")
+            if num_m < MESES_NUM[mes]:
+                candidata = f"IR {nombre_m} {anio}"
+                if candidata in [s.Name for s in wb.Sheets]:
+                    hoja_origen = candidata
+                    break
+
+        if not hoja_origen:
+            raise Exception("No se encontró hoja anterior válida")
 
         escribir_log(f"[CREAR_HOJA] Copiando desde {hoja_origen}")
 
-        # 5. Copia atómica con manejo de tiempo
-        excel.ScreenUpdating = True
+        # 5. Protocolo de copia robusta
+        excel.ScreenUpdating = True  # Necesario para gráficos en Excel 2016
         wb.Sheets(hoja_origen).Copy(After=wb.Sheets(wb.Sheets.Count))
         excel.ScreenUpdating = False
-        time.sleep(2)  # Espera crítica para la copia
+        time.sleep(3)  # Espera extendida para Excel 2016
 
-        # 6. Renombrar nueva hoja (siempre la última)
+        # 6. Renombrar nueva hoja
         nueva_hoja = wb.Sheets(wb.Sheets.Count)
-        for intento in range(3):
+        for intento in range(5):  # Más reintentos para Excel 2016
             try:
                 nueva_hoja.Name = nombre_hoja
                 break
-            except:
-                time.sleep(1)
+            except Exception as e:
+                escribir_log(f"[CREAR_HOJA] Intento {intento+1} fallido: {str(e)}")
+                time.sleep(2)
+                if intento == 4:
+                    raise
 
-        # 7. Limpieza selectiva (solo la nueva hoja)
-        celdas_limpiar = ["B3:B4", "B8:B9", "B13:B19", "B23:B24", "B28:B40"]
-        for rango in celdas_limpiar:
-            nueva_hoja.Range(rango).Value = "" if "B13" in rango else 0
-
-        # 8. Actualización garantizada de gráficos
+        # 7. Actualización de gráficos (2 gráficos por hoja)
         excel.ScreenUpdating = True
-        for chart in nueva_hoja.ChartObjects():
-            chart.Chart.Refresh()
-            chart.Chart.ChartTitle.Text = chart.Chart.ChartTitle.Text.replace(
-                hoja_origen.split()[1], mes
-            )
-        
-        wb.Save()
+        for i, chart in enumerate(nueva_hoja.ChartObjects(), 1):
+            try:
+                chart.Chart.Refresh()
+                # Actualizar títulos si es necesario
+                if i == 1:  # Primer gráfico
+                    chart.Chart.ChartTitle.Text = chart.Chart.ChartTitle.Text.replace(
+                        hoja_origen.split()[1], mes
+                    )
+                elif i == 2:  # Segundo gráfico
+                    chart.Chart.ChartTitle.Text = chart.Chart.ChartTitle.Text.replace(
+                        hoja_origen.split()[1], mes
+                    )
+                time.sleep(1)  # Espera entre gráficos
+            except Exception as e:
+                escribir_log(f"[CREAR_HOJA] Error en gráfico {i}: {str(e)}", nivel="warning")
+
+        # 8. Guardado seguro
+        for intento in range(3):
+            try:
+                wb.Save()
+                break
+            except Exception as e:
+                if intento == 2:
+                    raise
+                time.sleep(2)
+                escribir_log(f"[CREAR_HOJA] Intento {intento+1} de guardado fallido", nivel="warning")
+
         return True
 
     except Exception as e:
-        escribir_log(f"[CREAR_HOJA] Error: {str(e)}", nivel="error")
+        escribir_log(f"[CREAR_HOJA] Error crítico: {str(e)}", nivel="error")
         return False
         
     finally:
-        # 9. Liberación garantizada de recursos
+        # 9. Cierre garantizado - EXTRA ROBUSTO
         try:
-            if wb: 
-                wb.Close(SaveChanges=True)
-                time.sleep(1)  # Espera para liberar lock
-            if excel: 
-                excel.Quit()
-        except: pass
-        pythoncom.CoUninitialize()
-        time.sleep(2)  # Espera adicional de seguridad
+            if 'wb' in locals() and wb is not None:
+                for i in range(3):  # Reintentos para cerrar
+                    try:
+                        wb.Close(SaveChanges=True)
+                        break
+                    except:
+                        if i == 2:
+                            escribir_log("[CREAR_HOJA] No se pudo cerrar el libro", nivel="error")
+                        time.sleep(2)
+        except:
+            pass
 
+        try:
+            if 'excel' in locals() and excel is not None:
+                for i in range(3):  # Reintentos para cerrar Excel
+                    try:
+                        excel.Quit()
+                        break
+                    except:
+                        if i == 2:
+                            escribir_log("[CREAR_HOJA] No se pudo cerrar Excel", nivel="error")
+                        time.sleep(2)
+        except:
+            pass
+
+        try:
+            pythoncom.CoUninitialize()
+        except:
+            pass
+
+        # Limpieza final de objetos COM
+        time.sleep(3)  # Espera extendida para liberación de recursos
+        del excel, wb
+
+
+
+import psutil
+def verificar_procesos_excel():
+    for proc in psutil.process_iter(['name']):
+        if proc.info['name'] == 'EXCEL.EXE':
+            try:
+                proc.terminate()
+                escribir_log(f"Proceso Excel terminado: PID {proc.pid}")
+            except:
+                pass
 
 
 
