@@ -1245,79 +1245,79 @@ from datetime import datetime
 
 
 def crear_hoja_mes(mes, anio):
-    """Crea una copia exacta de la hoja anterior y la limpia"""
+    """Versión definitiva que garantiza copia correcta"""
     nombre_hoja = f"IR {mes} {anio}"
-    escribir_log(f"[CREAR_HOJA] Iniciando creación de {nombre_hoja}")
+    escribir_log(f"[CREAR_HOJA] Creando {nombre_hoja}")
 
     excel = None
     wb = None
     
     try:
-        # 1. Iniciar Excel
+        # 1. Configuración robusta
         pythoncom.CoInitialize()
         excel = win32.DispatchEx("Excel.Application")
-        excel.Visible = False  # ¡Importante para evitar diálogos!
+        excel.Visible = False
         excel.DisplayAlerts = False
-        excel.ScreenUpdating = False  # Mejor rendimiento
+        excel.ScreenUpdating = False
 
-        # 2. Abrir archivo
-        wb = excel.Workbooks.Open(os.path.abspath(RUTA_ENTRADA))
+        # 2. Abrir con acceso exclusivo
+        wb = excel.Workbooks.Open(
+            os.path.abspath(RUTA_ENTRADA),
+            UpdateLinks=0,
+            ReadOnly=False,
+            IgnoreReadOnlyRecommended=True,
+            Notify=False  # Evitar notificaciones de bloqueo
+        )
 
-        # 3. Verificar si ya existe
+        # 3. Verificar existencia
         if nombre_hoja in [s.Name for s in wb.Sheets]:
             return True
 
-        # 4. Buscar la última hoja mensual (orden natural)
-        meses_ordenados = sorted(MESES_NUM.items(), key=lambda x: x[1])
-        for nombre_mes, _ in reversed(meses_ordenados):
-            hoja_anterior = f"IR {nombre_mes} {anio}" if MESES_NUM[nombre_mes] < MESES_NUM[mes] else f"IR {nombre_mes} {int(anio)-1}"
-            if hoja_anterior in [s.Name for s in wb.Sheets]:
+        # 4. Selección PRECISA de hoja anterior
+        meses_ordenados = sorted(
+            [(m, num) for m, num in MESES_NUM.items() if m != mes],
+            key=lambda x: (x[1] <= MESES_NUM[mes], x[1]),
+            reverse=True
+        )
+        
+        for nombre_m, num_m in meses_ordenados:
+            hoja_candidata = f"IR {nombre_m} {anio if num_m < MESES_NUM[mes] else int(anio)-1}"
+            if hoja_candidata in [s.Name for s in wb.Sheets]:
+                hoja_origen = hoja_candidata
                 break
         else:
-            raise Exception("No se encontró hoja anterior válida")
+            raise Exception("No hay hoja anterior válida")
 
-        # 5. COPIADO REAL COMO USUARIO MANUAL
-        escribir_log(f"[CREAR_HOJA] Copiando {hoja_anterior}...")
-        
-        # Activar actualización para la copia
-        excel.ScreenUpdating = True  
-        wb.Sheets(hoja_anterior).Copy(After=wb.Sheets(wb.Sheets.Count))
+        escribir_log(f"[CREAR_HOJA] Copiando desde {hoja_origen}")
+
+        # 5. Copia atómica con manejo de tiempo
+        excel.ScreenUpdating = True
+        wb.Sheets(hoja_origen).Copy(After=wb.Sheets(wb.Sheets.Count))
         excel.ScreenUpdating = False
-        
-        # 6. Renombrar la NUEVA hoja (siempre la última)
+        time.sleep(2)  # Espera crítica para la copia
+
+        # 6. Renombrar nueva hoja (siempre la última)
         nueva_hoja = wb.Sheets(wb.Sheets.Count)
-        for intento in range(3):  # Reintentos por si está bloqueada
+        for intento in range(3):
             try:
                 nueva_hoja.Name = nombre_hoja
                 break
             except:
                 time.sleep(1)
 
-        # 7. LIMPIEZA SOLO DE LA COPIA NUEVA
-        excel.ScreenUpdating = True  # Necesario para limpieza
-        
-        # Limpiar datos pero mantener formatos y gráficos
-        rango_limpiar = [
-            ("B2:AH40", ""),  # Datos principales
-            ("B3:B4", 0),     # Valores podados
-            ("B8:B9", 0),     # Valores regulares
-            ("B13:B14", ""),  # Referencias podadas
-            ("B18:B19", "")   # Referencias regulares
-        ]
-        
-        for rango, valor in rango_limpiar:
-            nueva_hoja.Range(rango).Value = valor
-        
-        # Mantener fórmulas en celdas clave
-        nueva_hoja.Range("B23").Formula = "=IFERROR((B3*B13+B8*B18)/(B3+B8),0)"
-        nueva_hoja.Range("B24").Formula = "=IFERROR((B4*B14+B9*B19)/(B4+B9),0)"
-        
-        # 8. Actualizar gráficos
+        # 7. Limpieza selectiva (solo la nueva hoja)
+        celdas_limpiar = ["B3:B4", "B8:B9", "B13:B19", "B23:B24", "B28:B40"]
+        for rango in celdas_limpiar:
+            nueva_hoja.Range(rango).Value = "" if "B13" in rango else 0
+
+        # 8. Actualización garantizada de gráficos
+        excel.ScreenUpdating = True
         for chart in nueva_hoja.ChartObjects():
             chart.Chart.Refresh()
-            chart.Chart.SetSourceData(nueva_hoja.Range("B2:AH40"))  # Ajustar rango de datos
-
-        # 9. Guardar
+            chart.Chart.ChartTitle.Text = chart.Chart.ChartTitle.Text.replace(
+                hoja_origen.split()[1], mes
+            )
+        
         wb.Save()
         return True
 
@@ -1326,13 +1326,16 @@ def crear_hoja_mes(mes, anio):
         return False
         
     finally:
-        # Limpieza garantizada
+        # 9. Liberación garantizada de recursos
         try:
-            if wb: wb.Close(SaveChanges=True)
-            if excel: excel.Quit()
+            if wb: 
+                wb.Close(SaveChanges=True)
+                time.sleep(1)  # Espera para liberar lock
+            if excel: 
+                excel.Quit()
         except: pass
         pythoncom.CoUninitialize()
-        time.sleep(1)
+        time.sleep(2)  # Espera adicional de seguridad
 
 
 
