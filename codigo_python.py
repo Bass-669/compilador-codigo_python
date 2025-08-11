@@ -1418,6 +1418,7 @@ def preparar_hoja_mes(mes, dia, anio):
 
 
 
+
 def dias_en_mes(mes, anio):
     escribir_log("Inicio de dias_en_mes")
     # Devuelve el número de días en un mes, considerando años bisiestos
