@@ -1232,122 +1232,140 @@ import pythoncom
 import os
 from datetime import datetime
 
+
+
 def crear_hoja_mes(mes, anio):
-    """
-    Crea una nueva hoja para el mes/año especificado copiando la estructura de la última hoja IR existente.
-    Usa win32com para interactuar con Excel.
-    
-    Args:
-        mes (str): Nombre del mes (ej. "Agosto")
-        anio (int): Año (ej. 2025)
-        
-    Returns:
-        bool: True si tuvo éxito, False si falló
-    """
+    """Crear/duplicar la última hoja 'IR ...' válida y renombrarla a 'IR <mes> <anio>'."""
+    nombre_hoja = f"IR {mes} {anio}"
+    escribir_log(f"Iniciando creación de {nombre_hoja}")
     excel = None
     wb = None
-    
-    try:
-        # Inicializar COM
-        pythoncom.CoInitialize()
-        
-        # Crear instancia de Excel
-        excel = win32.Dispatch("Excel.Application")
-        excel.Visible = False  # Ocultar Excel
-        excel.DisplayAlerts = False  # Deshabilitar alertas
-        excel.AskToUpdateLinks = False  # No preguntar por actualización de links
-        
-        # Abrir el archivo
-        wb = excel.Workbooks.Open(os.path.abspath(RUTA_ENTRADA))
-        
-        nombre_hoja_nueva = f"IR {mes} {anio}"
-        
-        # Verificar si la hoja ya existe
-        for sheet in wb.Sheets:
-            if sheet.Name == nombre_hoja_nueva:
-                escribir_log(f"La hoja {nombre_hoja_nueva} ya existe")
-                wb.Close(SaveChanges=False)
-                excel.Quit()
-                return True
-        
-        # Buscar la última hoja IR para copiar (excluyendo 'IR diario')
-        hojas_ir = []
-        for sheet in wb.Sheets:
-            if sheet.Name.startswith("IR ") and sheet.Name != "IR diario ":
-                hojas_ir.append(sheet.Name)
-        
-        if not hojas_ir:
-            raise Exception("No se encontraron hojas IR para copiar")
-        
-        # Ordenar hojas por fecha (más reciente primero)
-        def obtener_fecha_hoja(nombre):
-            try:
-                _, mes_hoja, anio_hoja = nombre.split()
-                return (int(anio_hoja), MESES_NUM.get(mes_hoja, 0))
-            except:
-                return (0, 0)
-        
-        hojas_ir_ordenadas = sorted(hojas_ir, key=obtener_fecha_hoja, reverse=True)
-        hoja_a_copiar = hojas_ir_ordenadas[0]  # La más reciente
-        
-        # Copiar la hoja
-        sheet_origen = wb.Sheets(hoja_a_copiar)
-        sheet_origen.Copy(After=wb.Sheets(wb.Sheets.Count))
-        nueva_hoja = wb.ActiveSheet
-        nueva_hoja.Name = nombre_hoja_nueva
-        
-        # Limpiar datos pero mantener fórmulas y formatos
-        rangos_a_limpiar = [
-            "B3:AF4",  # Datos Torno 1
-            "B8:AF9",  # Datos Torno 2
-            "B13:AF14", # Referencias Torno 1
-            "B18:AF19", # Referencias Torno 2
-            "B23:AF24", # IR Diario
-            "B32:AF34"  # Rendimientos
-        ]
-        
-        for rango in rangos_a_limpiar:
-            nueva_hoja.Range(rango).ClearContents()
-        
-        # Configurar fechas para todos los días del mes
-        dias_mes = dias_en_mes(mes, anio)
-        for dia in range(1, dias_mes + 1):
-            col = dia + 1  # Las fechas empiezan en columna B (2)
-            fecha_str = f"{dia:02d}/{MESES_NUM[mes]:02d}/{anio}"
-            
-            # Celdas donde va la fecha
-            for fila in [2, 7, 12, 17, 22, 27, 31, 37]:
-                nueva_hoja.Cells(fila, col).Value = fecha_str
-        
-        # Guardar cambios
-        wb.Save()
+    nueva_hoja = None
 
-        escribir_log(f"Hoja {nombre_hoja_nueva} creada exitosamente")
+    try:
+        pythoncom.CoInitialize()
+        excel = win32.DispatchEx("Excel.Application")
+        excel.Visible = False
+        excel.DisplayAlerts = False
+        excel.AskToUpdateLinks = False
+        excel.EnableEvents = False
+        excel.AutomationSecurity = 1
+
+        wb = excel.Workbooks.Open(
+            os.path.abspath(RUTA_ENTRADA),
+            UpdateLinks=0,
+            ReadOnly=False,
+            IgnoreReadOnlyRecommended=True
+        )
+
+        hojas_antes = [s.Name for s in wb.Sheets]
+        if nombre_hoja in hojas_antes:
+            escribir_log(f"La hoja '{nombre_hoja}' ya existe. No se creará una nueva.")
+            return True
+
+        hojas_validas = [h for h in hojas_antes
+                         if h.startswith("IR ") and h != nombre_hoja and "diario" not in h.lower()]
+
+        if not hojas_validas:
+            messagebox.showwarning("Error", "No hay hojas 'IR' válidas desde las que copiar.")
+            escribir_log("No hay hojas válidas para copiar", nivel="error")
+            return False
+
+        def score_hoja(nombre):
+            partes = nombre.split()
+            if len(partes) == 3 and partes[0] == "IR":
+                return int(partes[2]) * 12 + MESES_NUM.get(partes[1], 0)
+            return -1
+
+        hoja_origen = max(hojas_validas, key=score_hoja)
+        escribir_log(f"Copiando desde hoja origen: {hoja_origen}")
+
+        origen = wb.Sheets(hoja_origen)
+        cuenta_antes = wb.Sheets.Count
+
+        # Intento de copia dentro del mismo libro (al final)
+        origen.Copy(After=wb.Sheets(wb.Sheets.Count))
+
+        # Espera activa corta para detectar la nueva hoja
+        for _ in range(20):  # hasta ~10s (20 * 0.5)
+            time.sleep(0.5)
+            if wb.Sheets.Count > cuenta_antes:
+                break
+        else:
+            raise Exception("La copia no se detectó (no aumentó el número de hojas).")
+
+        # Identificar la hoja recién creada (comparando nombres)
+        for i in range(wb.Sheets.Count, 0, -1):
+            s = wb.Sheets(i)
+            if s.Name not in hojas_antes:
+                nueva_hoja = s
+                break
+        if nueva_hoja is None:
+            nueva_hoja = wb.Sheets(wb.Sheets.Count)  # fallback
+
+        # Renombrado seguro con reintentos
+        for intento in range(4):
+            try:
+                nueva_hoja.Name = nombre_hoja
+                break
+            except Exception as e:
+                escribir_log(f"Error renombrando hoja (intento {intento+1}): {e}", nivel="warning")
+                # Si existe una hoja con ese nombre (conflicto), intentar eliminarla (DisplayAlerts=False evitará confirmación).
+                if nombre_hoja in [sh.Name for sh in wb.Sheets]:
+                    try:
+                        wb.Sheets(nombre_hoja).Delete()
+                        time.sleep(0.3)
+                        continue
+                    except Exception:
+                        # si no se puede eliminar, probar renombrar con nombre temporal
+                        pass
+                # intentar renombrar a nombre temporal y luego al final al nombre objetivo
+                try:
+                    tmp_name = f"{nombre_hoja}_tmp_{int(time.time())}"
+                    nueva_hoja.Name = tmp_name
+                    time.sleep(0.2)
+                    wb.Sheets(tmp_name).Name = nombre_hoja
+                    break
+                except Exception:
+                    time.sleep(0.5)
+                    continue
+        else:
+            raise Exception("No fue posible renombrar la hoja copiada.")
+
+        # Guardar y terminar
+        wb.Save()
+        escribir_log(f"Hoja '{nombre_hoja}' creada correctamente.")
         return True
-        
+
     except Exception as e:
-        escribir_log(f"Error al crear hoja: {str(e)}", nivel="error")
-        
-        # Limpieza de recursos
+        escribir_log(f"Error en crear_hoja_mes: {str(e)}", nivel="error")
+        # Intento de limpieza: si quedó una hoja temporal sin renombrar, intentar eliminarla
         try:
             if wb is not None:
-                wb.Close(SaveChanges=False)
-        except:
+                for s in list(wb.Sheets):
+                    if getattr(s, "Name", "").startswith(f"{nombre_hoja}_tmp_"):
+                        s.Delete()
+                wb.Save()
+        except Exception:
             pass
-            
+        return False
+
+    finally:
+        try:
+            if wb is not None:
+                wb.Close(SaveChanges=True)
+        except Exception:
+            pass
         try:
             if excel is not None:
                 excel.Quit()
-        except:
+        except Exception:
             pass
-            
-        return False
-        
-    finally:
         try:
             pythoncom.CoUninitialize()
-        except:
+        except Exception:
             pass
+
 
 
 
