@@ -1245,7 +1245,7 @@ from datetime import datetime
 
 
 def crear_hoja_mes(mes, anio):
-    """Versión mejorada que garantiza la copia completa de hojas con gráficos"""
+    """Versión corregida sin modificar Calculation"""
     nombre_hoja = f"IR {mes} {anio}"
     escribir_log(f"[CREAR_HOJA] Iniciando creación robusta de {nombre_hoja}")
 
@@ -1253,62 +1253,61 @@ def crear_hoja_mes(mes, anio):
     wb = None
     
     try:
-        # 1. Configuración COM optimizada
+        # 1. Configuración COM optimizada (sin Calculation)
         pythoncom.CoInitialize()
         excel = win32.DispatchEx("Excel.Application")
-        excel.Visible = False  # ¡CRÍTICO! Evitar interacciones
-        excel.DisplayAlerts = False  # No mostrar diálogos
-        excel.EnableEvents = False  # Deshabilitar eventos
-        excel.ScreenUpdating = False  # Máximo rendimiento
-        excel.Calculation = -4135  # xlCalculationManual
+        excel.Visible = False
+        excel.DisplayAlerts = False
+        excel.EnableEvents = False
+        excel.ScreenUpdating = False  # Mantenemos esto porque es crítico
         
         # 2. Abrir archivo con opciones avanzadas
         wb = excel.Workbooks.Open(
             os.path.abspath(RUTA_ENTRADA),
             UpdateLinks=0,
             ReadOnly=False,
-            IgnoreReadOnlyRecommended=True,
-            CorruptLoad=1
+            IgnoreReadOnlyRecommended=True
         )
         
         # 3. Verificación de existencia
         if nombre_hoja in [s.Name for s in wb.Sheets]:
             return True
 
-        # 4. Selección inteligente de hoja origen
-        def es_hoja_mensual(nombre):
-            partes = nombre.split()
-            return len(partes) == 3 and partes[0] == "IR" and partes[1] in MESES_NUM
+        # 4. Selección de hoja origen (versión simplificada)
+        def es_hoja_valida(nombre):
+            try:
+                _, m, a = nombre.split()
+                return m in MESES_NUM and int(a) <= int(anio)
+            except:
+                return False
+                
+        hojas_validas = [h for h in wb.Sheets if es_hoja_valida(h.Name)]
+        if not hojas_validas:
+            raise ValueError("No hay hojas válidas para copiar")
             
-        hojas_validas = [h for h in wb.Sheets if es_hoja_mensual(h.Name)]
         hoja_origen = max(
-            (h for h in hojas_validas if MESES_NUM[h.Name.split()[1]] <= MESES_NUM[mes]),
-            key=lambda x: MESES_NUM[x.Name.split()[1]]
+            hojas_validas,
+            key=lambda x: (int(x.Name.split()[2]), MESES_NUM[x.Name.split()[1]])
         )
 
-        # 5. Protocolo de copia robusta
+        # 5. Protocolo de copia mejorado
         escribir_log(f"[CREAR_HOJA] Copiando desde {hoja_origen.Name}...")
         
-        # Paso crítico: Activar temporariamente ScreenUpdating para la copia
-        excel.ScreenUpdating = True
+        # Método alternativo de copia que funciona en más versiones
         hoja_origen.Copy(After=wb.Sheets(wb.Sheets.Count))
-        excel.ScreenUpdating = False
+        time.sleep(2)  # Espera generosa
         
-        # Espera activa con verificación de nombres
+        # Buscar la hoja recién copiada
         nueva_hoja = None
-        for _ in range(30):  # 30 intentos de 0.5 segundos (15 seg total)
-            time.sleep(0.5)
-            for sheet in wb.Sheets:
-                if sheet.Name.startswith(f"{hoja_origen.Name} (2)"):  # Nombre temporal
-                    nueva_hoja = sheet
-                    break
-            if nueva_hoja:
+        for sheet in wb.Sheets:
+            if sheet.Name.startswith(hoja_origen.Name):
+                nueva_hoja = sheet
                 break
-        
+                
         if not nueva_hoja:
-            raise Exception("No se detectó la nueva hoja después de copiar")
+            raise Exception("No se detectó la nueva hoja")
 
-        # 6. Renombrado seguro
+        # 6. Renombrado seguro con reintentos
         for intento in range(3):
             try:
                 nueva_hoja.Name = nombre_hoja
@@ -1317,17 +1316,19 @@ def crear_hoja_mes(mes, anio):
                 if intento == 2:
                     raise
                 time.sleep(1)
+                excel.ScreenUpdating = True  # Activar temporalmente
+                time.sleep(1)
+                excel.ScreenUpdating = False
 
-        # 7. Reconstrucción de conexiones de gráficos
-        excel.ScreenUpdating = True  # Necesario para gráficos
+        # 7. Forzar actualización de gráficos
+        excel.ScreenUpdating = True
         for chart in nueva_hoja.ChartObjects():
-            chart.Chart.Refresh()
-            chart.Chart.ChartWizard()  # Reconstruir estructura
-            
-        # 8. Cálculo completo y guardado
-        excel.CalculateUntilAsyncQueriesDone()
+            try:
+                chart.Chart.Refresh()
+            except Exception as e:
+                escribir_log(f"Error actualizando gráfico: {str(e)}", nivel="warning")
+        
         wb.Save()
-
         return True
 
     except Exception as e:
@@ -1344,7 +1345,7 @@ def crear_hoja_mes(mes, anio):
         except:
             pass
         pythoncom.CoUninitialize()
-        time.sleep(1)  # Espera de seguridad
+        time.sleep(1)
 
 
 
