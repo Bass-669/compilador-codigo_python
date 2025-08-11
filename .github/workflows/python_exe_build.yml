@@ -27,8 +27,8 @@ jobs:
         pip install tkcalendar
         pip install xlwings
         pip install pywin32
-        
         pip install pandas
+        pip install psutil  # AGREGAR ESTA DEPENDENCIA FALTANTE
         pip install --upgrade numpy pandas pyinstaller
         pip install numpy pandas pywin32 openpyxl
         
@@ -36,7 +36,7 @@ jobs:
       run: mkdir reportes
 
     - name: Build EXE
-      run: pyinstaller --onefile --windowed --name=procesador_excel_gui --hidden-import=openpyxl --hidden-import=tkinter --exclude-module=numpy codigo_python.py
+      run: pyinstaller --onefile --windowed --name=procesador_excel_gui --hidden-import=openpyxl --hidden-import=tkinter --hidden-import=psutil --exclude-module=numpy codigo_python.py
 
     - name: Crear archivo LEEME
       run: echo "Este archivo fue generado automáticamente. Es seguro y no contiene malware." > dist\LEEME.txt
@@ -50,8 +50,6 @@ jobs:
         name: procesador_excel
         path: dist/procesador_excel.zip
         retention-days: 1
-
-
 
 
 
