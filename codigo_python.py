@@ -1189,7 +1189,16 @@ def preparar_hoja_mes(mes, dia, anio):
         messagebox.showerror("Error crítico", f"No se pudo completar la operación:\n{str(e)}")
         return False
 
-
+def dias_en_mes(mes, anio):
+    escribir_log("Inicio de dias_en_mes")
+    """Devuelve el número de días en un mes, considerando años bisiestos para febrero"""
+    if mes == "Febrero":
+        # Año bisiesto si es divisible por 4, pero no por 100, a menos que también sea divisible por 400
+        if (anio % 4 == 0 and anio % 100 != 0) or (anio % 400 == 0):
+            return 29
+        return 28
+    meses_31_dias = ["Enero", "Marzo", "Mayo", "Julio", "Agosto", "Octubre", "Diciembre"]
+    return 31 if mes in meses_31_dias else 30
 
 
 
