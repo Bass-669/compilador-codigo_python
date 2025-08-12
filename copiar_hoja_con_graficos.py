@@ -95,6 +95,13 @@ def copiar_hoja():
         excel = win32.Dispatch("Excel.Application")
         excel.Visible = False
         excel.DisplayAlerts = False
+        excel.EnableEvents = False
+        excel.AskToUpdateLinks = False
+
+        wb_origen = None
+        wb_destino = None
+        hoja_origen = None
+        nueva_hoja = None
         
         ruta_plantilla, ruta_destino = verificar_archivos()
         
@@ -103,7 +110,12 @@ def copiar_hoja():
         wb_origen = excel.Workbooks.Open(ruta_plantilla)
         
         logger.info(f"Abriendo archivo destino: {ruta_destino}")
-        wb_destino = excel.Workbooks.Open(ruta_destino)
+        wb_destino = excel.Workbooks.Open(
+                os.path.abspath(RUTA_ENTRADA),
+                UpdateLinks=0,
+                IgnoreReadOnlyRecommended=True,
+                ReadOnly=False
+            )
         
         # Buscar hoja en origen
         logger.info(f"Buscando hoja origen: {NOMBRE_HOJA_ORIGEN}")
