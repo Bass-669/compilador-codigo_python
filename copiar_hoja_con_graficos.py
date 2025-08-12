@@ -133,5 +133,3 @@ if __name__ == "__main__":
         copiar_hoja()
     except Exception as e:
         sys.exit(1)
-    finally:
-        Print("prueba")
