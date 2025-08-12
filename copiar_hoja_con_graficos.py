@@ -6,6 +6,13 @@ import tempfile
 import sys
 import ctypes
 
+# ========== CONFIGURACIÓN MODIFICABLE ==========
+ARCHIVO_PLANTILLA_NOMBRE = "plantilla.xlsx"  # Nombre del archivo plantilla
+ARCHIVO_DESTINO_NOMBRE = "prueba.xlsx"       # Nombre del archivo destino
+NOMBRE_HOJA_A_COPIAR = "Informe Mensual"     # Nombre de la hoja a copiar (cambiar según necesidad)
+CREAR_DESTINO_SI_NO_EXISTE = True            # Si True, crea el archivo destino si no existe
+# ==============================================
+
 def mostrar_mensaje(mensaje, titulo="Excel Copier", es_error=False):
     """Muestra mensaje en cuadro de diálogo"""
     estilo = 0x10 if es_error else 0x40  # 0x10: icono error, 0x40: icono info
@@ -46,27 +53,31 @@ def escribir_log(mensaje, nivel="info"):
     except Exception:
         pass
 
-
 def verificar_archivos(plantilla, destino):
     """Verifica que los archivos existan y sean accesibles"""
     if not os.path.exists(plantilla):
-        escribir_log(f"Archivo plantilla no encontrado: {plantilla}", "error")
-        raise FileNotFoundError(f"No se encontró el archivo plantilla: {plantilla}")
+        error_msg = f"Archivo plantilla no encontrado: {plantilla}"
+        escribir_log(error_msg, "error")
+        raise FileNotFoundError(error_msg)
     
     if not os.path.exists(destino):
-        escribir_log(f"Creando archivo de destino vacío: {destino}", "warning")
-        try:
-            # Crear un archivo Excel vacío
-            excel = win32.Dispatch("Excel.Application")
-            excel.Visible = False
-            wb = excel.Workbooks.Add()
-            wb.SaveAs(destino)
-            wb.Close()
-            excel.Quit()
-            escribir_log(f"Archivo de destino creado exitosamente: {destino}")
-        except Exception as e:
-            escribir_log(f"Error al crear archivo de destino: {str(e)}", "error")
-            raise
+        if CREAR_DESTINO_SI_NO_EXISTE:
+            escribir_log(f"Creando archivo de destino: {destino}", "info")
+            try:
+                excel = win32.Dispatch("Excel.Application")
+                excel.Visible = False
+                wb = excel.Workbooks.Add()
+                wb.SaveAs(destino)
+                wb.Close()
+                excel.Quit()
+                escribir_log(f"Archivo de destino creado exitosamente: {destino}")
+            except Exception as e:
+                escribir_log(f"Error al crear archivo de destino: {str(e)}", "error")
+                raise
+        else:
+            error_msg = f"Archivo destino no encontrado: {destino}"
+            escribir_log(error_msg, "error")
+            raise FileNotFoundError(error_msg)
 
 def copiar_hoja_con_graficos(origen_path, destino_path, nombre_hoja):
     """Copia una hoja con gráficos entre archivos Excel"""
@@ -109,6 +120,7 @@ def copiar_hoja_con_graficos(origen_path, destino_path, nombre_hoja):
         wb_destino.Save()
         
         escribir_log("Proceso completado exitosamente")
+        mostrar_mensaje(f"Hoja '{nombre_hoja}' copiada exitosamente a {ARCHIVO_DESTINO_NOMBRE}")
         
     except Exception as e:
         escribir_log(f"Error durante el proceso: {str(e)}", "error")
@@ -127,26 +139,28 @@ def copiar_hoja_con_graficos(origen_path, destino_path, nombre_hoja):
 
 if __name__ == "__main__":
     try:
-        mostrar_mensaje("Iniciando proceso de copia de Excel")
-        
         # Obtener directorio del ejecutable (no __file__ en .exe)
         if getattr(sys, 'frozen', False):
             directorio = os.path.dirname(sys.executable)
         else:
             directorio = os.path.dirname(__file__)
             
-        ARCHIVO_PLANTILLA = os.path.join(directorio, "plantilla.xlsx")
-        ARCHIVO_PRUEBAS = os.path.join(directorio, "pruebas.xlsx")
-        NOMBRE_HOJA = "IR Julio 2025"
+        ARCHIVO_PLANTILLA = os.path.join(directorio, ARCHIVO_PLANTILLA_NOMBRE)
+        ARCHIVO_DESTINO = os.path.join(directorio, ARCHIVO_DESTINO_NOMBRE)
         
-        escribir_log(f"Buscando plantilla en: {ARCHIVO_PLANTILLA}")
+        mostrar_mensaje(
+            f"Se copiará la hoja:\n'{NOMBRE_HOJA_A_COPIAR}'\n\n"
+            f"Desde:\n{ARCHIVO_PLANTILLA_NOMBRE}\n\n"
+            f"Hacia:\n{ARCHIVO_DESTINO_NOMBRE}",
+            "Confirmación de Proceso"
+        )
         
-        if not os.path.exists(ARCHIVO_PLANTILLA):
-            raise FileNotFoundError(f"No se encuentra: {ARCHIVO_PLANTILLA}")
-            
-        copiar_hoja_con_graficos(ARCHIVO_PLANTILLA, ARCHIVO_PRUEBAS, NOMBRE_HOJA)
-        mostrar_mensaje("Proceso completado exitosamente")
+        escribir_log(f"Iniciando proceso con hoja: {NOMBRE_HOJA_A_COPIAR}")
+        escribir_log(f"Archivo plantilla: {ARCHIVO_PLANTILLA}")
+        escribir_log(f"Archivo destino: {ARCHIVO_DESTINO}")
+        
+        copiar_hoja_con_graficos(ARCHIVO_PLANTILLA, ARCHIVO_DESTINO, NOMBRE_HOJA_A_COPIAR)
         
     except Exception as e:
-        escribir_log(f"Error: {str(e)}", "error")
+        escribir_log(f"Error fatal: {str(e)}", "error")
         sys.exit(1)
