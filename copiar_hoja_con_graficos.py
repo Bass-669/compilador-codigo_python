@@ -8,36 +8,40 @@ import sys
 
 # Configuración básica
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CARPETA = "reportes"  # Carpeta para logs (se creará si no existe)
 
 def configurar_logging():
-    """Configura el sistema de logging con archivo rotativo"""
-    log_file = os.path.join(BASE_DIR, "prueba.log")
-    
+    """Configura logging con consola y archivo"""
     logger = logging.getLogger('ExcelCopyLogger')
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG)  # Nivel más detallado
     
-    formatter = logging.Formatter(
-        '%(asctime)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
     
-    try:
-        os.makedirs(os.path.dirname(log_file), exist_ok=True)
-        handler = RotatingFileHandler(
-            log_file,
-            maxBytes=5*1024*1024,  # 5 MB
-            backupCount=3,
-            encoding='utf-8'
-        )
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-    except Exception as e:
-        print(f"No se pudo configurar archivo de log: {e}", file=sys.stderr)
-        # Fallback a consola
-        console_handler = logging.StreamHandler()
-        console_handler.setFormatter(formatter)
-        logger.addHandler(console_handler)
+    # Handler de consola (SIEMPRE activo)
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+    
+    # Intentar archivo de log en tempdir si falla en BASE_DIR
+    log_locations = [
+        os.path.join(BASE_DIR, "prueba.log"),
+        os.path.join(tempfile.gettempdir(), "excel_copy.log")
+    ]
+    
+    for log_file in log_locations:
+        try:
+            os.makedirs(os.path.dirname(log_file), exist_ok=True)
+            file_handler = RotatingFileHandler(
+                log_file,
+                maxBytes=5*1024*1024,
+                backupCount=3,
+                encoding='utf-8'
+            )
+            file_handler.setFormatter(formatter)
+            logger.addHandler(file_handler)
+            logger.info(f"Log configurado en: {log_file}")
+            break
+        except Exception as e:
+            logger.warning(f"No se pudo crear log en {log_file}: {str(e)}")
     
     return logger
 
@@ -136,6 +140,8 @@ def copiar_hoja_con_graficos(origen_path, destino_path, nombre_hoja):
             escribir_log(f"Error al cerrar recursos: {str(e)}", "warning")
 
 if __name__ == "__main__":
+    logger.info("Mensaje de prueba INFO")
+    logger.error("Mensaje de prueba ERROR")
     try:
         # Configurar rutas en el mismo directorio del script
         directorio_script = os.path.dirname(os.path.abspath(__file__))
