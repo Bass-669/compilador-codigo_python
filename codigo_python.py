@@ -1619,29 +1619,13 @@ def preparar_hoja_mes(mes, dia, anio):
         wb2.save(RUTA_ENTRADA)
         wb2.close()
 
-        # 4. Recalcular fórmulas en Excel
-        pythoncom.CoInitialize()
-        excel = win32.DispatchEx("Excel.Application")
-        excel.Visible = False
-        excel.DisplayAlerts = False
-        wb_calc = excel.Workbooks.Open(os.path.abspath(RUTA_ENTRADA), UpdateLinks=0)
-        excel.CalculateFull()
-        wb_calc.Save()
-        wb_calc.Close()
-        excel.Quit()
-        pythoncom.CoUninitialize()
-
-        # Limpieza final
-        del wb_calc, excel
-        gc.collect()
-        time.sleep(0.5)
-
         return True
 
     except Exception as e:
         escribir_log(f"Error en preparar_hoja_mes: {str(e)}", nivel="error")
         messagebox.showerror("Error crítico", f"No se pudo preparar la hoja del mes:\n{str(e)}")
         return False
+
 
 
 
