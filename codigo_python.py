@@ -1510,7 +1510,6 @@ def preparar_hoja_mes(mes, dia, anio):
     """Crea la hoja del mes copiándola desde la plantilla y la configura."""
     escribir_log("Inicio de preparar_hoja_mes")
     nombre_hoja = f"IR {mes} {anio}"
-    col_dia = dia + 1
 
     try:
         # 1. Verificar si la hoja ya existe
@@ -1521,17 +1520,20 @@ def preparar_hoja_mes(mes, dia, anio):
             return True
         wb_check.close()
 
-        # 2. Copiar desde plantilla usando win32com
+        # 2. Ruta de plantilla
         plantilla_path = os.path.join(BASE_DIR, "plantilla.xlsx")
         if not os.path.exists(plantilla_path):
             messagebox.showerror("Error", f"No se encontró la plantilla:\n{plantilla_path}")
             escribir_log(f"No se encontró la plantilla en {plantilla_path}", nivel="error")
             return False
 
+        # 3. Copiar desde plantilla usando win32com
         pythoncom.CoInitialize()
         excel = win32.Dispatch("Excel.Application")
         excel.Visible = False
         excel.DisplayAlerts = False
+        excel.EnableEvents = False
+        excel.AskToUpdateLinks = False
 
         wb_origen = None
         wb_destino = None
@@ -1539,18 +1541,29 @@ def preparar_hoja_mes(mes, dia, anio):
         nueva_hoja = None
 
         try:
-            wb_origen = excel.Workbooks.Open(plantilla_path)
-            wb_destino = excel.Workbooks.Open(os.path.abspath(RUTA_ENTRADA))
+            # Abrir plantilla
+            wb_origen = excel.Workbooks.Open(
+                plantilla_path,
+                UpdateLinks=0,
+                IgnoreReadOnlyRecommended=True,
+                ReadOnly=False
+            )
 
-            # Buscar hoja origen
-            for sheet in wb_origen.Sheets:
-                if sheet.Name.startswith("IR "):  # Plantilla base
-                    hoja_origen = sheet
-                    break
-            if not hoja_origen:
-                raise Exception("No se encontró hoja origen en la plantilla")
+            # Abrir libro destino
+            wb_destino = excel.Workbooks.Open(
+                os.path.abspath(RUTA_ENTRADA),
+                UpdateLinks=0,
+                IgnoreReadOnlyRecommended=True,
+                ReadOnly=False
+            )
 
-            # Copiar hoja y renombrar
+            # Seleccionar hoja origen EXACTA
+            try:
+                hoja_origen = wb_origen.Sheets("IR PLANTILLA")  # Cambia por el nombre real en la plantilla
+            except:
+                hoja_origen = wb_origen.Sheets(1)  # Primera hoja como fallback
+
+            # Copiar hoja al final del libro destino
             hoja_origen.Copy(After=wb_destino.Sheets(wb_destino.Sheets.Count))
             nueva_hoja = wb_destino.Sheets(wb_destino.Sheets.Count)
             nueva_hoja.Name = nombre_hoja
