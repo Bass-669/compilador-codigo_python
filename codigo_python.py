@@ -1507,120 +1507,128 @@ import os
 
 
 def preparar_hoja_mes(mes, dia, anio):
-    """Crea la hoja del mes si no existe usando el método probado de copia"""
+    """Crea la hoja del mes copiándola desde la plantilla y la configura."""
+    escribir_log("Inicio de preparar_hoja_mes")
     nombre_hoja = f"IR {mes} {anio}"
-    escribir_log(f"Iniciando preparación de hoja para {mes} {anio}")
-    
+    col_dia = dia + 1
+
     try:
         # 1. Verificar si la hoja ya existe
         wb_check = openpyxl.load_workbook(RUTA_ENTRADA)
         if nombre_hoja in wb_check.sheetnames:
-            escribir_log(f"La hoja '{nombre_hoja}' ya existe")
+            escribir_log(f"La hoja '{nombre_hoja}' ya existe. Se usará tal cual.")
             wb_check.close()
             return True
         wb_check.close()
 
-        # 2. Determinar la hoja anterior a copiar
-        mes_num = MESES_NUM[mes]
-        prev_mes_num = mes_num - 1 if mes_num > 1 else 12
-        prev_anio = anio if mes_num > 1 else anio - 1
-        
-        prev_mes = [k for k, v in MESES_NUM.items() if v == prev_mes_num][0]
-        nombre_hoja_anterior = f"IR {prev_mes} {prev_anio}"
-        escribir_log(f"Buscando hoja anterior: {nombre_hoja_anterior}")
+        # 2. Copiar desde plantilla usando win32com
+        plantilla_path = os.path.join(BASE_DIR, "plantilla.xlsx")
+        if not os.path.exists(plantilla_path):
+            messagebox.showerror("Error", f"No se encontró la plantilla:\n{plantilla_path}")
+            escribir_log(f"No se encontró la plantilla en {plantilla_path}", nivel="error")
+            return False
 
-        # 3. Usar win32com para copiar la hoja (como en el código de prueba)
+        pythoncom.CoInitialize()
+        excel = win32.Dispatch("Excel.Application")
+        excel.Visible = False
+        excel.DisplayAlerts = False
+
+        wb_origen = excel.Workbooks.Open(plantilla_path)
+        wb_destino = excel.Workbooks.Open(os.path.abspath(RUTA_ENTRADA))
+
+        # Buscar hoja origen
+        hoja_origen = None
+        for sheet in wb_origen.Sheets:
+            if sheet.Name.startswith("IR "):  # Plantilla base
+                hoja_origen = sheet
+                break
+        if not hoja_origen:
+            escribir_log("No se encontró hoja origen en plantilla", nivel="error")
+            messagebox.showerror("Error", "No se encontró hoja origen en la plantilla")
+            wb_origen.Close(False)
+            wb_destino.Close(False)
+            excel.Quit()
+            pythoncom.CoUninitialize()
+            return False
+
+        # Copiar hoja y renombrar
+        hoja_origen.Copy(After=wb_destino.Sheets(wb_destino.Sheets.Count))
+        nueva_hoja = wb_destino.Sheets(wb_destino.Sheets.Count)
+        nueva_hoja.Name = nombre_hoja
+        wb_destino.Save()
+
+        wb_origen.Close(False)
+        wb_destino.Close(True)
+        excel.Quit()
+        pythoncom.CoUninitialize()
+
+        escribir_log(f"Hoja '{nombre_hoja}' creada correctamente desde plantilla.")
+
+        # 3. Limpiar y configurar con openpyxl
+        wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
+        hoja = wb2[nombre_hoja]
+
+        # Limpiar celdas
+        filas_a_limpiar = [2,3,4,7,8,9,12,13,14,17,18,19,22,23,24,27,28,31,32,33,34,37,38,39,40]
+        for fila in filas_a_limpiar:
+            for col in range(2, 35):
+                celda = hoja.cell(row=fila, column=col)
+                if not isinstance(celda, openpyxl.cell.cell.MergedCell):
+                    celda.value = ""
+
+        # Fechas del mes
+        dias_mes = dias_en_mes(mes, anio)
+        for col in range(2, 2 + dias_mes):
+            dia_mes = col - 1
+            fecha = f"{dia_mes:02d}/{MESES_NUM[mes]:02d}/{anio}"
+            for fila in [2,7,12,17,22,27,31,37]:
+                hoja.cell(row=fila, column=col, value=fecha)
+
+        # Fórmulas clave
+        for col in range(2, 2 + dias_mes):
+            letra = openpyxl.utils.get_column_letter(col)
+            hoja.cell(row=23, column=col, value=f"=IFERROR(({letra}3*{letra}13+{letra}8*{letra}18)/({letra}3+{letra}8), 0)")
+            hoja.cell(row=24, column=col, value=f"=IFERROR(({letra}4*{letra}14+{letra}9*{letra}19)/({letra}4+{letra}9), 0)")
+            hoja.cell(row=28, column=col, value=f"=IFERROR(({letra}23*({letra}3+{letra}8)+{letra}24*({letra}4+{letra}9))/({letra}3+{letra}4+{letra}8+{letra}9), 0)")
+
+        # Encabezados y totales
+        hoja.cell(row=32, column=34, value="R%").font = Font(bold=True)
+        hoja.cell(row=38, column=34, value="IR%").font = Font(bold=True)
+        hoja.cell(row=32, column=34).alignment = hoja.cell(row=38, column=34).alignment = Alignment(horizontal='center', vertical='center')
+        for fila in [49,50,51]:
+            for col_limpiar in [27,28,29,30]:
+                hoja.cell(row=fila, column=col_limpiar, value=" ")
+        hoja.cell(row=2, column=34, value=int(anio))
+        for fila in [3,4,8,9]:
+            hoja.cell(row=fila, column=34, value=f"=SUM(B{fila}:AG{fila})")
+        hoja.cell(row=23, column=34, value="=(AH3*AH13+AH8*AH18)/(AH3+AH8)")
+        hoja.cell(row=24, column=34, value="=(AH4*AH14+AH9*AH19)/(AH4+AH9)")
+        hoja.cell(row=28, column=34, value="=(AH23*(AH3+AH8)+AH24*(AH4+AH9))/(AH3+AH4+AH8+AH9)")
+        hoja.cell(row=39, column=34, value="=AH33/AH28").number_format = '0.00%'
+        hoja.cell(row=40, column=34, value="=AH34/AH28").number_format = '0.00%'
+
+        wb2.save(RUTA_ENTRADA)
+        wb2.close()
+
+        # 4. Recalcular fórmulas en Excel
         pythoncom.CoInitialize()
         excel = win32.DispatchEx("Excel.Application")
         excel.Visible = False
         excel.DisplayAlerts = False
-        excel.EnableEvents = False
-        
-        try:
-            # Abrir archivo
-            wb = excel.Workbooks.Open(os.path.abspath(RUTA_ENTRADA))
-            
-            # Verificar si existe la hoja anterior
-            hojas = [sheet.Name for sheet in wb.Sheets]
-            if nombre_hoja_anterior not in hojas:
-                # Buscar cualquier hoja IR existente como fallback
-                hojas_ir = [h for h in hojas if h.startswith("IR ")]
-                if not hojas_ir:
-                    raise Exception("No hay hojas IR para copiar")
-                nombre_hoja_anterior = hojas_ir[-1]  # Última hoja disponible
-            
-            # Copiar hoja (método probado del código de prueba)
-            sheet_origen = wb.Sheets(nombre_hoja_anterior)
-            sheet_origen.Copy(After=wb.Sheets(wb.Sheets.Count))
-            nueva_hoja = wb.ActiveSheet
-            nueva_hoja.Name = nombre_hoja
-            escribir_log(f"Hoja creada: {nombre_hoja} copiada de {nombre_hoja_anterior}")
+        wb_calc = excel.Workbooks.Open(os.path.abspath(RUTA_ENTRADA), UpdateLinks=0)
+        excel.CalculateFull()
+        wb_calc.Save()
+        wb_calc.Close()
+        excel.Quit()
+        pythoncom.CoUninitialize()
 
-            # Actualizar títulos de gráficos
-            for chart_obj in nueva_hoja.ChartObjects():
-                try:
-                    chart = chart_obj.Chart
-                    if chart.HasTitle:
-                        titulo = chart.ChartTitle.Text
-                        # Actualizar mes y año en el título
-                        nuevo_titulo = titulo.replace(str(prev_anio), str(anio))
-                        nuevo_titulo = nuevo_titulo.replace(prev_mes, mes)
-                        chart.ChartTitle.Text = nuevo_titulo
-                        escribir_log(f"Gráfico actualizado: {nuevo_titulo}")
-                except Exception as e:
-                    escribir_log(f"Error actualizando gráfico: {str(e)}", "warning")
-
-            # Guardar cambios
-            wb.Save()
-            wb.Close(True)
-            excel.Quit()
-            pythoncom.CoUninitialize()
-            
-        except Exception as e:
-            escribir_log(f"Error creando hoja: {str(e)}", "error")
-            try:
-                wb.Close(False)
-            except: pass
-            try:
-                excel.Quit()
-            except: pass
-            pythoncom.CoUninitialize()
-            return False
-
-        # 4. Configurar la nueva hoja con openpyxl
-        wb_openpyxl = openpyxl.load_workbook(RUTA_ENTRADA)
-        hoja = wb_openpyxl[nombre_hoja]
-        
-        # Limpiar datos pero mantener fórmulas
-        dias_mes = dias_en_mes(mes, anio)
-        filas_a_limpiar = [3,4,8,9,13,14,18,19,23,24,28,32,33,34,38,39,40]
-        
-        for fila in filas_a_limpiar:
-            for col in range(2, 2 + dias_mes):  # Columnas B-AG
-                if not isinstance(hoja.cell(row=fila, column=col), openpyxl.cell.cell.MergedCell):
-                    hoja.cell(row=fila, column=col, value="")
-
-        # Configurar fechas
-        for col in range(2, 2 + dias_mes):
-            dia_mes = col - 1
-            fecha_str = f"{dia_mes:02d}/{mes_num:02d}/{anio}"
-            for fila in [2,7,12,17,22,27,31,37]:
-                hoja.cell(row=fila, column=col, value=fecha_str)
-
-        # Configurar fórmulas de resumen
-        letra_final = openpyxl.utils.get_column_letter(1 + dias_mes)
-        for fila in [3,4,8,9]:
-            hoja.cell(row=fila, column=34, value=f"=SUM(B{fila}:{letra_final}{fila})")
-        
-        # Guardar cambios
-        wb_openpyxl.save(RUTA_ENTRADA)
-        wb_openpyxl.close()
-        escribir_log(f"Configuración de {nombre_hoja} completada")
         return True
 
     except Exception as e:
-        escribir_log(f"Error crítico en preparar_hoja_mes: {str(e)}", "error")
+        escribir_log(f"Error en preparar_hoja_mes: {str(e)}", nivel="error")
+        messagebox.showerror("Error crítico", f"No se pudo preparar la hoja del mes:\n{str(e)}")
         return False
+
 
 def dias_en_mes(mes, anio):
     """Calcula días en mes considerando años bisiestos"""
