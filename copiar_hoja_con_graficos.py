@@ -8,9 +8,9 @@ import time
 
 # ========== CONFIGURACIÓN MODIFICABLE ==========
 ARCHIVO_PLANTILLA = "plantilla.xlsx"      # Nombre del archivo origen
-ARCHIVO_DESTINO = "prueba.xlsx"           # Nombre del archivo destino
-NOMBRE_HOJA_ORIGEN = "IR Julio 2025"      # Nombre de la hoja a copiar (en plantilla.xlsx)
-NOMBRE_HOJA_DESTINO = "Informe Mensual"   # Nombre que tendrá la hoja copiada (en prueba.xlsx)
+ARCHIVO_DESTINO = "Reporte IR Tornos.xlsx"           # Nombre del archivo destino
+NOMBRE_HOJA_ORIGEN = "PLANTILLA"      # Nombre de la hoja a copiar (en plantilla.xlsx)
+NOMBRE_HOJA_DESTINO = "IR Agosto 2025"   # Nombre que tendrá la hoja copiada (en prueba.xlsx)
 # ==============================================
 
 def get_script_dir():
