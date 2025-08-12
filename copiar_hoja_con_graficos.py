@@ -6,18 +6,15 @@ from logging.handlers import RotatingFileHandler
 import tempfile
 import sys
 
-# Configuración de paths
+# Configuración básica
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CARPETA = "reportes"  # Carpeta donde se guardarán los logs
+CARPETA = "reportes"  # Carpeta para logs (se creará si no existe)
 
 def configurar_logging():
     """Configura el sistema de logging con archivo rotativo"""
-    posibles_rutas = [
-        os.path.join(BASE_DIR, "prueba.log"),  # Archivo en el mismo directorio
-        os.path.join(tempfile.gettempdir(), "prueba.log")  # Archivo en temp
-    ]
+    log_file = os.path.join(BASE_DIR, "prueba.log")
     
-    logger = logging.getLogger('ExcelLogger')
+    logger = logging.getLogger('ExcelCopyLogger')
     logger.setLevel(logging.INFO)
     
     formatter = logging.Formatter(
@@ -25,32 +22,29 @@ def configurar_logging():
         datefmt='%Y-%m-%d %H:%M:%S'
     )
     
-    for ruta in posibles_rutas:
-        try:
-            os.makedirs(os.path.dirname(ruta), exist_ok=True)
-            handler = RotatingFileHandler(
-                ruta,
-                maxBytes=5*1024*1024,  # 5 MB
-                backupCount=3,
-                encoding='utf-8'
-            )
-            handler.setFormatter(formatter)
-            logger.addHandler(handler)
-            return logger
-        except Exception as e:
-            print(f"No se pudo configurar log en {ruta}: {e}", file=sys.stderr)
+    try:
+        os.makedirs(os.path.dirname(log_file), exist_ok=True)
+        handler = RotatingFileHandler(
+            log_file,
+            maxBytes=5*1024*1024,  # 5 MB
+            backupCount=3,
+            encoding='utf-8'
+        )
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+    except Exception as e:
+        print(f"No se pudo configurar archivo de log: {e}", file=sys.stderr)
+        # Fallback a consola
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
     
-    # Fallback a consola si no se pudo crear archivo
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
-    logger.warning("No se pudo crear archivo de log. Usando consola.")
     return logger
 
 logger = configurar_logging()
 
 def escribir_log(mensaje, nivel="info"):
-    """Escribe un mensaje en el log con el nivel especificado"""
+    """Escribe un mensaje en el log"""
     try:
         if nivel.lower() == "info":
             logger.info(mensaje)
@@ -63,16 +57,30 @@ def escribir_log(mensaje, nivel="info"):
     except Exception as e:
         print(f"Error al escribir en log: {e}", file=sys.stderr)
 
-def copiar_hoja_con_graficos(origen_path, destino_path, nombre_hoja):
-    """
-    Copia una hoja específica con todos sus gráficos de un archivo Excel a otro.
+def verificar_archivos(plantilla, destino):
+    """Verifica que los archivos existan y sean accesibles"""
+    if not os.path.exists(plantilla):
+        escribir_log(f"Archivo plantilla no encontrado: {plantilla}", "error")
+        raise FileNotFoundError(f"No se encontró el archivo plantilla: {plantilla}")
     
-    Args:
-        origen_path (str): Ruta del archivo Excel de origen (plantilla)
-        destino_path (str): Ruta del archivo Excel de destino (pruebas)
-        nombre_hoja (str): Nombre de la hoja a copiar
-    """
-    escribir_log(f"Iniciando copia de hoja '{nombre_hoja}' de {origen_path} a {destino_path}")
+    if not os.path.exists(destino):
+        escribir_log(f"Creando archivo de destino vacío: {destino}", "warning")
+        try:
+            # Crear un archivo Excel vacío
+            excel = win32.Dispatch("Excel.Application")
+            excel.Visible = False
+            wb = excel.Workbooks.Add()
+            wb.SaveAs(destino)
+            wb.Close()
+            excel.Quit()
+            escribir_log(f"Archivo de destino creado exitosamente: {destino}")
+        except Exception as e:
+            escribir_log(f"Error al crear archivo de destino: {str(e)}", "error")
+            raise
+
+def copiar_hoja_con_graficos(origen_path, destino_path, nombre_hoja):
+    """Copia una hoja con gráficos entre archivos Excel"""
+    escribir_log(f"Iniciando proceso de copia de hoja '{nombre_hoja}'")
     
     pythoncom.CoInitialize()
     excel = win32.Dispatch("Excel.Application")
@@ -80,7 +88,9 @@ def copiar_hoja_con_graficos(origen_path, destino_path, nombre_hoja):
     excel.DisplayAlerts = False
     
     try:
-        # Abrir archivos
+        # Verificar y abrir archivos
+        verificar_archivos(origen_path, destino_path)
+        
         escribir_log(f"Abriendo archivo origen: {origen_path}")
         wb_origen = excel.Workbooks.Open(os.path.abspath(origen_path))
         
@@ -88,7 +98,7 @@ def copiar_hoja_con_graficos(origen_path, destino_path, nombre_hoja):
         wb_destino = excel.Workbooks.Open(os.path.abspath(destino_path))
         
         # Buscar hoja en origen
-        escribir_log(f"Buscando hoja '{nombre_hoja}' en archivo origen")
+        escribir_log(f"Buscando hoja '{nombre_hoja}' en origen")
         hoja_origen = None
         for sheet in wb_origen.Sheets:
             if sheet.Name == nombre_hoja:
@@ -96,31 +106,30 @@ def copiar_hoja_con_graficos(origen_path, destino_path, nombre_hoja):
                 break
         
         if not hoja_origen:
-            error_msg = f"No se encontró la hoja '{nombre_hoja}' en el archivo de origen"
+            error_msg = f"Hoja '{nombre_hoja}' no encontrada en {origen_path}"
             escribir_log(error_msg, "error")
             raise Exception(error_msg)
         
-        # Copiar hoja al destino
-        escribir_log(f"Copiando hoja '{nombre_hoja}' al archivo destino")
-        hoja_origen.Copy(Before=wb_destino.Sheets(wb_destino.Sheets.Count))
-        nueva_hoja = wb_destino.ActiveSheet
+        # Copiar hoja
+        escribir_log(f"Copiando hoja '{nombre_hoja}' a destino")
+        hoja_origen.Copy(Before=wb_destino.Sheets(1))  # Copiar al inicio
         
         # Guardar cambios
         escribir_log("Guardando cambios en archivo destino")
         wb_destino.Save()
         
-        escribir_log(f"Operación completada exitosamente. Hoja '{nombre_hoja}' copiada")
+        escribir_log("Proceso completado exitosamente")
         
     except Exception as e:
-        error_msg = f"Error durante la copia: {str(e)}"
-        escribir_log(error_msg, "error")
+        escribir_log(f"Error durante el proceso: {str(e)}", "error")
         raise
     finally:
-        # Cerrar siempre los archivos y Excel
         try:
-            escribir_log("Cerrando archivos Excel")
-            wb_origen.Close(SaveChanges=False)
-            wb_destino.Close(SaveChanges=True)
+            escribir_log("Cerrando archivos y liberando recursos")
+            if 'wb_origen' in locals():
+                wb_origen.Close(False)
+            if 'wb_destino' in locals():
+                wb_destino.Close(True)
             excel.Quit()
             pythoncom.CoUninitialize()
         except Exception as e:
@@ -128,27 +137,22 @@ def copiar_hoja_con_graficos(origen_path, destino_path, nombre_hoja):
 
 if __name__ == "__main__":
     try:
-        # Configurar rutas
-        directorio_actual = os.path.dirname(os.path.abspath(__file__))
-        ARCHIVO_PLANTILLA = os.path.join(directorio_actual, "plantilla.xlsx")
-        ARCHIVO_PRUEBAS = os.path.join(directorio_actual, "pruebas.xlsx")
+        # Configurar rutas en el mismo directorio del script
+        directorio_script = os.path.dirname(os.path.abspath(__file__))
+        ARCHIVO_PLANTILLA = os.path.join(directorio_script, "plantilla.xlsx")
+        ARCHIVO_PRUEBAS = os.path.join(directorio_script, "pruebas.xlsx")
         NOMBRE_HOJA = "IR Julio 2025"
         
-        escribir_log(f"Directorios configurados: Origen={ARCHIVO_PLANTILLA}, Destino={ARCHIVO_PRUEBAS}")
+        escribir_log(f"Script iniciado desde: {directorio_script}")
+        escribir_log(f"Archivo plantilla: {ARCHIVO_PLANTILLA}")
+        escribir_log(f"Archivo pruebas: {ARCHIVO_PRUEBAS}")
         
-        # Verificar archivos
-        if not os.path.exists(ARCHIVO_PLANTILLA):
-            error_msg = f"Archivo plantilla no encontrado: {ARCHIVO_PLANTILLA}"
-            escribir_log(error_msg, "error")
-            raise FileNotFoundError(error_msg)
-            
-        if not os.path.exists(ARCHIVO_PRUEBAS):
-            escribir_log(f"Creando archivo de pruebas vacío: {ARCHIVO_PRUEBAS}", "warning")
-            open(ARCHIVO_PRUEBAS, 'a').close()  # Crear archivo vacío si no existe
-            
+        # Mostrar contenido del directorio para diagnóstico
+        escribir_log(f"Contenido del directorio: {os.listdir(directorio_script)}")
+        
         # Ejecutar copia
         copiar_hoja_con_graficos(ARCHIVO_PLANTILLA, ARCHIVO_PRUEBAS, NOMBRE_HOJA)
         
     except Exception as e:
-        escribir_log(f"Error en ejecución principal: {str(e)}", "error")
-        raise
+        escribir_log(f"Error fatal: {str(e)}", "error")
+        sys.exit(1)
