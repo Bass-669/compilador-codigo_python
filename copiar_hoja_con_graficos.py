@@ -2,19 +2,18 @@ import win32com.client as win32
 import pythoncom
 import os
 import logging
-import tempfile
 import sys
 import ctypes
 
 # ========== CONFIGURACIÓN ==========
-ARCHIVO_PLANTILLA = "plantilla.xlsx"  # Archivo de origen (no modificar)
-ARCHIVO_DESTINO = "prueba.xlsx"       # Archivo de destino (no modificar)
-NOMBRE_HOJA_A_COPIAR = "IR Julio 2025"      # Cambiar por el nombre exacto de la hoja a copiar
+ARCHIVO_PLANTILLA = "plantilla.xlsx"  # Nombre exacto del archivo origen
+ARCHIVO_DESTINO = "prueba.xlsx"       # Nombre exacto del archivo destino
+NOMBRE_HOJA_A_COPIAR = "IR Julio 2025" # Nombre exacto de la hoja a copiar
 # ===================================
 
 def mostrar_mensaje(mensaje, titulo="Excel Copier", es_error=False):
     """Muestra mensaje en cuadro de diálogo"""
-    estilo = 0x10 if es_error else 0x40
+    estilo = 0x10 if es_error else 0x40  # 0x10: icono error, 0x40: icono info
     ctypes.windll.user32.MessageBoxW(0, mensaje, titulo, estilo)
 
 def configurar_logging():
@@ -24,40 +23,67 @@ def configurar_logging():
     
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     
-    # Log en el directorio del script
-    log_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'excel_copy.log')
+    # Configurar handler para consola
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+    
+    # Configurar handler para archivo
     try:
-        handler = logging.FileHandler(log_file, mode='w', encoding='utf-8')
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
+        log_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'excel_copy.log')
+        file_handler = logging.FileHandler(log_file, mode='w', encoding='utf-8')
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
     except Exception as e:
-        mostrar_mensaje(f"No se pudo crear archivo log: {str(e)}", "Error", True)
+        logger.error(f"No se pudo crear archivo log: {str(e)}")
     
     return logger
 
 logger = configurar_logging()
 
+def encontrar_archivo(nombre_archivo, directorio):
+    """Busca un archivo ignorando mayúsculas/minúsculas"""
+    try:
+        for f in os.listdir(directorio):
+            if f.lower() == nombre_archivo.lower():
+                return os.path.join(directorio, f)
+        return None
+    except Exception as e:
+        logger.error(f"Error buscando archivo: {str(e)}")
+        return None
+
 def verificar_archivos():
-    """Verifica que los archivos existan"""
+    """Verifica que los archivos existan y sean accesibles"""
     directorio = os.path.dirname(os.path.abspath(__file__))
-    ruta_plantilla = os.path.join(directorio, ARCHIVO_PLANTILLA)
-    ruta_destino = os.path.join(directorio, ARCHIVO_DESTINO)
     
-    if not os.path.exists(ruta_plantilla):
-        error_msg = f"No se encontró {ARCHIVO_PLANTILLA} en el directorio"
+    # Mostrar información de diagnóstico
+    logger.debug(f"Directorio del script: {directorio}")
+    logger.debug(f"Archivos en directorio: {os.listdir(directorio)}")
+    
+    # Buscar archivo plantilla (insensible a mayúsculas)
+    ruta_plantilla = encontrar_archivo(ARCHIVO_PLANTILLA, directorio)
+    if not ruta_plantilla:
+        error_msg = (
+            f"No se encontró {ARCHIVO_PLANTILLA} en:\n"
+            f"{directorio}\n\n"
+            f"Archivos presentes:\n"
+            f"{chr(10).join(os.listdir(directorio))}"
+        )
         logger.error(error_msg)
         mostrar_mensaje(error_msg, "Error", True)
         raise FileNotFoundError(error_msg)
     
+    # Buscar o crear archivo destino
+    ruta_destino = os.path.join(directorio, ARCHIVO_DESTINO)
     if not os.path.exists(ruta_destino):
         try:
+            logger.info(f"Creando archivo destino: {ruta_destino}")
             excel = win32.Dispatch("Excel.Application")
             excel.Visible = False
             wb = excel.Workbooks.Add()
             wb.SaveAs(ruta_destino)
             wb.Close()
             excel.Quit()
-            logger.info(f"Se creó {ARCHIVO_DESTINO} porque no existía")
         except Exception as e:
             error_msg = f"No se pudo crear {ARCHIVO_DESTINO}: {str(e)}"
             logger.error(error_msg)
@@ -76,13 +102,14 @@ def copiar_hoja():
         
         ruta_plantilla, ruta_destino = verificar_archivos()
         
-        logger.info(f"Abriendo {ARCHIVO_PLANTILLA}")
+        logger.info(f"Abriendo archivo origen: {ruta_plantilla}")
         wb_origen = excel.Workbooks.Open(ruta_plantilla)
         
-        logger.info(f"Abriendo {ARCHIVO_DESTINO}")
+        logger.info(f"Abriendo archivo destino: {ruta_destino}")
         wb_destino = excel.Workbooks.Open(ruta_destino)
         
         # Buscar hoja en origen
+        logger.info(f"Buscando hoja: {NOMBRE_HOJA_A_COPIAR}")
         hoja_origen = None
         for sheet in wb_origen.Sheets:
             if sheet.Name == NOMBRE_HOJA_A_COPIAR:
@@ -137,3 +164,4 @@ if __name__ == "__main__":
         sys.exit(1)
     finally:
         logger.info("=== FIN DEL PROCESO ===")
+        input("Presiona Enter para salir...")  # Para que no se cierre la ventana inmediatamente
