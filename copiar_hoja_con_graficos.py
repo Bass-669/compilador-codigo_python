@@ -9,7 +9,7 @@ import time
 ARCHIVO_PLANTILLA = "plantilla.xlsx"              # Nombre del archivo origen
 ARCHIVO_DESTINO = "Reporte IR Tornos.xlsx"        # Nombre del archivo destino
 NOMBRE_HOJA_ORIGEN = "PLANTILLA"                  # Nombre de la hoja a copiar
-NOMBRE_HOJA_DESTINO = "IR Agosto 2025"            # Nombre de la hoja copiada
+NOMBRE_HOJA_DESTINO = "IR plantilla"            # Nombre de la hoja copiada
 # ==============================================
 
 def get_script_dir():
