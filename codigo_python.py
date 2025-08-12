@@ -990,92 +990,76 @@ from datetime import datetime
 import time
 import ctypes
 
-def copiar_hoja_plantilla(archivo_plantilla, archivo_destino, nombre_hoja_origen, nombre_hoja_destino, directorio=None):
+def copiar_hoja_plantilla(archivo_plantilla, nombre_hoja_origen, nombre_hoja_destino):
     """
-    Copia una hoja de un archivo Excel a otro y le asigna un nuevo nombre
+    Copia una hoja desde la plantilla al archivo de reporte en RUTA_ENTRADA
+    solo si la hoja destino no existe
     
     Args:
-        archivo_plantilla (str): Nombre del archivo origen (ej. "plantilla.xlsx")
-        archivo_destino (str): Nombre del archivo destino (ej. "Reporte.xlsx")
-        nombre_hoja_origen (str): Nombre de la hoja a copiar
-        nombre_hoja_destino (str): Nombre que tendrá la hoja copiada
-        directorio (str, opcional): Directorio donde buscar los archivos. Si es None, usa el directorio del script
+        archivo_plantilla (str): Nombre del archivo plantilla (ej. "plantilla.xlsx")
+        nombre_hoja_origen (str): Nombre de la hoja a copiar en la plantilla
+        nombre_hoja_destino (str): Nombre que tendrá la hoja copiada en el reporte
     
     Returns:
-        bool: True si la operación fue exitosa, False si hubo error
+        bool: True si la hoja existe o fue creada exitosamente, False si hubo error
     """
     try:
-        # Configuración inicial
+        # Configuración inicial de Excel
         pythoncom.CoInitialize()
         excel = win32.Dispatch("Excel.Application")
         excel.Visible = False
         excel.DisplayAlerts = False
-        excel.EnableEvents = False
-        excel.AskToUpdateLinks = False
+        
+        # Rutas completas
+        ruta_plantilla = os.path.join(BASE_DIR, archivo_plantilla)
+        ruta_reporte = RUTA_ENTRADA  # Usamos siempre la ruta definida para el reporte activo
 
-        # Determinar directorio de trabajo
-        if directorio is None:
-            directorio = os.path.dirname(os.path.abspath(__file__)) if '__file__' in globals() else os.getcwd()
-
-        # Verificar y obtener rutas completas
-        def encontrar_archivo(nombre, dir):
-            for f in os.listdir(dir):
-                if f.lower() == nombre.lower():
-                    return os.path.join(dir, f)
-            return None
-
-        ruta_plantilla = encontrar_archivo(archivo_plantilla, directorio)
-        if not ruta_plantilla:
-            escribir_log(f"No se encontró {archivo_plantilla} en {directorio}", nivel="error")
+        # Verificar existencia de archivos
+        if not os.path.exists(ruta_plantilla):
+            escribir_log(f"No se encontró el archivo plantilla: {ruta_plantilla}", nivel="error")
             return False
 
-        ruta_destino = os.path.join(directorio, archivo_destino)
-        
-        # Crear archivo destino si no existe
-        if not os.path.exists(ruta_destino):
-            try:
-                temp_excel = win32.Dispatch("Excel.Application")
-                temp_excel.Visible = False
-                wb = temp_excel.Workbooks.Add()
-                wb.SaveAs(ruta_destino)
-                wb.Close()
-                temp_excel.Quit()
-                escribir_log(f"Archivo destino creado: {ruta_destino}")
-            except Exception as e:
-                escribir_log(f"No se pudo crear {archivo_destino}: {str(e)}", nivel="error")
-                return False
+        if not os.path.exists(ruta_reporte):
+            escribir_log(f"No se encontró el archivo de reporte: {ruta_reporte}", nivel="error")
+            return False
 
-        # Proceso de copiado
-        wb_origen = excel.Workbooks.Open(ruta_plantilla)
-        wb_destino = excel.Workbooks.Open(ruta_destino, UpdateLinks=0, IgnoreReadOnlyRecommended=True, ReadOnly=False)
+        # Abrir archivo de reporte para verificar
+        wb_destino = excel.Workbooks.Open(ruta_reporte, UpdateLinks=0, IgnoreReadOnlyRecommended=True)
         
-        # Buscar hoja origen
-        hoja_origen = None
+        # Verificar si la hoja destino ya existe
+        for sheet in wb_destino.Sheets:
+            if sheet.Name == nombre_hoja_destino:
+                escribir_log(f"La hoja '{nombre_hoja_destino}' ya existe - no se requiere creación")
+                wb_destino.Close(False)
+                return True  # La hoja ya existe, retornamos éxito
+        
+        # Si llegamos aquí, la hoja no existe y necesitamos crearla
+        wb_origen = excel.Workbooks.Open(ruta_plantilla)
+        
+        # Buscar y copiar hoja origen
+        hoja_copiada = None
         for sheet in wb_origen.Sheets:
             if sheet.Name == nombre_hoja_origen:
-                hoja_origen = sheet
+                sheet.Copy(Before=wb_destino.Sheets(1))
+                hoja_copiada = wb_destino.Sheets(1)
+                hoja_copiada.Name = nombre_hoja_destino
+                escribir_log(f"Hoja creada: '{nombre_hoja_destino}' copiada desde plantilla")
                 break
         
-        if not hoja_origen:
-            escribir_log(f"No se encontró la hoja '{nombre_hoja_origen}' en {archivo_plantilla}", nivel="error")
+        if not hoja_copiada:
+            escribir_log(f"No se encontró la hoja '{nombre_hoja_origen}' en la plantilla", nivel="error")
             return False
-        
-        # Copiar y renombrar hoja
-        hoja_origen.Copy(Before=wb_destino.Sheets(1))
-        hoja_copiada = wb_destino.Sheets(1)
-        hoja_copiada.Name = nombre_hoja_destino
-        escribir_log(f"Hoja copiada: '{nombre_hoja_origen}' -> '{nombre_hoja_destino}'")
         
         # Guardar y cerrar
         wb_destino.Save()
         wb_origen.Close(False)
         wb_destino.Close(True)
         
-        escribir_log(f"Operación completada exitosamente: {nombre_hoja_destino} creada en {archivo_destino}")
+        escribir_log(f"Hoja '{nombre_hoja_destino}' creada exitosamente")
         return True
-        
+
     except Exception as e:
-        escribir_log(f"Error inesperado en copiar_hoja_plantilla: {str(e)}", nivel="error")
+        escribir_log(f"Error al copiar hoja: {str(e)}", nivel="error")
         return False
     finally:
         try:
@@ -1084,6 +1068,8 @@ def copiar_hoja_plantilla(archivo_plantilla, archivo_destino, nombre_hoja_origen
         except Exception as e:
             escribir_log(f"Error al cerrar Excel: {str(e)}", nivel="warning")
         pythoncom.CoUninitialize()
+
+
 
 def preparar_hoja_mes(mes, dia, anio):
     """Crea la hoja del mes desde la plantilla y la configura."""
