@@ -1533,36 +1533,45 @@ def preparar_hoja_mes(mes, dia, anio):
         excel.Visible = False
         excel.DisplayAlerts = False
 
-        wb_origen = excel.Workbooks.Open(plantilla_path)
-        wb_destino = excel.Workbooks.Open(os.path.abspath(RUTA_ENTRADA))
-
-        # Buscar hoja origen
+        wb_origen = None
+        wb_destino = None
         hoja_origen = None
-        for sheet in wb_origen.Sheets:
-            if sheet.Name.startswith("IR "):  # Plantilla base
-                hoja_origen = sheet
-                break
-        if not hoja_origen:
-            escribir_log("No se encontró hoja origen en plantilla", nivel="error")
-            messagebox.showerror("Error", "No se encontró hoja origen en la plantilla")
-            wb_origen.Close(False)
-            wb_destino.Close(False)
+        nueva_hoja = None
+
+        try:
+            wb_origen = excel.Workbooks.Open(plantilla_path)
+            wb_destino = excel.Workbooks.Open(os.path.abspath(RUTA_ENTRADA))
+
+            # Buscar hoja origen
+            for sheet in wb_origen.Sheets:
+                if sheet.Name.startswith("IR "):  # Plantilla base
+                    hoja_origen = sheet
+                    break
+            if not hoja_origen:
+                raise Exception("No se encontró hoja origen en la plantilla")
+
+            # Copiar hoja y renombrar
+            hoja_origen.Copy(After=wb_destino.Sheets(wb_destino.Sheets.Count))
+            nueva_hoja = wb_destino.Sheets(wb_destino.Sheets.Count)
+            nueva_hoja.Name = nombre_hoja
+            wb_destino.Save()
+            escribir_log(f"Hoja '{nombre_hoja}' creada correctamente desde plantilla.")
+
+        finally:
+            # Cerrar libros si están abiertos
+            if wb_origen:
+                wb_origen.Close(False)
+            if wb_destino:
+                wb_destino.Close(True)
+            # Cerrar Excel
             excel.Quit()
             pythoncom.CoUninitialize()
-            return False
 
-        # Copiar hoja y renombrar
-        hoja_origen.Copy(After=wb_destino.Sheets(wb_destino.Sheets.Count))
-        nueva_hoja = wb_destino.Sheets(wb_destino.Sheets.Count)
-        nueva_hoja.Name = nombre_hoja
-        wb_destino.Save()
-
-        wb_origen.Close(False)
-        wb_destino.Close(True)
-        excel.Quit()
-        pythoncom.CoUninitialize()
-
-        escribir_log(f"Hoja '{nombre_hoja}' creada correctamente desde plantilla.")
+            # Liberar objetos COM
+            import gc
+            del wb_origen, wb_destino, hoja_origen, nueva_hoja, excel
+            gc.collect()
+            time.sleep(0.5)
 
         # 3. Limpiar y configurar con openpyxl
         wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
@@ -1622,12 +1631,18 @@ def preparar_hoja_mes(mes, dia, anio):
         excel.Quit()
         pythoncom.CoUninitialize()
 
+        # Limpieza final
+        del wb_calc, excel
+        gc.collect()
+        time.sleep(0.5)
+
         return True
 
     except Exception as e:
         escribir_log(f"Error en preparar_hoja_mes: {str(e)}", nivel="error")
         messagebox.showerror("Error crítico", f"No se pudo preparar la hoja del mes:\n{str(e)}")
         return False
+
 
 
 def dias_en_mes(mes, anio):
