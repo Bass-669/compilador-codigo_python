@@ -119,12 +119,28 @@ def copiar_hoja():
             mostrar_mensaje(error_msg, "Error", True)
             raise Exception(error_msg)
         
-        # Copiar hoja
-        logger.info(f"Copiando hoja '{NOMBRE_HOJA_ORIGEN}' a '{NOMBRE_HOJA_DESTINO}'")
-        hoja_copiada = hoja_origen.Copy(Before=wb_destino.Sheets(1))
-        
-        # Renombrar la hoja copiada
-        hoja_copiada.Name = NOMBRE_HOJA_DESTINO
+        # Copiar hoja con verificación
+        logger.info(f"Copiando hoja '{NOMBRE_HOJA_ORIGEN}'")
+        try:
+            # Primero copiar
+            hoja_origen.Copy(Before=wb_destino.Sheets(1))
+            
+            # Luego obtener referencia a la hoja copiada
+            hoja_copiada = wb_destino.Sheets(1)  # La hoja recién copiada estará en la primera posición
+            
+            # Verificar que se copió correctamente
+            if hoja_copiada is None:
+                raise Exception("No se pudo copiar la hoja")
+                
+            # Renombrar
+            hoja_copiada.Name = NOMBRE_HOJA_DESTINO
+            logger.info(f"Hoja renombrada a: '{NOMBRE_HOJA_DESTINO}'")
+            
+        except Exception as e:
+            error_msg = f"Error al copiar/renombrar hoja: {str(e)}"
+            logger.error(error_msg)
+            mostrar_mensaje(error_msg, "Error", True)
+            raise
         
         # Guardar cambios
         wb_destino.Save()
