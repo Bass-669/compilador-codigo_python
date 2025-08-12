@@ -1505,10 +1505,7 @@ import pythoncom
 import os
 import ctypes
 
-def mostrar_mensaje(mensaje, titulo="Excel Copier", es_error=False):
-    """Muestra mensaje en cuadro de diálogo"""
-    estilo = 0x10 if es_error else 0x40
-    ctypes.windll.user32.MessageBoxW(0, mensaje, titulo, estilo)
+
 
 def copiar_hoja_plantilla(archivo_plantilla, archivo_destino, nombre_hoja_origen, nombre_hoja_destino, directorio=None):
     """
@@ -1589,18 +1586,18 @@ def copiar_hoja_plantilla(archivo_plantilla, archivo_destino, nombre_hoja_origen
         wb_origen.Close(False)
         wb_destino.Close(True)
         
-        mostrar_mensaje(
-            f"Hoja copiada exitosamente:\n"
-            f"Origen: '{nombre_hoja_origen}' en {archivo_plantilla}\n"
-            f"Destino: '{nombre_hoja_destino}' en {archivo_destino}",
-            "Proceso Completado"
-        )
+    #     mostrar_mensaje(
+    #         f"Hoja copiada exitosamente:\n"
+    #         f"Origen: '{nombre_hoja_origen}' en {archivo_plantilla}\n"
+    #         f"Destino: '{nombre_hoja_destino}' en {archivo_destino}",
+    #         "Proceso Completado"
+    #     )
         
-        return True
+    #     return True
         
-    except Exception as e:
-        mostrar_mensaje(f"Error inesperado: {str(e)}", "Error", True)
-        return False
+    # except Exception as e:
+    #     mostrar_mensaje(f"Error inesperado: {str(e)}", "Error", True)
+    #     return False
     finally:
         try:
             if 'excel' in locals():
@@ -1626,90 +1623,70 @@ if __name__ == "__main__":
 
 
 
-import win32com.client as win32
-import pythoncom
-import os
-
-def copiar_hoja_plantilla(archivo_plantilla, archivo_destino, nombre_hoja_origen, nombre_hoja_destino, directorio=None):
-    """
-    Copia una hoja de un archivo Excel a otro y le asigna un nuevo nombre
-    """
+def preparar_hoja_mes(mes, dia, anio):
+    """Crea la hoja del mes desde la plantilla y la configura."""
+    escribir_log(f"Inicio de preparar_hoja_mes para {mes} {anio}")
+    nombre_hoja = f"IR {mes} {anio}"
+    
     try:
-        escribir_log(f"Iniciando copia de hoja '{nombre_hoja_origen}' desde '{archivo_plantilla}' hacia '{archivo_destino}' como '{nombre_hoja_destino}'")
+        # 1. Verificar si ya existe
+        wb_check = openpyxl.load_workbook(RUTA_ENTRADA)
+        if nombre_hoja in wb_check.sheetnames:
+            escribir_log(f"La hoja '{nombre_hoja}' ya existe. Se usará tal cual.")
+            wb_check.close()
+            return True
+        wb_check.close()
 
-        pythoncom.CoInitialize()
-        excel = win32.Dispatch("Excel.Application")
-        excel.Visible = False
-        excel.DisplayAlerts = False
-        excel.EnableEvents = False
-        excel.AskToUpdateLinks = False
-
-        if directorio is None:
-            directorio = os.getcwd()
-
-        # Verificar archivos
-        def encontrar_archivo(nombre, dir):
-            for f in os.listdir(dir):
-                if f.lower() == nombre.lower():
-                    return os.path.join(dir, f)
-            return None
-
-        ruta_plantilla = encontrar_archivo(archivo_plantilla, directorio)
-        if not ruta_plantilla:
-            escribir_log(f"❌ No se encontró {archivo_plantilla} en {directorio}", nivel="error")
+        # 2. Copiar hoja desde plantilla
+        if not copiar_hoja_plantilla(
+            archivo_plantilla="plantilla.xlsx",
+            archivo_destino="Reporte IR Tornos.xlsx",
+            nombre_hoja_origen="PLANTILLA",
+            nombre_hoja_destino=nombre_hoja,
+            directorio=BASE_DIR
+        ):
+            escribir_log("Error al copiar hoja desde plantilla", nivel="error")
             return False
 
-        ruta_destino = os.path.join(directorio, archivo_destino)
-        
-        if not os.path.exists(ruta_destino):
-            try:
-                temp_excel = win32.Dispatch("Excel.Application")
-                temp_excel.Visible = False
-                wb = temp_excel.Workbooks.Add()
-                wb.SaveAs(ruta_destino)
-                wb.Close()
-                temp_excel.Quit()
-                escribir_log(f"📄 Archivo destino '{archivo_destino}' creado.")
-            except Exception as e:
-                escribir_log(f"❌ No se pudo crear {archivo_destino}: {str(e)}", nivel="error")
-                return False
+        # 3. Configurar hoja con openpyxl
+        wb = openpyxl.load_workbook(RUTA_ENTRADA)
+        hoja = wb[nombre_hoja]
 
-        # Abrir libros
-        wb_origen = excel.Workbooks.Open(ruta_plantilla, UpdateLinks=0, IgnoreReadOnlyRecommended=True, ReadOnly=False)
-        wb_destino = excel.Workbooks.Open(ruta_destino, UpdateLinks=0, IgnoreReadOnlyRecommended=True, ReadOnly=False)
+        # Limpiar celdas específicas
+        filas_a_limpiar = [2,3,4,7,8,9,12,13,14,17,18,19,22,23,24,27,28,31,32,33,34,37,38,39,40]
+        for fila in filas_a_limpiar:
+            for col in range(2, 35):
+                celda = hoja.cell(row=fila, column=col)
+                if not isinstance(celda, openpyxl.cell.cell.MergedCell):
+                    celda.value = ""
+
+        # Configurar fechas y fórmulas
+        dias_mes = dias_en_mes(mes, anio)
+        for col in range(2, 2 + dias_mes):
+            dia_mes = col - 1
+            fecha = f"{dia_mes:02d}/{MESES_NUM[mes]:02d}/{anio}"
+            for fila in [2,7,12,17,22,27,31,37]:
+                hoja.cell(row=fila, column=col, value=fecha)
+
+            letra = openpyxl.utils.get_column_letter(col)
+            hoja.cell(row=23, column=col, value=f"=IFERROR(({letra}3*{letra}13+{letra}8*{letra}18)/({letra}3+{letra}8), 0)")
+            hoja.cell(row=24, column=col, value=f"=IFERROR(({letra}4*{letra}14+{letra}9*{letra}19)/({letra}4+{letra}9), 0)")
+            hoja.cell(row=28, column=col, value=f"=IFERROR(({letra}23*({letra}3+{letra}8)+{letra}24*({letra}4+{letra}9))/({letra}3+{letra}4+{letra}8+{letra}9), 0)")
+
+        # Configurar resumen mensual
+        hoja.cell(row=32, column=34, value="R%").font = Font(bold=True)
+        hoja.cell(row=38, column=34, value="IR%").font = Font(bold=True)
+        hoja.cell(row=2, column=34, value=int(anio))
         
-        hoja_origen = None
-        for sheet in wb_origen.Sheets:
-            if sheet.Name == nombre_hoja_origen:
-                hoja_origen = sheet
-                break
+        wb.save(RUTA_ENTRADA)
+        wb.close()
         
-        if not hoja_origen:
-            escribir_log(f"❌ No se encontró la hoja '{nombre_hoja_origen}' en {archivo_plantilla}", nivel="error")
-            return False
-        
-        hoja_origen.Copy(Before=wb_destino.Sheets(1))
-        hoja_copiada = wb_destino.Sheets(1)
-        hoja_copiada.Name = nombre_hoja_destino
-        
-        wb_destino.Save()
-        wb_origen.Close(False)
-        wb_destino.Close(True)
-        
-        escribir_log(f"✅ Hoja '{nombre_hoja_origen}' copiada como '{nombre_hoja_destino}' en '{archivo_destino}'")
+        escribir_log(f"Hoja '{nombre_hoja}' configurada exitosamente")
         return True
-        
-    except Exception as e:
-        escribir_log(f"Error inesperado: {str(e)}", nivel="error")
-        return False
-    finally:
-        try:
-            if 'excel' in locals():
-                excel.Quit()
-        except:
-            pass
-        pythoncom.CoUninitialize()
 
+    except Exception as e:
+        escribir_log(f"Error en preparar_hoja_mes: {str(e)}", nivel="error")
+        return False
 
 
 
