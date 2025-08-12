@@ -2,64 +2,50 @@ import win32com.client as win32
 import pythoncom
 import os
 import logging
-from logging.handlers import RotatingFileHandler
 import tempfile
 import sys
+import ctypes
 
-# Configuración básica
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+def mostrar_mensaje(mensaje, titulo="Excel Copier", es_error=False):
+    """Muestra mensaje en cuadro de diálogo"""
+    estilo = 0x10 if es_error else 0x40  # 0x10: icono error, 0x40: icono info
+    ctypes.windll.user32.MessageBoxW(0, mensaje, titulo, estilo)
 
 def configurar_logging():
-    """Configura logging con consola y archivo"""
+    """Configura logging para .exe"""
     logger = logging.getLogger('ExcelCopyLogger')
-    logger.setLevel(logging.DEBUG)  # Nivel más detallado
+    logger.setLevel(logging.DEBUG)
     
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     
-    # Handler de consola (SIEMPRE activo)
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
-    
-    # Intentar archivo de log en tempdir si falla en BASE_DIR
+    # Log en tempdir y escritorio
     log_locations = [
-        os.path.join(BASE_DIR, "prueba.log"),
-        os.path.join(tempfile.gettempdir(), "excel_copy.log")
+        os.path.join(tempfile.gettempdir(), 'excel_copy.log'),
+        os.path.join(os.path.expanduser('~'), 'Desktop', 'excel_copy.log')
     ]
     
     for log_file in log_locations:
         try:
-            os.makedirs(os.path.dirname(log_file), exist_ok=True)
-            file_handler = RotatingFileHandler(
-                log_file,
-                maxBytes=5*1024*1024,
-                backupCount=3,
-                encoding='utf-8'
-            )
-            file_handler.setFormatter(formatter)
-            logger.addHandler(file_handler)
-            logger.info(f"Log configurado en: {log_file}")
+            handler = logging.FileHandler(log_file, mode='w', encoding='utf-8')
+            handler.setFormatter(formatter)
+            logger.addHandler(handler)
             break
-        except Exception as e:
-            logger.warning(f"No se pudo crear log en {log_file}: {str(e)}")
+        except Exception:
+            continue
     
     return logger
 
 logger = configurar_logging()
 
 def escribir_log(mensaje, nivel="info"):
-    """Escribe un mensaje en el log"""
+    """Escribe en log y muestra mensaje si es error"""
     try:
-        if nivel.lower() == "info":
-            logger.info(mensaje)
-        elif nivel.lower() == "warning":
-            logger.warning(mensaje)
-        elif nivel.lower() == "error":
-            logger.error(mensaje)
-        else:
-            logger.debug(mensaje)
-    except Exception as e:
-        print(f"Error al escribir en log: {e}", file=sys.stderr)
+        getattr(logger, nivel.lower())(mensaje)
+        if nivel.lower() == "error":
+            mostrar_mensaje(mensaje, "Error", es_error=True)
+    except Exception:
+        pass
+
 
 def verificar_archivos(plantilla, destino):
     """Verifica que los archivos existan y sean accesibles"""
@@ -140,25 +126,27 @@ def copiar_hoja_con_graficos(origen_path, destino_path, nombre_hoja):
             escribir_log(f"Error al cerrar recursos: {str(e)}", "warning")
 
 if __name__ == "__main__":
-    logger.info("Mensaje de prueba INFO")
-    logger.error("Mensaje de prueba ERROR")
     try:
-        # Configurar rutas en el mismo directorio del script
-        directorio_script = os.path.dirname(os.path.abspath(__file__))
-        ARCHIVO_PLANTILLA = os.path.join(directorio_script, "plantilla.xlsx")
-        ARCHIVO_PRUEBAS = os.path.join(directorio_script, "pruebas.xlsx")
+        mostrar_mensaje("Iniciando proceso de copia de Excel")
+        
+        # Obtener directorio del ejecutable (no __file__ en .exe)
+        if getattr(sys, 'frozen', False):
+            directorio = os.path.dirname(sys.executable)
+        else:
+            directorio = os.path.dirname(__file__)
+            
+        ARCHIVO_PLANTILLA = os.path.join(directorio, "plantilla.xlsx")
+        ARCHIVO_PRUEBAS = os.path.join(directorio, "pruebas.xlsx")
         NOMBRE_HOJA = "IR Julio 2025"
         
-        escribir_log(f"Script iniciado desde: {directorio_script}")
-        escribir_log(f"Archivo plantilla: {ARCHIVO_PLANTILLA}")
-        escribir_log(f"Archivo pruebas: {ARCHIVO_PRUEBAS}")
+        escribir_log(f"Buscando plantilla en: {ARCHIVO_PLANTILLA}")
         
-        # Mostrar contenido del directorio para diagnóstico
-        escribir_log(f"Contenido del directorio: {os.listdir(directorio_script)}")
-        
-        # Ejecutar copia
+        if not os.path.exists(ARCHIVO_PLANTILLA):
+            raise FileNotFoundError(f"No se encuentra: {ARCHIVO_PLANTILLA}")
+            
         copiar_hoja_con_graficos(ARCHIVO_PLANTILLA, ARCHIVO_PRUEBAS, NOMBRE_HOJA)
+        mostrar_mensaje("Proceso completado exitosamente")
         
     except Exception as e:
-        escribir_log(f"Error fatal: {str(e)}", "error")
+        escribir_log(f"Error: {str(e)}", "error")
         sys.exit(1)
