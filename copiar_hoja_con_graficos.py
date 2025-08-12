@@ -6,28 +6,31 @@ import sys
 import ctypes
 import time
 
-# ========== CONFIGURACIÓN ==========
-ARCHIVO_PLANTILLA = "plantilla.xlsx"
-ARCHIVO_DESTINO = "prueba.xlsx"
-NOMBRE_HOJA_A_COPIAR = "IR Julio 2025"
-# ===================================
+# ========== CONFIGURACIÓN MODIFICABLE ==========
+ARCHIVO_PLANTILLA = "plantilla.xlsx"      # Nombre del archivo origen
+ARCHIVO_DESTINO = "prueba.xlsx"           # Nombre del archivo destino
+NOMBRE_HOJA_ORIGEN = "IR Julio 2025"      # Nombre de la hoja a copiar (en plantilla.xlsx)
+NOMBRE_HOJA_DESTINO = "Informe Mensual"   # Nombre que tendrá la hoja copiada (en prueba.xlsx)
+# ==============================================
 
 def get_script_dir():
-    """Obtiene el directorio correcto tanto para .exe como para .py"""
+    """Obtiene el directorio del ejecutable o script"""
     if getattr(sys, 'frozen', False):
         return os.path.dirname(sys.executable)
     return os.path.dirname(os.path.abspath(__file__))
 
 def mostrar_mensaje(mensaje, titulo="Excel Copier", es_error=False):
+    """Muestra mensaje en cuadro de diálogo"""
     estilo = 0x10 if es_error else 0x40
     ctypes.windll.user32.MessageBoxW(0, mensaje, titulo, estilo)
 
 def configurar_logging():
+    """Configura el sistema de logging"""
     logger = logging.getLogger('ExcelCopyLogger')
     logger.setLevel(logging.DEBUG)
+    
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     
-    # Configurar logging para archivo
     try:
         log_file = os.path.join(get_script_dir(), 'excel_copy.log')
         file_handler = logging.FileHandler(log_file, mode='w', encoding='utf-8')
@@ -39,10 +42,6 @@ def configurar_logging():
     return logger
 
 logger = configurar_logging()
-
-def esperar_segundos(segundos=3):
-    """Reemplazo seguro para input() en .exe"""
-    time.sleep(segundos)
 
 def encontrar_archivo(nombre_archivo, directorio):
     """Busca archivo ignorando mayúsculas/minúsculas"""
@@ -56,21 +55,21 @@ def encontrar_archivo(nombre_archivo, directorio):
         return None
 
 def verificar_archivos():
+    """Verifica que los archivos existan"""
     directorio = get_script_dir()
     
-    logger.debug(f"Buscando en directorio: {directorio}")
-    logger.debug(f"Archivos presentes: {os.listdir(directorio)}")
+    logger.info(f"Buscando archivos en: {directorio}")
+    logger.info(f"Archivos presentes: {os.listdir(directorio)}")
     
+    # Buscar archivo plantilla
     ruta_plantilla = encontrar_archivo(ARCHIVO_PLANTILLA, directorio)
     if not ruta_plantilla:
-        error_msg = (
-            f"No se encontró {ARCHIVO_PLANTILLA} en:\n{directorio}\n\n"
-            f"Archivos presentes:\n{chr(10).join(os.listdir(directorio))}"
-        )
+        error_msg = f"No se encontró {ARCHIVO_PLANTILLA} en el directorio"
         logger.error(error_msg)
         mostrar_mensaje(error_msg, "Error", True)
         raise FileNotFoundError(error_msg)
     
+    # Buscar o crear archivo destino
     ruta_destino = os.path.join(directorio, ARCHIVO_DESTINO)
     if not os.path.exists(ruta_destino):
         try:
@@ -90,7 +89,7 @@ def verificar_archivos():
     return ruta_plantilla, ruta_destino
 
 def copiar_hoja():
-    """Copia la hoja especificada de plantilla.xlsx a prueba.xlsx"""
+    """Copia la hoja especificada y le asigna el nombre deseado"""
     try:
         pythoncom.CoInitialize()
         excel = win32.Dispatch("Excel.Application")
@@ -99,6 +98,7 @@ def copiar_hoja():
         
         ruta_plantilla, ruta_destino = verificar_archivos()
         
+        # Abrir archivos
         logger.info(f"Abriendo archivo origen: {ruta_plantilla}")
         wb_origen = excel.Workbooks.Open(ruta_plantilla)
         
@@ -106,29 +106,33 @@ def copiar_hoja():
         wb_destino = excel.Workbooks.Open(ruta_destino)
         
         # Buscar hoja en origen
-        logger.info(f"Buscando hoja: {NOMBRE_HOJA_A_COPIAR}")
+        logger.info(f"Buscando hoja origen: {NOMBRE_HOJA_ORIGEN}")
         hoja_origen = None
         for sheet in wb_origen.Sheets:
-            if sheet.Name == NOMBRE_HOJA_A_COPIAR:
+            if sheet.Name == NOMBRE_HOJA_ORIGEN:
                 hoja_origen = sheet
                 break
         
         if not hoja_origen:
-            error_msg = f"No se encontró la hoja '{NOMBRE_HOJA_A_COPIAR}' en {ARCHIVO_PLANTILLA}"
+            error_msg = f"No se encontró la hoja '{NOMBRE_HOJA_ORIGEN}' en {ARCHIVO_PLANTILLA}"
             logger.error(error_msg)
             mostrar_mensaje(error_msg, "Error", True)
             raise Exception(error_msg)
         
-        # Copiar hoja al inicio del archivo destino
-        logger.info(f"Copiando hoja '{NOMBRE_HOJA_A_COPIAR}'")
-        hoja_origen.Copy(Before=wb_destino.Sheets(1))
+        # Copiar hoja
+        logger.info(f"Copiando hoja '{NOMBRE_HOJA_ORIGEN}' a '{NOMBRE_HOJA_DESTINO}'")
+        hoja_copiada = hoja_origen.Copy(Before=wb_destino.Sheets(1))
+        
+        # Renombrar la hoja copiada
+        hoja_copiada.Name = NOMBRE_HOJA_DESTINO
         
         # Guardar cambios
         wb_destino.Save()
         logger.info("Proceso completado exitosamente")
         mostrar_mensaje(
-            f"Hoja '{NOMBRE_HOJA_A_COPIAR}' copiada exitosamente\n"
-            f"de {ARCHIVO_PLANTILLA} a {ARCHIVO_DESTINO}",
+            f"Hoja copiada y renombrada exitosamente:\n"
+            f"Origen: '{NOMBRE_HOJA_ORIGEN}'\n"
+            f"Destino: '{NOMBRE_HOJA_DESTINO}'",
             "Proceso Completado"
         )
         
@@ -150,9 +154,11 @@ def copiar_hoja():
 if __name__ == "__main__":
     try:
         logger.info("=== INICIO DEL PROCESO ===")
-        logger.info(f"Hoja a copiar: {NOMBRE_HOJA_A_COPIAR}")
-        logger.info(f"Archivo origen: {ARCHIVO_PLANTILLA}")
-        logger.info(f"Archivo destino: {ARCHIVO_DESTINO}")
+        logger.info(f"Configuración:")
+        logger.info(f" - Archivo origen: {ARCHIVO_PLANTILLA}")
+        logger.info(f" - Archivo destino: {ARCHIVO_DESTINO}")
+        logger.info(f" - Hoja origen: {NOMBRE_HOJA_ORIGEN}")
+        logger.info(f" - Hoja destino: {NOMBRE_HOJA_DESTINO}")
         
         copiar_hoja()
         
@@ -161,5 +167,4 @@ if __name__ == "__main__":
         sys.exit(1)
     finally:
         logger.info("=== FIN DEL PROCESO ===")
-        # Reemplazado input() por espera automática
-        esperar_segundos(3)  # Espera 3 segundos antes de cerrar
+        time.sleep(1)  # Pausa para leer logs si se ejecuta desde consola
