@@ -1559,7 +1559,7 @@ def preparar_hoja_mes(mes, dia, anio):
 
             # Seleccionar hoja origen EXACTA
             try:
-                hoja_origen = wb_origen.Sheets("IR PLANTILLA")  # Cambia por el nombre real en la plantilla
+                hoja_origen = wb_origen.Sheets("PLANTILLA")  # Cambia por el nombre real en la plantilla
             except:
                 hoja_origen = wb_origen.Sheets(1)  # Primera hoja como fallback
 
