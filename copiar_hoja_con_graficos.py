@@ -4,6 +4,7 @@ import os
 import logging
 import sys
 import ctypes
+import time
 
 # ========== CONFIGURACIÓN ==========
 ARCHIVO_PLANTILLA = "plantilla.xlsx"
@@ -26,21 +27,22 @@ def configurar_logging():
     logger.setLevel(logging.DEBUG)
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
-    
+    # Configurar logging para archivo
     try:
         log_file = os.path.join(get_script_dir(), 'excel_copy.log')
         file_handler = logging.FileHandler(log_file, mode='w', encoding='utf-8')
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
     except Exception as e:
-        logger.error(f"No se pudo crear archivo log: {str(e)}")
+        mostrar_mensaje(f"No se pudo crear archivo log: {str(e)}", "Error", True)
     
     return logger
 
 logger = configurar_logging()
+
+def esperar_segundos(segundos=3):
+    """Reemplazo seguro para input() en .exe"""
+    time.sleep(segundos)
 
 def encontrar_archivo(nombre_archivo, directorio):
     """Busca archivo ignorando mayúsculas/minúsculas"""
@@ -159,4 +161,5 @@ if __name__ == "__main__":
         sys.exit(1)
     finally:
         logger.info("=== FIN DEL PROCESO ===")
-        input("Presiona Enter para salir...")  # Para que no se cierre la ventana inmediatamente
+        # Reemplazado input() por espera automática
+        esperar_segundos(3)  # Espera 3 segundos antes de cerrar
