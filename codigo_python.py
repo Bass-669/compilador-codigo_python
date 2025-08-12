@@ -791,7 +791,7 @@ def hoja_existe_y_es_valida(nombre_hoja, dia):
 
 
 def ordenar_hojas_mensuales():
-    """Ordena todas las hojas mensuales en orden cronológico dejando otras hojas intactas"""
+    """Ordena SOLO las hojas mensuales (IR Mes Año) manteniendo otras hojas en su lugar"""
     try:
         pythoncom.CoInitialize()
         excel = win32.Dispatch("Excel.Application")
@@ -800,30 +800,42 @@ def ordenar_hojas_mensuales():
 
         wb = excel.Workbooks.Open(RUTA_ENTRADA)
         
-        # Separar hojas mensuales de otras hojas
+        # 1. Identificar hojas mensuales y otras hojas
         hojas_mensuales = []
         otras_hojas = []
         
         for sheet in wb.Sheets:
-            if sheet.Name.startswith("IR ") and len(sheet.Name.split()) == 3:
+            nombre = sheet.Name
+            if nombre.startswith("IR ") and len(nombre.split()) == 3:
                 try:
-                    _, mes, anio = sheet.Name.split()
-                    hojas_mensuales.append((MESES_NUM[mes], int(anio), sheet))
+                    _, mes, anio = nombre.split()
+                    if mes in MESES_NUM:  # Verificar que sea un mes válido
+                        hojas_mensuales.append({
+                            'sheet': sheet,
+                            'mes_num': MESES_NUM[mes],
+                            'anio': int(anio),
+                            'nombre': nombre
+                        })
                 except:
                     otras_hojas.append(sheet)
             else:
                 otras_hojas.append(sheet)
         
-        # Ordenar cronológicamente (primero por año, luego por mes)
-        hojas_mensuales.sort(key=lambda x: (x[1], x[0]))
+        # 2. Ordenar hojas mensuales cronológicamente
+        hojas_mensuales.sort(key=lambda x: (x['anio'], x['mes_num']))
         
-        # Reordenar todas las hojas (primero las no mensuales, luego las mensuales ordenadas)
-        for i, (_, _, sheet) in enumerate(hojas_mensuales, start=len(otras_hojas)+1):
-            sheet.Move(Before=wb.Sheets(i))
+        # 3. Reubicar solo las hojas mensuales manteniendo el orden relativo
+        ultima_posicion = 1  # Comenzar después de la primera hoja
+        
+        for hoja_data in hojas_mensuales:
+            hoja = hoja_data['sheet']
+            # Mover la hoja a la posición siguiente disponible
+            hoja.Move(Before=wb.Sheets(ultima_posicion + 1))
+            ultima_posicion += 1
         
         wb.Save()
         wb.Close()
-        escribir_log("Hojas mensuales ordenadas cronológicamente")
+        escribir_log(f"Hojas mensuales ordenadas: {len(hojas_mensuales)} hojas reorganizadas")
         return True
         
     except Exception as e:
