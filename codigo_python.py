@@ -1088,10 +1088,8 @@ def preparar_hoja_mes(mes, dia, anio):
         # 2. Copiar hoja desde plantilla
         if not copiar_hoja_plantilla(
             archivo_plantilla="plantilla.xlsx",
-            archivo_destino="Reporte IR Tornos.xlsx",
             nombre_hoja_origen="PLANTILLA",
-            nombre_hoja_destino=nombre_hoja,
-            directorio=BASE_DIR
+            nombre_hoja_destino=nombre_hoja
         ):
             escribir_log("Error al copiar hoja desde plantilla", nivel="error")
             return False
