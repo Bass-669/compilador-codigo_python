@@ -1507,9 +1507,9 @@ import os
 
 
 def preparar_hoja_mes(mes, dia, anio):
-    """Crea la hoja del mes si no existe y la configura correctamente"""
-    escribir_log(f"Iniciando preparación de hoja para {mes} {anio}")
+    """Crea la hoja del mes si no existe usando el método probado de copia"""
     nombre_hoja = f"IR {mes} {anio}"
+    escribir_log(f"Iniciando preparación de hoja para {mes} {anio}")
     
     try:
         # 1. Verificar si la hoja ya existe
@@ -1520,19 +1520,16 @@ def preparar_hoja_mes(mes, dia, anio):
             return True
         wb_check.close()
 
-        # 2. Calcular mes anterior para copiar
+        # 2. Determinar la hoja anterior a copiar
         mes_num = MESES_NUM[mes]
-        prev_mes_num = mes_num - 1
-        prev_anio = anio
-        if prev_mes_num == 0:
-            prev_mes_num = 12
-            prev_anio = anio - 1
+        prev_mes_num = mes_num - 1 if mes_num > 1 else 12
+        prev_anio = anio if mes_num > 1 else anio - 1
         
         prev_mes = [k for k, v in MESES_NUM.items() if v == prev_mes_num][0]
         nombre_hoja_anterior = f"IR {prev_mes} {prev_anio}"
         escribir_log(f"Buscando hoja anterior: {nombre_hoja_anterior}")
 
-        # 3. Crear hoja usando win32com (para preservar gráficos)
+        # 3. Usar win32com para copiar la hoja (como en el código de prueba)
         pythoncom.CoInitialize()
         excel = win32.DispatchEx("Excel.Application")
         excel.Visible = False
@@ -1552,7 +1549,7 @@ def preparar_hoja_mes(mes, dia, anio):
                     raise Exception("No hay hojas IR para copiar")
                 nombre_hoja_anterior = hojas_ir[-1]  # Última hoja disponible
             
-            # Copiar hoja
+            # Copiar hoja (método probado del código de prueba)
             sheet_origen = wb.Sheets(nombre_hoja_anterior)
             sheet_origen.Copy(After=wb.Sheets(wb.Sheets.Count))
             nueva_hoja = wb.ActiveSheet
@@ -1590,7 +1587,7 @@ def preparar_hoja_mes(mes, dia, anio):
             pythoncom.CoUninitialize()
             return False
 
-        # 4. Configurar nueva hoja con openpyxl
+        # 4. Configurar la nueva hoja con openpyxl
         wb_openpyxl = openpyxl.load_workbook(RUTA_ENTRADA)
         hoja = wb_openpyxl[nombre_hoja]
         
