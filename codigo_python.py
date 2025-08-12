@@ -1541,15 +1541,7 @@ def preparar_hoja_mes(mes, dia, anio):
         nueva_hoja = None
 
         try:
-            # Abrir plantilla
-            wb_origen = excel.Workbooks.Open(
-                plantilla_path,
-                UpdateLinks=0,
-                IgnoreReadOnlyRecommended=True,
-                ReadOnly=False
-            )
-
-            # Abrir libro destino
+            # 3.1 Abrir libro destino primero
             wb_destino = excel.Workbooks.Open(
                 os.path.abspath(RUTA_ENTRADA),
                 UpdateLinks=0,
@@ -1557,23 +1549,35 @@ def preparar_hoja_mes(mes, dia, anio):
                 ReadOnly=False
             )
 
-            # Seleccionar hoja origen EXACTA
-            try:
-                hoja_origen = wb_origen.Sheets("PLANTILLA")  # Cambia por el nombre real en la plantilla
-            except:
-                hoja_origen = wb_origen.Sheets(1)  # Primera hoja como fallback
+            # 3.2 Abrir plantilla después
+            wb_origen = excel.Workbooks.Open(
+                plantilla_path,
+                UpdateLinks=0,
+                IgnoreReadOnlyRecommended=True,
+                ReadOnly=False
+            )
 
-            # Copiar hoja al final del libro destino
+            # 3.3 Seleccionar hoja origen EXACTA y activarla
+            try:
+                hoja_origen = wb_origen.Sheets("PLANTILLA")  # Cambia por el nombre real de la hoja
+            except:
+                hoja_origen = wb_origen.Sheets(1)  # Primera hoja si no se encuentra
+            hoja_origen.Activate()
+
+            # 3.4 Copiar hoja al final del libro destino
             hoja_origen.Copy(After=wb_destino.Sheets(wb_destino.Sheets.Count))
             nueva_hoja = wb_destino.Sheets(wb_destino.Sheets.Count)
             nueva_hoja.Name = nombre_hoja
+
+            # 3.5 Guardar cambios
             wb_destino.Save()
             escribir_log(f"Hoja '{nombre_hoja}' creada correctamente desde plantilla.")
 
         finally:
-            # Cerrar libros si están abiertos
+            # Cerrar plantilla primero
             if wb_origen:
                 wb_origen.Close(False)
+            # Cerrar destino
             if wb_destino:
                 wb_destino.Close(True)
             # Cerrar Excel
@@ -1586,7 +1590,7 @@ def preparar_hoja_mes(mes, dia, anio):
             gc.collect()
             time.sleep(0.5)
 
-        # 3. Limpiar y configurar con openpyxl
+        # 4. Limpiar y configurar con openpyxl (tu lógica actual)
         wb2 = openpyxl.load_workbook(RUTA_ENTRADA)
         hoja = wb2[nombre_hoja]
 
