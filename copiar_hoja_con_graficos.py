@@ -111,7 +111,7 @@ def copiar_hoja():
         
         logger.info(f"Abriendo archivo destino: {ruta_destino}")
         wb_destino = excel.Workbooks.Open(
-                os.path.abspath(RUTA_ENTRADA),
+                os.path.abspath(ruta_destino),
                 UpdateLinks=0,
                 IgnoreReadOnlyRecommended=True,
                 ReadOnly=False
@@ -170,14 +170,16 @@ def copiar_hoja():
         raise
     finally:
         try:
-            if 'wb_origen' in locals():
+            if 'wb_origen' in locals() and wb_origen is not None:
                 wb_origen.Close(False)
-            if 'wb_destino' in locals():
+            if 'wb_destino' in locals() and wb_destino is not None:
                 wb_destino.Close(True)
-            excel.Quit()
-            pythoncom.CoUninitialize()
+            if 'excel' in locals():
+                excel.Quit()
         except Exception as e:
             logger.warning(f"Error al cerrar recursos: {str(e)}")
+        finally:
+            pythoncom.CoUninitialize()
 
 if __name__ == "__main__":
     try:
